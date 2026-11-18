@@ -1,17 +1,26 @@
-"""Windsor Communities: one sitemap of every building nationwide; each page states its address, and its
-floor-plans page names the SightMap unit map."""
+"""Windsor Communities: a sitemap of location pages (one per city), each linking its buildings; each building
+page states its address, and its floor-plans page names the SightMap unit map.
+
+Only the region's location pages are read. Reading every building nationwide to find the local ones made the
+site stop answering properly partway through.
+"""
 
 import re
 
 from .. import fetch
 from . import common
 
-SITEMAP = "https://www.windsorcommunities.com/windsor_properties-sitemap.xml"
-BUILDING = re.compile(r"<loc>\s*(https://www\.windsorcommunities\.com/properties/[^/<\s]+/)\s*</loc>")
+SITEMAP = "https://www.windsorcommunities.com/locations-sitemap.xml"
+LOCATION = re.compile(r"<loc>\s*(https://www\.windsorcommunities\.com/apartments/(?:virginia-[^/<\s]+|maryland-[^/<\s]+|washington-dc)/)\s*</loc>")
+BUILDING = re.compile(r'href="(https://www\.windsorcommunities\.com/properties/[^/"\s]+/)"')
 
 
-def building_urls(sitemap_xml):
-    return list(dict.fromkeys(BUILDING.findall(sitemap_xml)))
+def location_urls(sitemap_xml):
+    return list(dict.fromkeys(LOCATION.findall(sitemap_xml)))
+
+
+def building_urls(location_html):
+    return sorted(set(BUILDING.findall(location_html)))
 
 
 def parse(url, page_html, floorplans_html):
@@ -22,10 +31,17 @@ def parse(url, page_html, floorplans_html):
 
 
 def discover(get, limit=None):
-    """Every Windsor building in DC, Maryland and Virginia. The sitemap does not say where a building is,
-    so each page is read; only buildings in those states get a second request for their unit map."""
+    """Every Windsor building in DC, Maryland and Virginia."""
+    urls = []
+    for location in location_urls(get(SITEMAP).decode("utf-8", "replace")):
+        try:
+            urls += building_urls(get(location).decode("utf-8", "replace"))
+        except fetch.RateLimited:
+            raise
+        except Exception as error:
+            print(f"  skipped {location}: {error!r}")
     found = []
-    for url in building_urls(get(SITEMAP).decode("utf-8", "replace"))[:limit]:
+    for url in list(dict.fromkeys(urls))[:limit]:
         try:
             page = get(url).decode("utf-8", "replace")
             described = common.place(page)

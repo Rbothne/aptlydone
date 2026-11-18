@@ -40,10 +40,13 @@ class CommonTests(unittest.TestCase):
 
 
 class WindsorTests(QuietTestCase):
-    def test_urls(self):
-        urls = windsor.building_urls(fixture("windsor_sitemap.xml"))
-        self.assertEqual(len(urls), 6)
-        self.assertIn(URL, urls)
+    def test_location_pages_for_the_region_only(self):
+        self.assertEqual(sorted(u.split("/apartments/")[1] for u in windsor.location_urls(fixture("windsor_locations.xml"))),
+                         ["maryland-bethesda/", "virginia-arlington/", "washington-dc/"])
+
+    def test_building_links_on_a_location_page(self):
+        self.assertEqual(windsor.building_urls(fixture("windsor_location.html")),
+                         ["https://www.windsorcommunities.com/properties/io-piazza-by-windsor/", URL])
 
     def test_parse(self):
         b = windsor.parse(URL, PAGE, FLOORPLANS)
@@ -60,21 +63,25 @@ class WindsorTests(QuietTestCase):
     def test_parse_without_embed_is_link(self):
         self.assertEqual(windsor.parse(URL, PAGE, "")["platform"], "link")
 
-    def test_discover_only_fetches_floor_plans_for_region_states(self):
+    def test_discover_reads_region_location_pages_then_their_buildings(self):
         self.assertNotEqual(ELSEWHERE, PAGE)
-        other = "https://www.windsorcommunities.com/properties/the-casey/"
+        arlington = "https://www.windsorcommunities.com/apartments/virginia-arlington/"
+        other = "https://www.windsorcommunities.com/properties/io-piazza-by-windsor/"
         asked = []
 
         def get(url):
             asked.append(url)
-            pages = {windsor.SITEMAP: fixture("windsor_sitemap.xml"), URL: PAGE, URL + "floorplans/": FLOORPLANS, other: ELSEWHERE}
+            pages = {windsor.SITEMAP: fixture("windsor_locations.xml"), arlington: fixture("windsor_location.html"),
+                     URL: PAGE, URL + "floorplans/": FLOORPLANS, other: ELSEWHERE}
             if url not in pages:
                 raise fetch.Gone(url)
             return pages[url].encode()
         found = windsor.discover(get)
         self.assertEqual([b["id"] for b in found], ["windsor-courthouse"])
         self.assertIn(URL + "floorplans/", asked)
-        self.assertNotIn(other + "floorplans/", asked)
+        self.assertNotIn(other + "floorplans/", asked)                    # its page says it is in another state
+        self.assertFalse([u for u in asked if "colorado" in u or "georgia" in u])
+        self.assertEqual(len(asked), len(set(asked)))
 
     def test_registered(self):
         self.assertIs(discover.DISCOVERERS["windsor"], windsor.discover)

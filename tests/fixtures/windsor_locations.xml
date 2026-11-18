@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?><?xml-stylesheet type="text/xsl" href="//www.windsorcommunities.com/wp-content/plugins/wordpress-seo/css/main-sitemap.xsl"?>
+<urlset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd http://www.google.com/schemas/sitemap-image/1.1 http://www.google.com/schemas/sitemap-image/1.1/sitemap-image.xsd" xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+	<url>
+		<loc>https://www.windsorcommunities.com/apartments/maryland-bethesda/</loc>
+		<lastmod>2026-07-29T22:01:58+00:00</lastmod>
+		<image:image>
+			<image:loc>https://www.windsorcommunities.com/wp-content/themes/wincommunities/dist/images/favicons/favicon-32x32.png</image:loc>
+		</image:image>
+	</url>
+<url>
+		<loc>https://www.windsorcommunities.com/apartments/virginia-arlington/</loc>
+		<lastmod>2026-07-30T01:03:47+00:00</lastmod>
+		<image:image>
+			<image:loc>https://www.windsorcommunities.com/wp-content/themes/wincommunities/dist/images/favicons/favicon-32x32.png</image:loc>
+		</image:image>
+	</url>
+<url>
+		<loc>https://www.windsorcommunities.com/apartments/washington-dc/</loc>
+		<lastmod>2026-07-30T01:14:30+00:00</lastmod>
+		<image:image>
+			<image:loc>https://www.windsorcommunities.com/wp-content/themes/wincommunities/dist/images/favicons/favicon-32x32.png</image:loc>
+		</image:image>
+	</url>
+<url>
+		<loc>https://www.windsorcommunities.com/apartments/colorado-westminster/</loc>
+		<lastmod>2026-06-03T22:13:00+00:00</lastmod>
+		<image:image>
+			<image:loc>https://www.windsorcommunities.com/wp-content/themes/wincommunities/dist/images/favicons/favicon-32x32.png</image:loc>
+		</image:image>
+	</url>
+<url>
+		<loc>https://www.windsorcommunities.com/apartments/georgia-peachtree-corners/</loc>
+		<lastmod>2026-06-03T22:21:46+00:00</lastmod>
+		<image:image>
+			<image:loc>https://www.windsorcommunities.com/wp-content/themes/wincommunities/dist/images/favicons/favicon-32x32.png</image:loc>
+		</image:image>
+	</url>
+<url>
+		<loc>https://www.windsorcommunities.com/apartments/massachusetts-quincy/</loc>
+		<lastmod>2026-06-03T22:27:17+00:00</lastmod>
+		<image:image>
+			<image:loc>https://www.windsorcommunities.com/wp-content/themes/wincommunities/dist/images/favicons/favicon-32x32.png</image:loc>
+		</image:image>
+	</url>
+</urlset>
