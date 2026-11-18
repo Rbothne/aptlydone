@@ -3,6 +3,7 @@
 import re
 
 from .. import fetch
+from . import common
 from ..readers import ReadError
 from ..readers.camden import page_data
 
@@ -39,7 +40,7 @@ def parse(url, html):
 
 def discover(get, limit=None):
     """Every Camden building in DC, Maryland and Virginia. A building whose page fails is skipped."""
-    found = []
+    found, watch = [], common.Watch()
     for url in building_urls(get(SITEMAP).decode("utf-8", "replace"))[:limit]:
         try:
             building = parse(url, get(url).decode("utf-8", "replace"))
@@ -49,5 +50,8 @@ def discover(get, limit=None):
             print(f"  skipped {url}: {error!r}")
             continue
         if building:
+            watch.ok()
             found.append(building)
+        else:
+            watch.miss(url)
     return found

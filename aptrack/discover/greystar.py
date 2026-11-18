@@ -31,17 +31,18 @@ def parse(url, page_html, site_html):
 
 def discover(get, limit=None):
     """Every Greystar building in DC, Maryland and Virginia."""
-    found = []
+    found, watch = [], common.Watch()
     for url in building_urls(get(SITEMAP).decode("utf-8", "replace"))[:limit]:
         try:
             page = get(url).decode("utf-8", "replace")
+            if not common.place(page):
+                watch.miss(url)
+                continue
+            watch.ok()
             own = website(page)
-            building = parse(url, page, common.own_site_html(get, own) if own else "")
+            found.append(parse(url, page, common.own_site_html(get, own) if own else ""))
         except fetch.RateLimited:
             raise
         except Exception as error:
             print(f"  skipped {url}: {error!r}")
-            continue
-        if building:
-            found.append(building)
     return found

@@ -1,8 +1,14 @@
 """Turning what the discoverers found into the building list: merge with last time, then locate each building."""
 
+import concurrent.futures
+import time
+
 from . import geo
 
 MISS_LIMIT = 3                 # a building absent from this many discoveries in a row is dropped
+SHRINK = 0.5                   # a company listing under this share of its known buildings is not believed...
+SMALL = 4                      # ...unless it had fewer buildings than this to begin with
+RETRY_WAIT = 60                # seconds before going back to companies whose sites stopped answering
 KEPT = ("first_seen", "state", "county", "tract", "neighborhood", "zip", "in_region")
 
 
@@ -13,6 +19,13 @@ def merge(previous, found, day, partial=False):
     means a building that was not found is not counted as missing.
     """
     before = {b["id"]: b for b in previous}
+    found = dict(found)
+    if not partial:
+        for manager, buildings in found.items():
+            known = sum(1 for b in previous if b["manager"] == manager)
+            if buildings is not None and known >= SMALL and len(buildings) < SHRINK * known:
+                print(f"{manager}: found {len(buildings)} of {known} known buildings; not believing it, keeping what was known")
+                found[manager] = None
     merged = {}
     for manager, buildings in found.items():
         if buildings is None:
@@ -37,6 +50,29 @@ def merge(previous, found, day, partial=False):
         elif old.get("missed", 0) + 1 < MISS_LIMIT:
             merged[old["id"]] = dict(old, missed=old.get("missed", 0) + 1)
     return sorted(merged.values(), key=lambda b: b["id"])
+
+
+def run_all(managers, discoverers, get, limit=None, workers=4, sleep=time.sleep):
+    """{manager name: buildings found, or None when its discovery failed}. Companies are read side by side; one
+    whose site fails or stops answering is left alone, and come back to once after the others are done."""
+    def attempt(manager):
+        try:
+            return discoverers[manager["discover"]](get, limit=limit)
+        except Exception as error:
+            print(f"{manager['name']}: discovery failed: {error!r}")
+            return None
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+        found = dict(zip((m["name"] for m in managers), pool.map(attempt, managers)))
+    failed = [m for m in managers if found[m["name"]] is None]
+    if failed:
+        print(f"Coming back to {', '.join(m['name'] for m in failed)} in {RETRY_WAIT}s")
+        sleep(RETRY_WAIT)
+        for manager in failed:
+            found[manager["name"]] = attempt(manager)
+            if found[manager["name"]] is None:
+                print(f"{manager['name']}: still failing; keeping its buildings as they were")
+    return found
 
 
 def in_region(building, counties):

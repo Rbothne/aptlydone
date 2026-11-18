@@ -40,12 +40,16 @@ def discover(get, limit=None):
             raise
         except Exception as error:
             print(f"  skipped {location}: {error!r}")
-    found = []
+    found, watch = [], common.Watch()
     for url in list(dict.fromkeys(urls))[:limit]:
         try:
             page = get(url).decode("utf-8", "replace")
             described = common.place(page)
-            if not described or described["address"]["state"] not in common.REGION_STATES:
+            if not described:
+                watch.miss(url)
+                continue
+            watch.ok()
+            if described["address"]["state"] not in common.REGION_STATES:
                 continue
             try:
                 floorplans = get(url + "floorplans/").decode("utf-8", "replace")

@@ -24,7 +24,9 @@ Status: tracking, true monthly cost, deal tags, the page, area data (census, cri
 ## Rules the tracking follows
 
 - Nothing about a building is typed in by hand. A fact that cannot be collected automatically is left blank.
-- At most one request per second per site. A site that answers "too many requests" is left alone and tried once more at the end of the run.
+- At most one request per second per site.
+- A site that stops answering is not hammered. When a site says "too many requests", or fails three times in a row (timeouts, errors, or pages that load without their data), the run leaves it alone, carries on with the other sites, and comes back to it once at the end after a minute's wait. If it is still silent then, its buildings keep yesterday's units and are marked stale.
+- Discovery works the same way: a company whose site fails or starts returning empty pages is come back to once after the others. A company that suddenly lists under half the buildings it had is not believed, and its known buildings are kept.
 - A failed read changes nothing: the building keeps its previous units and is marked stale. Units are marked gone only when a successful read no longer lists them.
 - A run that would leave under 80% of the previous unit records stops without saving.
 - Days are UTC dates. Two runs on one day keep one price point for that day, holding the later price.

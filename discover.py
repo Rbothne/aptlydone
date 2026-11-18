@@ -9,7 +9,6 @@ after three discoveries in a row without it.
 """
 
 import argparse
-import concurrent.futures
 import os
 
 from aptrack import discovery, fetch, files
@@ -18,14 +17,6 @@ from aptrack.discover import DISCOVERERS
 ROOT = os.path.dirname(os.path.abspath(__file__))
 BUILDINGS = os.path.join(ROOT, "data", "buildings.json")
 OSM_AGENT = {"User-Agent": "aptrack/0.1 (personal apartment price tracker)"}    # OpenStreetMap asks apps to name themselves
-
-
-def run_manager(manager, get, limit):
-    try:
-        return DISCOVERERS[manager["discover"]](get, limit=limit)
-    except Exception as error:
-        print(f"{manager['name']}: discovery failed, keeping its buildings as they were: {error!r}")
-        return None
 
 
 def main():
@@ -41,9 +32,7 @@ def main():
         parser.error(f"no company named {args.only!r} in managers.json")
     get = fetch.polite(settings["delay_seconds"])
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=settings["workers"]) as pool:
-        jobs = {m["name"]: pool.submit(run_manager, m, get, args.limit) for m in managers}
-        found = {name: job.result() for name, job in jobs.items()}
+    found = discovery.run_all(managers, DISCOVERERS, get, limit=args.limit, workers=settings["workers"])
 
     buildings = discovery.merge(files.load(BUILDINGS, []), found, files.today(), partial=bool(args.limit))
     discovery.locate_all(buildings, get, settings["counties"], osm_get=lambda url: get(url, headers=OSM_AGENT))

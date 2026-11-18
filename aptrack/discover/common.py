@@ -11,6 +11,26 @@ SIGHTMAP_EMBED = re.compile(r"https:\\?/\\?/sightmap\.com\\?/embed\\?/(\w+)")
 REGION_STATES = ("DC", "MD", "VA")
 
 
+class Watch:
+    """Notices a site that has stopped answering properly: page after page loads but lacks what it should hold
+    (a block page, say). After LIMIT such pages in a row it raises, so the caller stops asking and the company
+    is come back to later, instead of quietly concluding that the company has few buildings."""
+
+    LIMIT = 4
+
+    def __init__(self, limit=None):
+        self.limit = limit or self.LIMIT
+        self.misses = 0
+
+    def ok(self):
+        self.misses = 0
+
+    def miss(self, url):
+        self.misses += 1
+        if self.misses >= self.limit:
+            raise fetch.RateLimited(f"{self.misses} pages in a row without their data, last {url}")
+
+
 def ld_nodes(page_html):
     """Every schema.org object embedded in a page."""
     for block in LD_JSON.findall(page_html or ""):

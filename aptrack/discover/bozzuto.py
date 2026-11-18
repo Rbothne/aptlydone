@@ -24,7 +24,7 @@ def parse(url, page_html, floorplans_html):
 
 def discover(get, limit=None):
     """Every Bozzuto building in DC, Maryland and Virginia. A building whose pages fail is skipped."""
-    found = []
+    found, watch = [], common.Watch()
     for url in building_urls(get(SITEMAP).decode("utf-8", "replace"))[:limit]:
         try:
             page = get(url).decode("utf-8", "replace")
@@ -39,5 +39,8 @@ def discover(get, limit=None):
             print(f"  skipped {url}: {error!r}")
             continue
         if building:
+            watch.ok()
             found.append(building)
+        else:
+            watch.miss(url)
     return found

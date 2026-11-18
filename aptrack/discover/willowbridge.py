@@ -48,12 +48,16 @@ def parse(url, page_html, site_html):
 
 def discover(get, limit=None):
     """Every Willow Bridge building in DC, Maryland and Virginia."""
-    found = []
+    found, watch = [], common.Watch()
     for url in building_urls(get(SITEMAP).decode("utf-8", "replace"))[:limit]:
         try:
             page = get(url).decode("utf-8", "replace")
             place = described(page)
-            if not place or place["address"]["state"] not in common.REGION_STATES:
+            if not place:
+                watch.miss(url)
+                continue
+            watch.ok()
+            if place["address"]["state"] not in common.REGION_STATES:
                 continue
             own = website(page)
             found.append(parse(url, page, common.own_site_html(get, own) if own else ""))
