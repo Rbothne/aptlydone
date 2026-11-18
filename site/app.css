@@ -88,6 +88,7 @@ main { padding: 14px 16px 30px; max-width: 1180px; margin: 0 auto; }
 .tag.absolute { background: var(--steal); color: #fff; }
 .tag.building { background: var(--accent); color: var(--bg); }
 .tag.local { border: 1px solid var(--value); color: var(--value); }
+.tag.check { border: 1px dashed var(--warn); color: var(--warn); cursor: help; }
 .note { font-size: 11px; border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; margin-left: 6px; color: var(--muted); white-space: nowrap; }
 .price b { font-size: 16px; font-variant-numeric: tabular-nums; }
 .price small, .vs, .when { font-size: 12.5px; }

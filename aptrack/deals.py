@@ -11,6 +11,8 @@ BUILDING_STEAL = 15          # percent below similar units in the same building
 LOCAL_VALUE = 20             # percent below similar units in nearby buildings
 ABSOLUTE_OWN = 10            # ABSOLUTE STEAL needs both of these
 ABSOLUTE_LOCAL = 15
+SUSPECT_OWN = 30             # this far under its own building is "check the price", not a steal: usually an
+                             # income-restricted unit the source did not label, or a data error
 OWN_SIZE_BAND = 0.20         # "similar size" inside a building
 LOCAL_SIZE_BAND = 0.15       # ...and across buildings, where layouts differ more
 OWN_MIN = 3                  # similar units needed for a building comparison
@@ -65,6 +67,8 @@ def percent(unit, others):
 
 
 def tag_for(own, local):
+    if own and own["pct"] <= -SUSPECT_OWN:
+        return "check"
     if own and local and own["pct"] <= -ABSOLUTE_OWN and local["pct"] <= -ABSOLUTE_LOCAL:
         return "absolute"
     if own and own["pct"] <= -BUILDING_STEAL:

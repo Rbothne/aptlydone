@@ -265,3 +265,16 @@ test("no-go ZIP codes hide their buildings; a building with no ZIP is never hidd
   assert.equal(unitMatches(unit(), building({ zip: "20002" }), f()), true);
   assert.equal("nogo" in DEFAULT_FILTERS, false);          // it is a standing choice, not a filter that Reset clears
 });
+
+test("a unit marked for checking is not a steal: not in tagged-only, not a top pick, and labelled", async () => {
+  const { isSteal, tagLabel: label, compareUnits: compare, mapPoints: points } = await import("../../site/js/logic.js");
+  assert.equal(label("check"), "Check price");
+  assert.equal(isSteal("check"), false);
+  assert.equal(isSteal("local"), true);
+  assert.equal(isSteal(null), false);
+  assert.equal(unitMatches(unit({ tag: "check" }), building(), f({ tagged: true })), false);
+  const units = [unit({ id: "check", tag: "check", own: { pct: -45 } }), unit({ id: "local", tag: "local" }), unit({ id: "plain", own: { pct: -5 } })];
+  assert.deepEqual(units.sort(compare("picks")).map((u) => u.id), ["local", "plain", "check"]);
+  const groups = groupBuildings([building({ id: "A", lat: 1, lon: 1 })], { A: [unit({ id: "A:1", building: "A", tag: "check" })] }, f());
+  assert.equal(points(groups)[0].tag, null);
+});

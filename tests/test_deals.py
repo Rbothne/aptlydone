@@ -122,6 +122,14 @@ class AbsoluteTests(unittest.TestCase):
         deals.score(block("A", 2000) + [mine], [b("A")])
         self.assertEqual(mine["tag"], "building")
 
+    def test_a_price_too_far_under_its_building_is_marked_for_checking_not_as_a_steal(self):
+        # 30% or more under identical neighbours is usually an income-restricted unit or a data error
+        suspect, real = u("A", 8, 1400), u("A", 9, 1402)
+        units = block("A", 2000, count=5) + block("B", 2500, count=2) + block("C", 2500, count=2) + block("D", 2500, count=1) + [suspect, real]
+        deals.score(units, [b("A"), b("B", 0.3), b("C", 0.5), b("D", 0.9)])
+        self.assertEqual((suspect["own"]["pct"], suspect["tag"]), (-30.0, "check"))
+        self.assertEqual((real["own"]["pct"], real["tag"]), (-29.9, "absolute"))
+
 
 class ExclusionTests(unittest.TestCase):
     def test_restricted_units_are_not_scored_or_used(self):

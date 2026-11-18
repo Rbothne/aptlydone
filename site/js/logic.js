@@ -7,7 +7,12 @@ export const DEFAULT_FILTERS = Object.freeze({
 
 export const GROUND_FLOORS = [0, 1];          // buildings number the ground floor either way
 const TAG_ORDER = { absolute: 0, building: 1, local: 2 };
-const TAG_LABELS = { absolute: "Absolute steal", building: "Building steal", local: "Local value" };
+const TAG_LABELS = { absolute: "Absolute steal", building: "Building steal", local: "Local value", check: "Check price" };
+
+/** The three steal tags. "check" is not one: it marks a price too low to believe without asking. */
+export function isSteal(tag) {
+  return tag in TAG_ORDER;
+}
 
 /** What a unit costs per month for comparing: the true monthly cost, or the rent when that is unknown. */
 export function cost(unit) {
@@ -35,7 +40,7 @@ export function unitMatches(unit, building, filters) {
   if (filters.laundry && building.laundry !== "in_unit") return false;
   if (filters.parking && building.parking_from == null) return false;
   if (filters.pets && building.pets !== true) return false;
-  if (filters.tagged && !unit.tag) return false;
+  if (filters.tagged && !isSteal(unit.tag)) return false;
   if (filters.maxViolent != null && !(building.crime && building.crime.violent <= filters.maxViolent)) return false;
   if (filters.maxDrive != null && !(building.drive != null && building.drive <= filters.maxDrive)) return false;
   if (filters.minRating != null && !(building.rating != null && building.rating >= filters.minRating)) return false;
@@ -73,7 +78,7 @@ function chain(...comparisons) {
 const costPerSqft = (u) => (cost(u) != null && u.sqft ? cost(u) / u.sqft : null);
 
 const SORTS = {
-  picks: chain(by((u) => TAG_ORDER[u.tag] ?? 3), by((u) => u.own?.pct), by(costPerSqft)),
+  picks: chain(by((u) => (u.tag === "check" ? 4 : TAG_ORDER[u.tag] ?? 3)), by((u) => u.own?.pct), by(costPerSqft)),
   cost: by(cost),
   ppsf: by(costPerSqft),
   own: by((u) => u.own?.pct),
@@ -106,7 +111,7 @@ export function mapPoints(groups) {
     .map(({ building, units, best }) => ({
       id: building.id, name: building.name, lat: building.lat, lon: building.lon, building,
       count: units.length, best: best[0],
-      tag: units.reduce((top, unit) => ((TAG_ORDER[unit.tag] ?? 3) < (TAG_ORDER[top] ?? 3) ? unit.tag : top), null),
+      tag: units.reduce((top, unit) => (isSteal(unit.tag) && (TAG_ORDER[unit.tag] ?? 3) < (TAG_ORDER[top] ?? 3) ? unit.tag : top), null),
     }));
 }
 

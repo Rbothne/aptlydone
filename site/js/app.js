@@ -1,7 +1,7 @@
 // Loads the data files and draws the page. Every decision (what matches, what order, what words) is in logic.js.
 
 import {
-  DEFAULT_FILTERS, ago, areaFacts, availability, cost, crimeText, driveLabel, mapPoints, groupBuildings, money, perSqft, shortDate, sparkline, tagLabel, tagReason, unitMatches,
+  DEFAULT_FILTERS, ago, areaFacts, availability, cost, crimeText, driveLabel, isSteal, mapPoints, groupBuildings, money, perSqft, shortDate, sparkline, tagLabel, tagReason, unitMatches,
 } from "./logic.js";
 import { driveTimes, geocode } from "./commute.js";
 import { createStore } from "./store.js";
@@ -65,7 +65,7 @@ const plural = (n, word) => `${n.toLocaleString("en-US")} ${word}${n === 1 ? "" 
 function address(building) {
   const a = building.address || {};
   if (a.full) return a.full;
-  return [a.city, [a.state, a.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  return [a.city, [a.state, building.zip || a.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
 }
 
 // ---------- unit rows ----------
@@ -88,7 +88,10 @@ function unitRow(unit, building, listed = true) {
       onclick: (event) => { event.stopPropagation(); store.toggleStar(unit, building); draw(); },
     }, starred ? "★" : "☆"),
     h("div", { class: "what" },
-      unit.tag && h("span", { class: `tag ${unit.tag}` }, tagLabel(unit.tag)),
+      unit.tag && h("span", {
+        class: `tag ${unit.tag}`,
+        title: unit.tag === "check" ? "30% or more under similar units in its own building. That is usually an income-restricted unit the building did not label, or a mistake. Ask before counting on it." : null,
+      }, tagLabel(unit.tag)),
       h("b", null, `#${unit.unit}`), " · ",
       [bedsLabel(unit.beds), unit.baths != null && `${unit.baths} bath`, unit.sqft && `${unit.sqft.toLocaleString("en-US")} sqft`,
         unit.floor != null && `floor ${unit.floor}`].filter(Boolean).join(" · "),
@@ -242,7 +245,7 @@ function noPrices() {
 function drawBuildings() {
   const groups = groupBuildings(state.index, state.units, active(), BEST);
   const matching = groups.reduce((n, group) => n + group.units.length, 0);
-  const tagged = groups.reduce((n, group) => n + group.units.filter((u) => u.tag).length, 0);
+  const tagged = groups.reduce((n, group) => n + group.units.filter((u) => isSteal(u.tag)).length, 0);
   $("count").replaceChildren(
     state.updated ? `Updated ${ago(state.updated)} · ` : "",
     h("b", null, plural(groups.length, "building")), " · ", h("b", null, plural(matching, "unit")), " match",
