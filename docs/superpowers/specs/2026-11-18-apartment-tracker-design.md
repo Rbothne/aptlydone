@@ -374,3 +374,17 @@ The Luxury / Standard tier from section 6 is dropped. Each building gets a rank 
 - **Map view.** A tab showing each matching building as a dot coloured by its best tag, with the work place marked.
 - **No-go regions, first version.** A ZIP code is marked no-go from any building card or map popup and hidden everywhere until removed. Clicking ZIP areas on the map is still to come.
 - **More filters:** minimum rating, managed by, violent crime nearby (slider), maximum drive (slider).
+
+## 17. Decisions made while the owner was away (2026-11-18, afternoon)
+
+The owner asked for these to be decided and published without check-ins; each is also listed in plain language in `site/changelog.html`.
+
+- **Companies:** AvalonBay (its own reader; promotions are attached to the units they apply to, so they count in the true monthly cost) and WC Smith (a RentPress site, which prices per floor plan: one entry per available floor plan, with a count). Seven companies in all.
+- **Crime:** readers for Prince George's and Fairfax counties, and Arlington for the last year it published locations (mid-2021 to mid-2022, labelled as such). No open incident data with locations was found for Alexandria, Howard, Loudoun, Anne Arundel, Prince William, Falls Church or Manassas Park.
+- **Check price:** a unit 30% or more under similar units in its own building, or 40% or more under similar units nearby, is tagged "check", never a steal. Constants `SUSPECT_OWN` and `SUSPECT_LOCAL` in `deals.py`.
+- **Income-restricted buildings:** in DC, a building standing on a completed project in the city's affordable-housing list where at least half the units are affordable is treated as income-restricted. Any match shows the city's unit counts on the building.
+- **"High-end for its area"** is the label for a building whose one-bedroom cost per sqft is in the top third of buildings within two miles. The three buildings the owner named (The Earl, The Wendy, Windsor Courthouse) rank at 89, 78 and 96.
+- **Following a building** remembers the bedroom, size and price filters in force at that moment and shows what fits them each day.
+- **First-visit setup** asks for bedrooms, size, budget, move-in date, work address, longest drive and income. Income only drives a "needs income of $X" note (rent above a third of monthly income).
+- **Sturdiness:** a site that stops answering is left alone after three failures in a row and come back to once, at the default speed; the same for a manager's facts pages and for discovery; a company that suddenly lists under half its buildings is not believed.
+- **Speed:** SightMap and Bozzuto are read at four requests a second after a ramp test; everything else stays at one.
