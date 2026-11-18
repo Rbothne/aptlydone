@@ -1,0 +1,29 @@
+name: Find buildings
+
+on:
+  schedule:
+    - cron: "40 9 * * 1"        # Mondays, about 4:40 am Eastern
+  workflow_dispatch:
+
+permissions:
+  contents: write               # to replace the data branch
+
+concurrency:                    # shared with the unit tracking, so the two never race on the data branch
+  group: tracking
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get the latest data
+        run: bash .github/scripts/data-branch.sh load || true
+
+      - name: Find buildings
+        run: python3 discover.py
+
+      - name: Save the data
+        run: bash .github/scripts/data-branch.sh save

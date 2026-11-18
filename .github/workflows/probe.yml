@@ -1,0 +1,23 @@
+name: Probe
+
+# Can GitHub's servers read the building sites? Run this by hand ("Run workflow") before relying on the
+# schedule. It reads one building per listing system and saves nothing.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get a few buildings to try
+        run: bash .github/scripts/data-branch.sh load || python3 discover.py --limit 3
+
+      - name: Read one building per listing system
+        run: python3 build.py --probe

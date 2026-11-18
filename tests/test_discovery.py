@@ -3,6 +3,7 @@ import os
 import unittest
 from urllib.parse import quote
 
+from tests.quiet import QuietTestCase
 from aptrack import discover, discovery, fetch, geo
 from aptrack.discover import bozzuto, camden
 
@@ -38,7 +39,7 @@ class Web:
         return answer.encode() if isinstance(answer, str) else answer
 
 
-class BozzutoTests(unittest.TestCase):
+class BozzutoTests(QuietTestCase):
     def test_bozzuto_urls_only_building_pages(self):
         urls = bozzuto.building_urls(fixture("bozzuto_sitemap.xml"))
         self.assertEqual(len(urls), 8)                         # 3 DC, 3 MD, 2 VA
@@ -174,7 +175,7 @@ class MergeTests(unittest.TestCase):
         self.assertNotIn("feed_api", m)
 
 
-class LocateAllTests(unittest.TestCase):
+class LocateAllTests(QuietTestCase):
     def setUp(self):
         self.calls = []
 

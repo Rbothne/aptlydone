@@ -1,0 +1,73 @@
+name: Track units
+
+on:
+  schedule:
+    - cron: "20 11 * * *"       # about 6:20 am Eastern: after buildings push the day's prices
+    - cron: "20 23 * * *"       # about 6:20 pm Eastern: catch same-day changes
+  workflow_dispatch:
+  push:                         # a change to the page republishes it; a change to the code or the companies rebuilds
+    branches: [main]
+    paths: ["site/**", "aptrack/**", "build.py", "managers.json", ".github/workflows/update.yml", ".github/scripts/**"]
+
+permissions:
+  contents: write               # to replace the data branch
+  pages: write                  # to publish the site
+  id-token: write               # required by the Pages deploy action
+
+concurrency:                    # one run at a time, shared with discovery, so two never race on the data branch
+  group: tracking
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # A push that only touches site/ republishes the page without reading any building.
+      - name: Decide what to run
+        run: |
+          python3 - >> "$GITHUB_ENV" <<'EOF'
+          import json, os, subprocess
+          event, e = os.environ["GITHUB_EVENT_NAME"], json.load(open(os.environ["GITHUB_EVENT_PATH"]))
+          rebuild = True
+          if event == "push":
+              try:
+                  subprocess.run(["git", "fetch", "-q", "--depth=1", "origin", e["before"]], check=True)
+                  changed = subprocess.run(["git", "diff", "--name-only", e["before"], "HEAD"], check=True,
+                                           capture_output=True, text=True).stdout.split()
+                  rebuild = any(not path.startswith("site/") for path in changed)
+              except Exception:
+                  rebuild = True             # can't tell: rebuild to be safe
+          print(f"REBUILD={'true' if rebuild else 'false'}")
+          EOF
+
+      - name: Get the latest data
+        run: |
+          if bash .github/scripts/data-branch.sh load; then echo "HAVE_DATA=true" >> "$GITHUB_ENV"
+          else echo "HAVE_DATA=false" >> "$GITHUB_ENV"; fi
+
+      - name: Find buildings (first run only)
+        if: env.HAVE_DATA == 'false'
+        run: python3 discover.py
+
+      # build.py refuses to save (and fails this step) when the new history has under 80% of the old unit
+      # records, so a bad run never replaces good history; the site keeps the previous data until the next run.
+      - name: Read units and update history
+        if: env.REBUILD == 'true' || env.HAVE_DATA == 'false'
+        run: python3 build.py
+
+      - name: Save the data
+        if: env.REBUILD == 'true' || env.HAVE_DATA == 'false'
+        run: bash .github/scripts/data-branch.sh save
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

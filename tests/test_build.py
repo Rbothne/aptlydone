@@ -3,6 +3,7 @@ import os
 import tempfile
 import unittest
 
+from tests.quiet import QuietTestCase
 import build
 from aptrack import fetch, history, output
 
@@ -56,7 +57,7 @@ class Web:
 GOOD = {API: fixture("sightmap_feed.json"), CAMDEN_FEED: fixture("camden_available.html")}
 
 
-class RunTests(unittest.TestCase):
+class RunTests(QuietTestCase):
     def run_it(self, buildings, pages, state=None):
         self.state = state or history.new_state()
         self.web = Web(pages)
@@ -117,7 +118,7 @@ class TotalsTests(unittest.TestCase):
         self.assertEqual(build.totals(state, DAY), {"listed": 3, "new": 1, "gone": 1, "changed": 1})
 
 
-class WriteSiteTests(unittest.TestCase):
+class WriteSiteTests(QuietTestCase):
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.dir.cleanup)
