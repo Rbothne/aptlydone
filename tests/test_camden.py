@@ -6,7 +6,8 @@ import unittest
 from aptrack.readers import READERS, ReadError, camden
 
 HERE = os.path.join(os.path.dirname(__file__), "fixtures")
-HTML = open(os.path.join(HERE, "camden_available.html"), encoding="utf-8").read()
+with open(os.path.join(HERE, "camden_available.html"), encoding="utf-8") as f:
+    HTML = f.read()
 B = {"id": "camden-camden-noma", "url": "https://www.camdenliving.com/apartments/washington-dc/camden-noma",
      "platform": "camden", "feed": "https://www.camdenliving.com/apartments/washington-dc/camden-noma/available-apartments"}
 

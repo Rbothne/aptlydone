@@ -50,6 +50,11 @@ class GetTests(unittest.TestCase):
         fetch.get("https://x.test/a", opener=op)
         self.assertIn("Mozilla", op.requests[0].get_header("User-agent"))
 
+    def test_extra_headers_replace_the_defaults(self):
+        op = Opener(b"ok")
+        fetch.get("https://x.test/a", opener=op, headers={"User-Agent": "aptrack/0.1"})
+        self.assertEqual(op.requests[0].get_header("User-agent"), "aptrack/0.1")
+
     def test_404_raises_gone(self):
         op = Opener(404)
         with self.assertRaises(fetch.Gone):
@@ -89,6 +94,20 @@ class ThrottleTests(unittest.TestCase):
         throttle.wait("https://a.test/1")
         throttle.wait("https://b.test/1")
         self.assertLess(time.monotonic() - start, 0.4)
+
+
+class PoliteTests(unittest.TestCase):
+    def test_polite_get_fetches_and_spaces_requests_to_one_host(self):
+        op = Opener(b"one", b"two")
+        get = fetch.polite(0.2, opener=op)
+        start = time.monotonic()
+        self.assertEqual((get("https://a.test/1"), get("https://a.test/2")), (b"one", b"two"))
+        self.assertGreaterEqual(time.monotonic() - start, 0.2)
+
+    def test_polite_get_passes_headers_through(self):
+        op = Opener(b"ok")
+        fetch.polite(0, opener=op)("https://a.test/1", headers={"User-Agent": "aptrack/0.1"})
+        self.assertEqual(op.requests[0].get_header("User-agent"), "aptrack/0.1")
 
 
 if __name__ == "__main__":

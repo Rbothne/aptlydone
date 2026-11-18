@@ -7,8 +7,13 @@ from aptrack import fetch, units
 from aptrack.readers import READERS, ReadError, sightmap
 
 HERE = os.path.join(os.path.dirname(__file__), "fixtures")
-EMBED = open(os.path.join(HERE, "sightmap_embed.html"), encoding="utf-8").read()
-FEED_TEXT = open(os.path.join(HERE, "sightmap_feed.json"), encoding="utf-8").read()
+def fixture(name):
+    with open(os.path.join(HERE, name), encoding="utf-8") as f:
+        return f.read()
+
+
+EMBED = fixture("sightmap_embed.html")
+FEED_TEXT = fixture("sightmap_feed.json")
 FEED = json.loads(FEED_TEXT)
 API = "https://sightmap.com/app/api/v1/rxwj9mldp1e/sightmaps/27596"
 B = {"id": "bozzuto-5333-connecticut", "url": "https://www.bozzuto.com/apartments-for-rent/dc/washington/5333-connecticut",

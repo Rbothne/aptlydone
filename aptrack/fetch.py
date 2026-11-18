@@ -19,12 +19,13 @@ class RateLimited(Exception):
     """The site answered 429. Callers come back later instead of retrying."""
 
 
-def get(url, *, timeout=25, tries=3, opener=urllib.request.urlopen, sleep=time.sleep):
+def get(url, *, timeout=25, tries=3, headers=None, opener=urllib.request.urlopen, sleep=time.sleep):
     """Fetch `url` and return the body as bytes, decompressed if the server gzipped it."""
     request = urllib.request.Request(url, headers={
         "User-Agent": USER_AGENT,
         "Accept": "*/*",
         "Accept-Encoding": "gzip",
+        **(headers or {}),
     })
     for attempt in range(tries):
         try:
@@ -61,3 +62,13 @@ class Throttle:
             self._next[host] = at + self.delay
         if at > now:
             time.sleep(at - now)
+
+
+def polite(delay=1.0, **defaults):
+    """A `get(url, **options)` that waits its turn for each host before fetching."""
+    throttle = Throttle(delay)
+
+    def polite_get(url, **options):
+        throttle.wait(url)
+        return get(url, **{**defaults, **options})
+    return polite_get
