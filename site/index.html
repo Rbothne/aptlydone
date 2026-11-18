@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apartment tracker</title>
+<style>
+  :root { color-scheme: light dark; --line: #8884; --muted: #888; }
+  body { font: 15px/1.5 system-ui, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 16px; }
+  h1 { font-size: 1.4rem; margin-bottom: 0; }
+  p.note { color: var(--muted); margin-top: .25rem; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0 2rem; }
+  th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--line); }
+  th.n, td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .stale { color: #c80; }
+  a { color: inherit; }
+</style>
+</head>
+<body>
+<h1>Apartment tracker</h1>
+<p class="note" id="updated">Loading…</p>
+<p class="note">Tracking is running and price history is building up. The full page (filters, deals, map) comes next.</p>
+
+<h2>By county</h2>
+<table id="counties"><thead><tr><th>County</th><th class="n">Buildings</th><th class="n">Units listed</th></tr></thead><tbody></tbody></table>
+
+<h2>Buildings</h2>
+<table id="buildings"><thead><tr><th>Building</th><th>Manager</th><th>Neighborhood</th><th class="n">Units</th><th>Last read</th></tr></thead><tbody></tbody></table>
+
+<script>
+const COUNTY = {
+  "11001": "Washington, DC", "51013": "Arlington, VA", "51510": "Alexandria, VA", "51059": "Fairfax County, VA",
+  "51600": "Fairfax City, VA", "51610": "Falls Church, VA", "51107": "Loudoun, VA", "51153": "Prince William, VA",
+  "51683": "Manassas, VA", "51685": "Manassas Park, VA", "24031": "Montgomery, MD", "24033": "Prince George's, MD",
+  "24027": "Howard, MD", "24003": "Anne Arundel, MD",
+};
+function row(cells) {
+  const tr = document.createElement("tr");
+  for (const [text, cls, href] of cells) {
+    const td = document.createElement("td");
+    if (cls) td.className = cls;
+    if (href) { const a = document.createElement("a"); a.href = href; a.textContent = text; a.rel = "noopener"; td.append(a); }
+    else td.textContent = text;
+    tr.append(td);
+  }
+  return tr;
+}
+fetch("data/index.json").then(r => r.json()).then(data => {
+  const total = Object.values(data.counties).reduce((n, c) => n + c.units, 0);
+  document.getElementById("updated").textContent =
+    `Updated ${data.updated.replace("T", " ").replace("Z", " UTC")} · ${data.buildings.length} buildings · ${total} units listed`;
+  const counties = document.querySelector("#counties tbody");
+  for (const [fips, c] of Object.entries(data.counties).sort((a, b) => b[1].units - a[1].units))
+    counties.append(row([[COUNTY[fips] || fips], [c.buildings, "n"], [c.units, "n"]]));
+  const buildings = document.querySelector("#buildings tbody");
+  for (const b of data.buildings.slice().sort((a, b) => b.units - a.units))
+    buildings.append(row([[b.name, "", b.url], [b.manager], [b.neighborhood || ""], [b.units, "n"],
+                          [b.platform === "link" ? "no readable feed" : (b.read || "not yet") + (b.stale ? " (last try failed)" : ""), b.stale ? "stale" : ""]]));
+}).catch(() => { document.getElementById("updated").textContent = "No data yet: run discover.py and build.py."; });
+</script>
+</body>
+</html>

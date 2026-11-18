@@ -61,7 +61,7 @@ class RunTests(unittest.TestCase):
         self.state = state or history.new_state()
         self.web = Web(pages)
         self.slept = []
-        return build.run(buildings, self.state, self.web, DAY, sleep=self.slept.append)
+        return build.run(buildings, self.state, self.web, DAY, workers=1, sleep=self.slept.append)
 
     def test_run_records_success_and_failure(self):
         results = self.run_it([bozzuto(), camden()], {API: fixture("sightmap_feed.json"), CAMDEN_FEED: OSError("timed out")})
