@@ -3,60 +3,77 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
 <title>Apartment tracker</title>
-<style>
-  :root { color-scheme: light dark; --line: #8884; --muted: #888; }
-  body { font: 15px/1.5 system-ui, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 16px; }
-  h1 { font-size: 1.4rem; margin-bottom: 0; }
-  p.note { color: var(--muted); margin-top: .25rem; }
-  table { border-collapse: collapse; width: 100%; margin: 1rem 0 2rem; }
-  th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--line); }
-  th.n, td.n { text-align: right; font-variant-numeric: tabular-nums; }
-  .stale { color: #c80; }
-  a { color: inherit; }
-</style>
+<link rel="stylesheet" href="app.css">
 </head>
 <body>
-<h1>Apartment tracker</h1>
-<p class="note" id="updated">Loading…</p>
-<p class="note">Tracking is running and price history is building up. The full page (filters, deals, map) comes next.</p>
+<header id="top">
+  <div class="bar">
+    <h1>Apartment tracker</h1>
+    <nav class="tabs" aria-label="Views">
+      <button type="button" data-tab="buildings" aria-pressed="true">Buildings <span class="n" id="n-buildings"></span></button>
+      <button type="button" data-tab="followed" aria-pressed="false">Followed <span class="n" id="n-followed"></span></button>
+    </nav>
+  </div>
 
-<h2>By county</h2>
-<table id="counties"><thead><tr><th>County</th><th class="n">Buildings</th><th class="n">Units listed</th></tr></thead><tbody></tbody></table>
+  <form class="filters" id="filters" autocomplete="off" onsubmit="return false">
+    <input type="search" id="q" placeholder="Building, neighborhood or ZIP" aria-label="Search">
+    <button type="button" class="pill" id="filtersbtn" aria-expanded="false">Filters</button>
 
-<h2>Buildings</h2>
-<table id="buildings"><thead><tr><th>Building</th><th>Manager</th><th>Neighborhood</th><th class="n">Units</th><th>Last read</th></tr></thead><tbody></tbody></table>
+    <span class="chips" id="beds" role="group" aria-label="Bedrooms">
+      <button type="button" data-beds="0" aria-pressed="false">Studio</button>
+      <button type="button" data-beds="1" aria-pressed="false">1 bed</button>
+      <button type="button" data-beds="2" aria-pressed="false">2 bed</button>
+      <button type="button" data-beds="3" aria-pressed="false">3+</button>
+    </span>
 
-<script>
-const COUNTY = {
-  "11001": "Washington, DC", "51013": "Arlington, VA", "51510": "Alexandria, VA", "51059": "Fairfax County, VA",
-  "51600": "Fairfax City, VA", "51610": "Falls Church, VA", "51107": "Loudoun, VA", "51153": "Prince William, VA",
-  "51683": "Manassas, VA", "51685": "Manassas Park, VA", "24031": "Montgomery, MD", "24033": "Prince George's, MD",
-  "24027": "Howard, MD", "24003": "Anne Arundel, MD",
-};
-function row(cells) {
-  const tr = document.createElement("tr");
-  for (const [text, cls, href] of cells) {
-    const td = document.createElement("td");
-    if (cls) td.className = cls;
-    if (href) { const a = document.createElement("a"); a.href = href; a.textContent = text; a.rel = "noopener"; td.append(a); }
-    else td.textContent = text;
-    tr.append(td);
-  }
-  return tr;
-}
-fetch("data/index.json").then(r => r.json()).then(data => {
-  const total = Object.values(data.counties).reduce((n, c) => n + c.units, 0);
-  document.getElementById("updated").textContent =
-    `Updated ${data.updated.replace("T", " ").replace("Z", " UTC")} · ${data.buildings.length} buildings · ${total} units listed`;
-  const counties = document.querySelector("#counties tbody");
-  for (const [fips, c] of Object.entries(data.counties).sort((a, b) => b[1].units - a[1].units))
-    counties.append(row([[COUNTY[fips] || fips], [c.buildings, "n"], [c.units, "n"]]));
-  const buildings = document.querySelector("#buildings tbody");
-  for (const b of data.buildings.slice().sort((a, b) => b.units - a.units))
-    buildings.append(row([[b.name, "", b.url], [b.manager], [b.neighborhood || ""], [b.units, "n"],
-                          [b.platform === "link" ? "no readable feed" : (b.read || "not yet") + (b.stale ? " (last try failed)" : ""), b.stale ? "stale" : ""]]));
-}).catch(() => { document.getElementById("updated").textContent = "No data yet: run discover.py and build.py."; });
-</script>
+    <label>Min sqft <input type="number" id="minSqft" min="0" step="50" inputmode="numeric"></label>
+    <label>Max per month <input type="number" id="maxCost" min="0" step="100" inputmode="numeric"></label>
+    <label>Move in by <input type="date" id="moveBy"></label>
+    <label>Floor <input type="number" id="floorMin" min="0" step="1" placeholder="from" inputmode="numeric" aria-label="Lowest floor">
+      <span aria-hidden="true">–</span>
+      <input type="number" id="floorMax" min="0" step="1" placeholder="to" inputmode="numeric" aria-label="Highest floor"></label>
+
+    <span class="chips" role="group" aria-label="Must have">
+      <button type="button" data-toggle="ground" aria-pressed="false">Ground floor</button>
+      <button type="button" data-toggle="laundry" aria-pressed="false">In-unit laundry</button>
+      <button type="button" data-toggle="parking" aria-pressed="false">Parking</button>
+      <button type="button" data-toggle="pets" aria-pressed="false">Pets</button>
+      <button type="button" data-toggle="tagged" aria-pressed="false">Tagged only</button>
+      <button type="button" data-toggle="showRestricted" aria-pressed="false" title="Income-restricted units and senior housing are hidden unless this is on">Income-restricted &amp; senior</button>
+    </span>
+
+    <label>County <select id="county"><option value="">All</option></select></label>
+    <label>Sort <select id="sort">
+      <option value="picks">Top picks</option>
+      <option value="cost">Lowest monthly cost</option>
+      <option value="ppsf">Lowest cost per sqft</option>
+      <option value="own">Furthest below its building</option>
+      <option value="local">Furthest below nearby buildings</option>
+      <option value="newest">Newest listings</option>
+      <option value="size">Largest</option>
+    </select></label>
+    <button type="button" class="pill" id="reset">Reset</button>
+  </form>
+
+  <p id="count" aria-live="polite">Loading…</p>
+</header>
+
+<main>
+  <section id="buildings"></section>
+  <section id="followed" hidden></section>
+</main>
+
+<footer>
+  <p><b>Monthly cost</b> is the true monthly cost: rent spread over the lease after any free months stated for that unit, plus required
+  monthly fees and required one-time fees spread over the lease. Parking and optional fees are not included.</p>
+  <p><b>Tags</b> compare cost per square foot between units with the same number of bedrooms and a similar size.
+  <b>Building steal</b>: 15% or more below similar units in the same building. <b>Local value</b>: 20% or more below similar units
+  in other buildings within one to two miles. <b>Absolute steal</b>: 10% or more below its building and 15% or more below its neighbors.
+  Prices come from each building's own site and are only as good as what it publishes; check with the building before relying on one.</p>
+</footer>
+
+<script type="module" src="js/app.js"></script>
 </body>
 </html>

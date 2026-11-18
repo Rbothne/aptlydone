@@ -2,7 +2,7 @@
 
 Follows available units at professionally managed apartment buildings across the DC, Maryland and Virginia region and records every price change, so unusually low prices can be spotted against a unit's own history and its neighbors.
 
-Status: tracking (this README) is built. The full page (filters, deal labels, map, commute) is not; `site/index.html` is a status page for now. The design is in `docs/superpowers/specs/`.
+Status: tracking, true monthly cost, deal tags and the page are built. Area data (crime, census, rent trend), the map with no-go regions, and commute are not yet. The design is in `docs/superpowers/specs/`.
 
 ## Files
 
@@ -13,7 +13,10 @@ Status: tracking (this README) is built. The full page (filters, deal labels, ma
   - `discover/`: one module per company (`bozzuto`, `camden`).
   - `readers/`: one module per listing system (`sightmap`, `camden`). Every reader writes the same unit format (`units.py`).
   - `history.py`: what is remembered: a point each time a unit's rent, concession text, quoted lease length or monthly fees change, when a unit appears and disappears, and each floor plan's lowest and median rent over time.
-- `site/`: the page GitHub Pages serves.
+  - `facts/`: one module per company that publishes more about a building on its own page (concession, rating, neighborhood, feature lists), read daily; `laundry.py` works out in-unit laundry from that text.
+  - `costs.py`: true monthly cost (rent after free months, plus required monthly fees, plus required one-time fees spread over the lease) and the reading of concession wording.
+  - `deals.py`: compares each unit's cost per sqft with similar units in its building and in nearby buildings, and tags it. The thresholds are constants at the top of the file.
+- `site/`: the page GitHub Pages serves. `js/logic.js` holds every decision the page makes (what matches the filters, the order, the wording) as plain functions; `js/store.js` keeps filters and followed units in the browser; `js/app.js` loads the data and draws.
 - `.github/workflows/`: `update.yml` reads units twice a day and publishes the page; `discover.yml` finds buildings weekly; `probe.yml` (run by hand) checks that GitHub's servers can read the building sites.
 - The **`data` branch** holds `buildings.json`, `state.json` and `site-data/` as a single commit that each run replaces. On the first of each month the same commit is also kept as `data-YYYY-MM`.
 
@@ -37,6 +40,9 @@ Python 3.12 or later, standard library only.
     py discover.py --limit 3        # a quick try: three buildings per company
     py build.py --probe             # read one building per listing system, write nothing
     py -m unittest discover -s tests -t .
+    node --test "tests/js/*.test.mjs"
+
+To exercise the page in a real browser, copy `tests/js/smoke.html` to `site/_smoke.html`, serve `site/`, and open `/_smoke.html`: it clicks through details, stars and every filter and prints what it saw.
 
 ## Adding a company
 
