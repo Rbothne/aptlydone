@@ -47,6 +47,12 @@ class ZipTests(unittest.TestCase):
         self.assertIsNone(area.zip_code({"address": {"full": "Somewhere"}}))
         self.assertIsNone(area.zip_code({}))
 
+    def test_the_looked_up_zip_wins_and_an_implausible_one_is_ignored(self):
+        # Some managers put the street number where the ZIP belongs. Every ZIP in DC, Maryland and Virginia starts with 2.
+        wrong = {"street": "11410 Reston Station Blvd", "city": "Reston", "state": "VA", "zip": "11410"}
+        self.assertIsNone(area.zip_code({"address": wrong}))
+        self.assertEqual(area.zip_code({"zip": "20190", "address": wrong}), "20190")
+
 
 class CollectTests(QuietTestCase):
     def test_collects_census_crime_and_rent_trend(self):

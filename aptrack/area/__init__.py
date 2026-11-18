@@ -12,10 +12,16 @@ PARTS = ("census", "crime", "rents")
 
 
 def zip_code(building):
-    """A building's 5-digit ZIP code, from its address parts or the end of a one-line address."""
+    """A building's 5-digit ZIP code: the one looked up from its coordinates, else the one in its address.
+
+    Some managers put the street number where the ZIP belongs, so an address ZIP is believed only when it
+    could be one here: every ZIP code in DC, Maryland and Virginia starts with 2.
+    """
+    if building.get("zip"):
+        return building["zip"]
     address = building.get("address") or {}
     match = re.search(r"\b(\d{5})(?:-\d{4})?\s*$", address.get("zip") or address.get("full") or "")
-    return match.group(1) if match else None
+    return match.group(1) if match and match.group(1).startswith("2") else None
 
 
 def collect(buildings, previous, get, today, now, parts=PARTS):

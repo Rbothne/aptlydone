@@ -119,6 +119,11 @@ class GeoTests(unittest.TestCase):
         url = geo.NOMINATIM + "?format=jsonv2&zoom=16&lat=38.960622&lon=-77.072685"
         self.assertEqual(geo.neighborhood(Web({url: fixture("nominatim_reverse.json")}), 38.960622, -77.072685), "Chevy Chase")
 
+    def test_reverse_gives_the_neighborhood_and_the_zip(self):
+        url = geo.NOMINATIM + "?format=jsonv2&zoom=16&lat=38.960622&lon=-77.072685"
+        self.assertEqual(geo.reverse(Web({url: fixture("nominatim_reverse.json")}), 38.960622, -77.072685),
+                         {"neighborhood": "Chevy Chase", "zip": "20015"})
+
     def test_neighborhood_prefers_neighbourhood_then_suburb(self):
         self.assertEqual(geo.pick_name({"suburb": "Northwest", "neighbourhood": "Glover Park", "city": "Washington"}), "Glover Park")
         self.assertEqual(geo.pick_name({"suburb": "Clarendon", "city": "Arlington"}), "Clarendon")
@@ -192,8 +197,8 @@ class LocateAllTests(QuietTestCase):
 
         def name(get, lat, lon):
             names.append((lat, lon))
-            return "NoMa"
-        discovery.locate_all(buildings, None, COUNTIES, locate=self.locate, neighborhood=name)
+            return {"neighborhood": "NoMa", "zip": "20002"}
+        discovery.locate_all(buildings, None, COUNTIES, locate=self.locate, reverse=name)
         return names
 
     def test_in_region(self):
@@ -208,6 +213,12 @@ class LocateAllTests(QuietTestCase):
                          ("11001", "11001010603", True, "NoMa"))
         self.assertEqual(self.calls, [{"lat": 38.9, "lon": -77.0}])
         self.assertEqual(names, [(38.9, -77.0)])
+        self.assertEqual(buildings[0]["zip"], "20002")
+
+    def test_a_named_building_without_a_zip_is_looked_up_once_more(self):
+        buildings = [b("x", tract="11001010603", county="11001", in_region=True, neighborhood="Shaw")]
+        names = self.run_it(buildings)
+        self.assertEqual((names, buildings[0]["neighborhood"], buildings[0]["zip"]), ([(38.9, -77.0)], "Shaw", "20002"))
 
     def test_building_with_only_an_address_gets_coordinates(self):
         buildings = [b("c", lat=None, lon=None, address={"full": "61 Pierce St NE Washington, DC 20002"})]
@@ -226,15 +237,15 @@ class LocateAllTests(QuietTestCase):
         self.assertEqual((buildings[0].get("tract"), buildings[0]["in_region"]), (None, False))
 
     def test_already_located_buildings_are_not_looked_up_again(self):
-        buildings = [b("x", tract="11001010603", county="11001", in_region=True, neighborhood="NoMa")]
-        self.run_it(buildings)
-        self.assertEqual(self.calls, [])
+        buildings = [b("x", tract="11001010603", county="11001", in_region=True, neighborhood="NoMa", zip="20002")]
+        names = self.run_it(buildings)
+        self.assertEqual((self.calls, names), ([], []))
 
     def test_a_lookup_error_leaves_the_building_for_next_time(self):
         def broken(get, **where):
             raise OSError("down")
         buildings = [b("x")]
-        discovery.locate_all(buildings, None, COUNTIES, locate=broken, neighborhood=lambda *a: None)
+        discovery.locate_all(buildings, None, COUNTIES, locate=broken, reverse=lambda *a: {})
         self.assertEqual((buildings[0].get("tract"), buildings[0]["in_region"]), (None, False))
 
 

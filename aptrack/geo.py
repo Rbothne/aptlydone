@@ -33,7 +33,13 @@ def pick_name(address):
     return next((address[key] for key in NAME_KEYS if address.get(key)), None)
 
 
+def reverse(get, lat, lon):
+    """What OpenStreetMap says about a point: {"neighborhood": name or None, "zip": 5 digits or None}."""
+    address = json.loads(get(f"{NOMINATIM}?format=jsonv2&zoom=16&lat={lat}&lon={lon}")).get("address") or {}
+    postcode = (address.get("postcode") or "")[:5]
+    return {"neighborhood": pick_name(address), "zip": postcode if len(postcode) == 5 and postcode.isdigit() else None}
+
+
 def neighborhood(get, lat, lon):
     """The neighborhood (or failing that the town) OpenStreetMap gives for a point."""
-    answer = json.loads(get(f"{NOMINATIM}?format=jsonv2&zoom=16&lat={lat}&lon={lon}"))
-    return pick_name(answer.get("address") or {})
+    return reverse(get, lat, lon)["neighborhood"]

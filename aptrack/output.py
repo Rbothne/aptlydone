@@ -7,7 +7,7 @@ from .area import zip_code
 from .facts import laundry
 
 BUILDING_FIELDS = ("id", "name", "manager", "url", "platform", "address", "lat", "lon", "state", "county", "tract",
-                   "neighborhood", "first_seen")
+                   "neighborhood", "zip", "first_seen")
 FACT_FIELDS = ("special", "rating", "rating_count", "coming_soon", "features", "laundry")
 
 

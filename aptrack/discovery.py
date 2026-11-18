@@ -3,7 +3,7 @@
 from . import geo
 
 MISS_LIMIT = 3                 # a building absent from this many discoveries in a row is dropped
-KEPT = ("first_seen", "state", "county", "tract", "neighborhood", "in_region")
+KEPT = ("first_seen", "state", "county", "tract", "neighborhood", "zip", "in_region")
 
 
 def merge(previous, found, day, partial=False):
@@ -51,8 +51,8 @@ def one_line(address):
     return ", ".join(part for part in parts if part)
 
 
-def locate_all(buildings, get, counties, *, locate=geo.locate, neighborhood=geo.neighborhood, osm_get=None):
-    """Fill in tract, county and neighborhood for buildings that lack them. Lookups that fail are left for next time."""
+def locate_all(buildings, get, counties, *, locate=geo.locate, reverse=geo.reverse, osm_get=None):
+    """Fill in tract, county, neighborhood and ZIP for buildings that lack them. Lookups that fail are left for next time."""
     for building in buildings:
         if not building.get("tract"):
             try:
@@ -66,8 +66,12 @@ def locate_all(buildings, get, counties, *, locate=geo.locate, neighborhood=geo.
             if where:
                 building.update(where)
         building["in_region"] = in_region(building, counties)
-        if building["in_region"] and not building.get("neighborhood"):
+        if building["in_region"] and not (building.get("neighborhood") and building.get("zip")):
             try:
-                building["neighborhood"] = neighborhood(osm_get or get, building["lat"], building["lon"])
+                found = reverse(osm_get or get, building["lat"], building["lon"])
             except Exception as error:
                 print(f"  no neighborhood for {building['id']}: {error!r}")
+                continue
+            for key in ("neighborhood", "zip"):
+                if not building.get(key) and found.get(key):
+                    building[key] = found[key]
