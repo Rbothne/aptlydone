@@ -14,6 +14,24 @@ async function run() {
   for (let i = 0; i < 100 && !doc.querySelector(".unit"); i++) await wait(100);
   const count = () => doc.getElementById("count").textContent;
   const set = (id, value) => { const el = doc.getElementById(id); el.value = value; el.dispatchEvent(new Event("change")); };
+  // first visit: the setup dialog is open; use it, then carry on with a clean slate
+  out.setupOpen = doc.getElementById("setup").open;
+  doc.querySelector('[data-sbeds="1"]').click();
+  doc.getElementById("s-minSqft").value = "700";
+  doc.getElementById("s-maxCost").value = "2600";
+  doc.getElementById("s-income").value = "60000";
+  doc.getElementById("s-go").click();
+  await wait(200);
+  out.setupClosed = !doc.getElementById("setup").open;
+  out.afterSetup = count();
+  out.setupFilters = JSON.parse(win.localStorage.getItem("apt.filters"));
+  out.incomeNote = (doc.querySelector(".unit .note") || {}).textContent || null;
+  out.welcomed = JSON.parse(win.localStorage.getItem("apt.settings")).welcomed;
+  doc.getElementById("reset").click();
+  out.standingChip = [...doc.querySelectorAll(".facts li")].map((li) => li.textContent).find((t) => /for its area/.test(t)) || null;
+  doc.querySelector('[data-toggle="highEnd"]').click();
+  out.highEnd = count();
+  doc.querySelector('[data-toggle="highEnd"]').click();
   out.start = count();
 
   doc.querySelector(".unit").click();

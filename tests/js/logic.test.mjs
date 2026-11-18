@@ -305,3 +305,28 @@ test("parking filter accepts a building that says it has parking without a price
   assert.equal(unitMatches(unit(), building({ parking_from: null, parking: true }), f({ parking: true })), true);
   assert.equal(unitMatches(unit(), building({ parking_from: null, parking: null }), f({ parking: true })), false);
 });
+
+test("price standing: a plain label for where a building sits among its neighbours", async () => {
+  const { standing } = await import("../../site/js/logic.js");
+  assert.equal(standing({ pct: 90, n: 20 }), "High-end for its area");
+  assert.equal(standing({ pct: 67, n: 9 }), "High-end for its area");
+  assert.equal(standing({ pct: 50, n: 9 }), "Mid-priced for its area");
+  assert.equal(standing({ pct: 33, n: 9 }), "Lower-priced for its area");
+  assert.equal(standing(null), "");
+});
+
+test("high-end filter needs a known standing in the top third", () => {
+  assert.equal(DEFAULT_FILTERS.highEnd, false);
+  assert.equal(unitMatches(unit(), building({ rank: { pct: 80, n: 9 } }), f({ highEnd: true })), true);
+  assert.equal(unitMatches(unit(), building({ rank: { pct: 60, n: 9 } }), f({ highEnd: true })), false);
+  assert.equal(unitMatches(unit(), building({ rank: null }), f({ highEnd: true })), false);
+});
+
+test("income rule of thumb: rent should be no more than a third of monthly income", async () => {
+  const { incomeNeeded, affordable } = await import("../../site/js/logic.js");
+  assert.equal(incomeNeeded(unit({ rent: 2500 })), 90000);
+  assert.equal(affordable(unit({ rent: 2500 }), 90000), true);
+  assert.equal(affordable(unit({ rent: 2500 }), 89999), false);
+  assert.equal(affordable(unit({ rent: 2500 }), null), null);
+  assert.equal(affordable(unit({ rent: null }), 90000), null);
+});

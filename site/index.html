@@ -44,6 +44,7 @@
       <button type="button" data-toggle="parking" aria-pressed="false">Parking</button>
       <button type="button" data-toggle="pets" aria-pressed="false">Pets</button>
       <button type="button" data-toggle="tagged" aria-pressed="false">Tagged only</button>
+      <button type="button" data-toggle="highEnd" aria-pressed="false" title="Buildings whose one-bedroom cost per sqft is in the top third of buildings within two miles">High-end</button>
       <button type="button" data-toggle="showRestricted" aria-pressed="false" title="Income-restricted units and senior housing are hidden unless this is on">Income-restricted &amp; senior</button>
     </span>
 
@@ -69,6 +70,7 @@
       <option value="drive">Shortest drive to work</option>
     </select></label>
     <button type="button" class="pill" id="reset">Reset</button>
+    <button type="button" class="pill" id="setupbtn">Setup</button>
 
     <span class="work">
       <label>Work address <input type="text" id="work" placeholder="Street, city, state" autocomplete="off"></label>
@@ -80,6 +82,33 @@
   <p id="count" aria-live="polite">Loading…</p>
   <p id="nogo" hidden></p>
 </header>
+
+<dialog id="setup">
+  <form method="dialog" id="setupform">
+    <h2>Set up your search</h2>
+    <p class="muted">A few answers so the list starts where you would. Skip anything; all of it can be changed later in the bar at the top.
+      Everything stays in this browser.</p>
+    <label>Bedrooms
+      <span class="chips" id="s-beds" role="group">
+        <button type="button" data-sbeds="0" aria-pressed="false">Studio</button>
+        <button type="button" data-sbeds="1" aria-pressed="false">1 bed</button>
+        <button type="button" data-sbeds="2" aria-pressed="false">2 bed</button>
+        <button type="button" data-sbeds="3" aria-pressed="false">3+</button>
+      </span></label>
+    <label>Smallest size <input type="number" id="s-minSqft" min="0" step="50" placeholder="sqft" inputmode="numeric"></label>
+    <label>Most you would pay per month <input type="number" id="s-maxCost" min="0" step="100" placeholder="$" inputmode="numeric"></label>
+    <label>Move in by <input type="date" id="s-moveBy"></label>
+    <label>Work address <input type="text" id="s-work" placeholder="Street, city, state" autocomplete="off"></label>
+    <label>Longest drive to work <input type="number" id="s-maxDrive" min="10" max="90" step="5" placeholder="minutes" inputmode="numeric"></label>
+    <label>Household income per year <input type="number" id="s-income" min="0" step="1000" placeholder="$ (optional)" inputmode="numeric"></label>
+    <p class="muted">Income is used only to flag units whose rent is more than a third of it, the usual rule buildings apply.
+      The work address is sent to OpenStreetMap and a public routing service to time drives without traffic.</p>
+    <div class="actions">
+      <button type="button" class="pill" id="s-skip">Skip</button>
+      <button type="submit" class="pill primary" id="s-go">Show apartments</button>
+    </div>
+  </form>
+</dialog>
 
 <main>
   <section id="buildings"></section>

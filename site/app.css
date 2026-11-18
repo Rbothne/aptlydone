@@ -52,6 +52,15 @@ h1 { font-size: 16px; margin: 0; letter-spacing: .01em; }
   .filters input[type=search] { max-width: none; }
 }
 
+/* ---------- setup ---------- */
+dialog#setup { border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink); padding: 20px 22px; width: min(480px, calc(100vw - 32px)); }
+dialog#setup::backdrop { background: rgb(0 0 0 / 55%); }
+#setup h2 { margin: 0 0 4px; font-size: 18px; }
+#setup form > label { display: grid; grid-template-columns: 1fr; gap: 4px; margin: 12px 0 0; color: var(--muted); }
+#setup input { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; }
+#setup .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.pill.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; }
+
 /* ---------- buildings ---------- */
 main { padding: 14px 16px 30px; max-width: 1180px; margin: 0 auto; }
 .building { background: var(--card); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 14px; overflow: hidden; }

@@ -2,9 +2,10 @@
 
 export const DEFAULT_FILTERS = Object.freeze({
   q: "", beds: [], minSqft: null, maxCost: null, moveBy: null, floorMin: null, floorMax: null, ground: false,
-  laundry: false, parking: false, pets: false, tagged: false, maxViolent: null, maxDrive: null, minRating: null, manager: "", county: "", showRestricted: false, sort: "picks",
+  laundry: false, parking: false, pets: false, tagged: false, highEnd: false, maxViolent: null, maxDrive: null, minRating: null, manager: "", county: "", showRestricted: false, sort: "picks",
 });
 
+export const HIGH_END = 67;                 // a building pricier than this share of its neighbours is "high-end for its area"
 export const GROUND_FLOORS = [0, 1];          // buildings number the ground floor either way
 const TAG_ORDER = { absolute: 0, building: 1, local: 2 };
 const TAG_LABELS = { absolute: "Absolute steal", building: "Building steal", local: "Local value", check: "Check price" };
@@ -41,6 +42,7 @@ export function unitMatches(unit, building, filters) {
   if (filters.parking && building.parking_from == null && building.parking !== true) return false;
   if (filters.pets && building.pets !== true) return false;
   if (filters.tagged && !isSteal(unit.tag)) return false;
+  if (filters.highEnd && !(building.rank && building.rank.pct >= HIGH_END)) return false;
   if (filters.maxViolent != null && !(building.crime && building.crime.violent <= filters.maxViolent)) return false;
   if (filters.maxDrive != null && !(building.drive != null && building.drive <= filters.maxDrive)) return false;
   if (filters.minRating != null && !(building.rating != null && building.rating >= filters.minRating)) return false;
@@ -136,6 +138,25 @@ export function criteriaLabel(criteria) {
   if (c.minSqft != null) parts.push(`${c.minSqft}+ sqft`);
   if (c.maxCost != null) parts.push(`up to ${money(c.maxCost)}`);
   return parts.join(" · ") || "any unit";
+}
+
+/** Where a building's one-bedroom cost per sqft sits among buildings within two miles, in plain words. */
+export function standing(rank) {
+  if (!rank) return "";
+  if (rank.pct >= HIGH_END) return "High-end for its area";
+  if (rank.pct > 100 - HIGH_END) return "Mid-priced for its area";
+  return "Lower-priced for its area";
+}
+
+/** The yearly income most managed buildings ask for: three times the rent, every month. */
+export function incomeNeeded(unit) {
+  return unit.rent == null ? null : unit.rent * 36;
+}
+
+/** true / false against a yearly income, or null when either side is unknown. */
+export function affordable(unit, income) {
+  const needed = incomeNeeded(unit);
+  return needed == null || income == null ? null : income >= needed;
 }
 
 export function tagLabel(tag) {

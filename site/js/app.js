@@ -1,7 +1,8 @@
 // Loads the data files and draws the page. Every decision (what matches, what order, what words) is in logic.js.
 
 import {
-  DEFAULT_FILTERS, ago, areaFacts, availability, cost, crimeText, criteriaFilters, criteriaFrom, criteriaLabel, driveLabel, isSteal, mapPoints, groupBuildings, money, perSqft, shortDate, sparkline, tagLabel, tagReason, unitMatches,
+  DEFAULT_FILTERS, affordable, ago, areaFacts, availability, cost, crimeText, criteriaFilters, criteriaFrom, criteriaLabel, driveLabel, incomeNeeded,
+  isSteal, mapPoints, standing, groupBuildings, money, perSqft, shortDate, sparkline, tagLabel, tagReason, unitMatches,
 } from "./logic.js";
 import { driveTimes, geocode } from "./commute.js";
 import { createStore } from "./store.js";
@@ -23,6 +24,7 @@ const store = createStore(storage);
 const state = {
   updated: null, index: [], byId: {}, units: {}, unitsById: {}, tracts: {}, zips: {}, crimeCounties: [],
   demographics: store.getSetting("demographics", true),
+  income: store.getSetting("income", null),        // yearly household income, used only for the three-times-rent flag
   nogo: store.getSetting("nogo", []),              // ZIP codes the user never wants to see
   work: store.getSetting("work", null),             // {address, lat, lon, label}: kept in this browser only
   filters: store.getFilters(), tab: "buildings", shown: PAGE, expanded: new Set(), open: new Set(),
@@ -97,6 +99,9 @@ function unitRow(unit, building, listed = true) {
         unit.floor != null && `floor ${unit.floor}`].filter(Boolean).join(" · "),
       unit.sqft && unit.sqft < ROOM_SQFT && h("span", { class: "note" }, "room"),
       unit.restricted === true && h("span", { class: "note" }, "income-restricted"),
+      affordable(unit, state.income) === false && h("span", {
+        class: "note", title: "Most managed buildings ask for yearly income of at least 36 times the monthly rent.",
+      }, `needs income of ${money(incomeNeeded(unit))}`),
       !listed && h("span", { class: "note" }, "no longer listed")),
     h("div", { class: "price" },
       h("b", null, money(cost(unit))), h("small", null, "/mo "), h("small", null, perSqft(unit)),
@@ -189,7 +194,7 @@ function facts(building) {
   if (building.drive != null) items.push([driveLabel(building.drive)]);
   const crime = crimeText(building, state.crimeCounties);
   items.push([crime.text, crime.known ? null : "unknown"]);
-  if (building.rank) items.push([`Pricier than ${building.rank.pct}% of ${building.rank.n} buildings within 2 miles`]);
+  if (building.rank) items.push([`${standing(building.rank)} (pricier than ${building.rank.pct}% of ${building.rank.n} buildings within 2 miles)`]);
   if (building.coming_soon) items.push(["Coming soon"]);
   if (building.senior) items.push(["Senior housing"]);
   if (building.stale) items.push([`Latest read failed; showing ${building.read ? shortDate(building.read) : "earlier data"}`, "stale"]);
@@ -517,6 +522,50 @@ function wire() {
   }
 }
 
+// ---------- first-visit setup ----------
+
+function openSetup() {
+  const f = state.filters;
+  for (const button of document.querySelectorAll("[data-sbeds]")) button.setAttribute("aria-pressed", String(f.beds.includes(Number(button.dataset.sbeds))));
+  $("s-minSqft").value = f.minSqft ?? "";
+  $("s-maxCost").value = f.maxCost ?? "";
+  $("s-moveBy").value = f.moveBy || "";
+  $("s-work").value = state.work ? state.work.address : "";
+  $("s-maxDrive").value = f.maxDrive ?? "";
+  $("s-income").value = state.income ?? "";
+  if (typeof $("setup").showModal === "function") $("setup").showModal();
+}
+
+function wireSetup() {
+  for (const button of document.querySelectorAll("[data-sbeds]")) {
+    button.addEventListener("click", () => button.setAttribute("aria-pressed", String(button.getAttribute("aria-pressed") !== "true")));
+  }
+  const number = (id) => ($(id).value === "" ? null : Number($(id).value));
+  const done = () => { store.setSetting("welcomed", true); $("setup").close(); };
+  $("s-skip").addEventListener("click", done);
+  $("setupform").addEventListener("submit", (event) => {
+    event.preventDefault();
+    state.filters.beds = [...document.querySelectorAll('[data-sbeds][aria-pressed="true"]')].map((b) => Number(b.dataset.sbeds));
+    state.filters.minSqft = number("s-minSqft");
+    state.filters.maxCost = number("s-maxCost");
+    state.filters.moveBy = $("s-moveBy").value || null;
+    state.income = number("s-income");
+    store.setSetting("income", state.income);
+    const maxDrive = number("s-maxDrive");
+    const address = $("s-work").value.trim();
+    done();
+    changed();
+    if (address && (!state.work || state.work.address !== address)) {
+      $("work").value = address;
+      timeDrives().then(() => { if (maxDrive != null && state.work) { state.filters.maxDrive = maxDrive; changed(); } });
+    } else if (maxDrive != null && state.work) {
+      state.filters.maxDrive = maxDrive;
+      changed();
+    }
+  });
+  $("setupbtn").addEventListener("click", openSetup);
+}
+
 // ---------- loading ----------
 
 async function getJson(path) {
@@ -528,6 +577,7 @@ async function getJson(path) {
 async function load() {
   if (["#map", "#followed"].includes(location.hash)) state.tab = location.hash.slice(1);      // a link can open a tab
   wire();
+  wireSetup();
   showFilters();
   let index;
   try {
@@ -560,6 +610,7 @@ async function load() {
   store.refreshStars(state.unitsById, state.byId);
   showWork();
   draw();
+  if (!store.getSetting("welcomed", false)) openSetup();
 }
 
 load();
