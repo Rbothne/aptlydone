@@ -2,7 +2,7 @@
 
 export const DEFAULT_FILTERS = Object.freeze({
   q: "", beds: [], minSqft: null, maxCost: null, moveBy: null, floorMin: null, floorMax: null, ground: false,
-  laundry: false, parking: false, pets: false, tagged: false, county: "", showRestricted: false, sort: "picks",
+  laundry: false, parking: false, pets: false, tagged: false, maxViolent: null, maxDrive: null, minRating: null, manager: "", county: "", showRestricted: false, sort: "picks",
 });
 
 export const GROUND_FLOORS = [0, 1];          // buildings number the ground floor either way
@@ -36,6 +36,10 @@ export function unitMatches(unit, building, filters) {
   if (filters.parking && building.parking_from == null) return false;
   if (filters.pets && building.pets !== true) return false;
   if (filters.tagged && !unit.tag) return false;
+  if (filters.maxViolent != null && !(building.crime && building.crime.violent <= filters.maxViolent)) return false;
+  if (filters.maxDrive != null && !(building.drive != null && building.drive <= filters.maxDrive)) return false;
+  if (filters.minRating != null && !(building.rating != null && building.rating >= filters.minRating)) return false;
+  if (filters.manager && building.manager !== filters.manager) return false;
   if (filters.county && building.county !== filters.county) return false;
   const q = filters.q.trim().toLowerCase();
   if (q && !searchable(building).includes(q)) return false;
@@ -75,6 +79,7 @@ const SORTS = {
   local: by((u) => u.local?.pct),
   newest: by((u) => u.first, true),
   size: by((u) => u.sqft, true),
+  drive: by((u) => u.drive),
 };
 
 export function compareUnits(sort) {
@@ -91,6 +96,17 @@ export function groupBuildings(index, unitsByBuilding, filters, bestCount = 5) {
     groups.push({ building, units, best: units.slice(0, bestCount) });
   }
   return groups.sort((a, b) => compare(a.best[0], b.best[0]));
+}
+
+/** One point per building that has coordinates: where it is, its best tag, how many units match, and its best unit. */
+export function mapPoints(groups) {
+  return groups
+    .filter(({ building }) => building.lat != null && building.lon != null)
+    .map(({ building, units, best }) => ({
+      id: building.id, name: building.name, lat: building.lat, lon: building.lon, building,
+      count: units.length, best: best[0],
+      tag: units.reduce((top, unit) => ((TAG_ORDER[unit.tag] ?? 3) < (TAG_ORDER[top] ?? 3) ? unit.tag : top), null),
+    }));
 }
 
 export function tagLabel(tag) {
@@ -111,6 +127,45 @@ export function tagReason(unit) {
     parts.push(`${versus(l.pct)} ${l.n} units in ${l.buildings} buildings within ${l.miles} mile${l.miles === 1 ? "" : "s"}`);
   }
   return parts.join(" · ");
+}
+
+/** The crime line for a building: counts when known, and why not when unknown. */
+export function crimeText(building, crimeCounties) {
+  const crime = building.crime;
+  if (crime) {
+    return { text: `Within ½ mile, past 12 months: ${crime.violent} violent · ${crime.property} property crimes`, known: true };
+  }
+  const covered = (crimeCounties || []).includes(building.county);
+  return { text: covered ? "Crime nearby not counted yet" : "No crime data for this county", known: false };
+}
+
+/** Sentences about the census tract and ZIP code a building is in. Race is included only when asked for. */
+export function areaFacts(tract, trend, zip, showRace) {
+  const lines = [];
+  if (trend && trend.latest != null) {
+    const change = trend.year_change;
+    const moved = change == null ? "" : `, ${change < 0 ? "down" : "up"} ${Math.abs(change)}% in a year`;
+    lines.push(`Typical rent in ZIP ${zip}: ${money(trend.latest)}${moved}`);
+  }
+  if (tract) {
+    if (tract.income != null) lines.push(`Median household income ${money(tract.income)}`);
+    if (tract.rent != null) lines.push(`Median rent paid ${money(tract.rent)}`);
+    if (tract.age != null) lines.push(`Median age ${Math.round(tract.age)}`);
+    if (tract.degree != null) lines.push(`${tract.degree}% of adults have a degree`);
+    if (tract.renters != null) lines.push(`${tract.renters}% of homes are rented`);
+    if (showRace && tract.race) {
+      const r = tract.race;
+      lines.push(`${r.white}% white · ${r.black}% Black · ${r.asian}% Asian · ${r.hispanic}% Hispanic · ${r.other}% other`);
+    }
+  }
+  return lines;
+}
+
+/** "38 min drive to work (no traffic)"; empty when the time is not known. */
+export function driveLabel(minutes) {
+  if (minutes == null) return "";
+  const time = minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
+  return `${time} drive to work (no traffic)`;
 }
 
 export function money(n) {

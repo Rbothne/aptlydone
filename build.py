@@ -23,6 +23,7 @@ from aptrack.readers import READERS
 ROOT = os.path.dirname(os.path.abspath(__file__))
 BUILDINGS = os.path.join(ROOT, "data", "buildings.json")
 STATE = os.path.join(ROOT, "data", "state.json")
+AREA = os.path.join(ROOT, "data", "area.json")      # written by area.py; optional
 SITE_DATA = os.path.join(ROOT, "site", "data")
 FAIL_SHARE = 0.2          # a run where more than this share of buildings fail ends in failure
 RETRY_WAIT = 60          # seconds to wait before going back to sites that said "too many requests"
@@ -165,7 +166,7 @@ def main():
                  "Not saving it.")
     files.save(STATE, state)
     files.save(BUILDINGS, buildings, indent=1)
-    output.write_site(buildings, results, state, SITE_DATA, files.now())
+    output.write_site(buildings, results, state, SITE_DATA, files.now(), area=files.load(AREA, None))
 
     count = totals(state, day)
     print(f"{len(results)} buildings read, {len(chosen) - len(results)} failed; {count['listed']} units listed, "

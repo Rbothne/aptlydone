@@ -3,6 +3,7 @@
 import os
 
 from . import costs, deals, files
+from .area import zip_code
 from .facts import laundry
 
 BUILDING_FIELDS = ("id", "name", "manager", "url", "platform", "address", "lat", "lon", "state", "county", "tract",
@@ -82,9 +83,17 @@ def price(entries, units_of):
     deals.rank(everything, entries)
 
 
-def write_site(buildings, results, state, out_dir, now):
+def write_site(buildings, results, state, out_dir, now, area=None):
+    """`area` is what area.py collected (census, crime, rent trends), or None when it has not run yet."""
+    area = area or {}
     entries, units_of = assemble(buildings, results, state, out_dir)
     price(entries, units_of)
+    crime = area.get("crime") or {}
+    for entry in entries:
+        entry["crime"] = crime.get(entry["id"])
+        entry["zip"] = zip_code(entry)
+    tracts = {e["tract"]: area["tracts"][e["tract"]] for e in entries if e.get("tract") in (area.get("tracts") or {})}
+    zips = {e["zip"]: area["zips"][e["zip"]] for e in entries if e.get("zip") in (area.get("zips") or {})}
 
     counties, by_county = {}, {}
     for entry in entries:
@@ -94,4 +103,7 @@ def write_site(buildings, results, state, out_dir, now):
         by_county.setdefault(entry["county"], []).extend(units_of[entry["id"]])
     for county, units in by_county.items():
         files.save(os.path.join(out_dir, f"units-{county}.json"), {"units": units})
-    files.save(os.path.join(out_dir, "index.json"), {"updated": now, "counties": counties, "buildings": entries})
+    files.save(os.path.join(out_dir, "index.json"), {
+        "updated": now, "counties": counties, "buildings": entries,
+        "tracts": tracts, "zips": zips, "crime_counties": area.get("crime_counties") or [], "area_updated": area.get("updated"),
+    })

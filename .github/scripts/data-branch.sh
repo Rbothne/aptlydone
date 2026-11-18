@@ -17,9 +17,11 @@ case "${1:-}" in
       exit 3
     fi
     git show FETCH_HEAD:buildings.json > data/buildings.json
-    if git cat-file -e FETCH_HEAD:state.json 2>/dev/null; then
-      git show FETCH_HEAD:state.json > data/state.json
-    fi
+    for extra in state.json area.json; do
+      if git cat-file -e "FETCH_HEAD:$extra" 2>/dev/null; then
+        git show "FETCH_HEAD:$extra" > "data/$extra"
+      fi
+    done
     if git cat-file -e FETCH_HEAD:site-data 2>/dev/null; then
       git archive FETCH_HEAD site-data | tar -x --strip-components=1 -C site/data
     fi
@@ -29,7 +31,9 @@ case "${1:-}" in
     out="$(mktemp -d)"
     mkdir -p "$out/site-data"
     cp data/buildings.json "$out/"
-    if [ -f data/state.json ]; then cp data/state.json "$out/"; fi
+    for extra in state.json area.json; do
+      if [ -f "data/$extra" ]; then cp "data/$extra" "$out/"; fi
+    done
     if ls site/data/*.json >/dev/null 2>&1; then cp site/data/*.json "$out/site-data/"; fi
 
     # Build the commit with plumbing commands and a throwaway index, so the checked-out files are left alone.

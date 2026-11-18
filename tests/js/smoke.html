@@ -59,6 +59,29 @@ async function run() {
   await wait(300);
   out.search = count();
   out.noPrices = (doc.querySelector(".noprices summary") || {}).textContent || null;
+  doc.getElementById("reset").click();
+  set("manager", "Camden");
+  out.camden = count();
+  set("manager", "");
+  set("minRating", "4.5");
+  out.rated45 = count();
+  set("minRating", "");
+  const slide = (id, value) => { const el = doc.getElementById(id); el.value = value; el.dispatchEvent(new Event("input")); };
+  slide("maxViolent", "2");
+  out.lowCrime = count();
+  out.lowCrimeLabel = doc.getElementById("maxViolentOut").textContent;
+  slide("maxViolent", "61");
+  out.area = (doc.querySelector(".area") || {}).textContent || null;
+  out.crimeChip = [...doc.querySelectorAll(".facts li")].map((li) => li.textContent).find((t) => /crime/i.test(t)) || null;
+  doc.querySelector('[data-tab="map"]').click();
+  await wait(1500);
+  out.mapDots = doc.querySelectorAll("#mapbox path.leaflet-interactive").length;
+  out.mapTiles = doc.querySelectorAll("#mapbox img.leaflet-tile").length;
+  out.mapHidden = doc.getElementById("map").hidden;
+  const dot = doc.querySelector("#mapbox path.leaflet-interactive");
+  if (dot) { dot.dispatchEvent(new MouseEvent("click", { bubbles: true, view: win })); await wait(400); }
+  out.popup = (doc.querySelector(".leaflet-popup-content") || {}).textContent || null;
+  doc.querySelector('[data-tab="buildings"]').click();
   document.getElementById("out").textContent = JSON.stringify(out, null, 1);
 }
 run().catch((error) => { document.getElementById("out").textContent = "ERROR " + error.stack; });

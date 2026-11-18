@@ -5,6 +5,7 @@ import { DEFAULT_FILTERS } from "./logic.js";
 
 const FILTERS = "apt.filters";
 const STARS = "apt.stars";
+const SETTINGS = "apt.settings";
 
 export function createStore(storage) {
   const memory = {};
@@ -47,6 +48,14 @@ export function createStore(storage) {
 
   return {
     getFilters,
+    getSetting(key, fallback) {
+      const saved = read(SETTINGS, {});
+      return saved && typeof saved === "object" && key in saved ? saved[key] : fallback;
+    },
+    setSetting(key, value) {
+      const saved = read(SETTINGS, {});
+      write(SETTINGS, { ...(saved && typeof saved === "object" ? saved : {}), [key]: value });
+    },
     setFilters(filters) { write(FILTERS, filters); },
     stars,
     isStarred(id) { return stars().some((star) => star.unit.id === id); },

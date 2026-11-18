@@ -90,3 +90,12 @@ test("works in memory when storage is blocked or missing", () => {
     assert.equal(store.isStarred("b1:101"), true);
   }
 });
+
+test("settings are remembered, with a fallback", () => {
+  const storage = fakeStorage();
+  const store = createStore(storage);
+  assert.equal(store.getSetting("demographics", true), true);
+  store.setSetting("demographics", false);
+  assert.equal(createStore(storage).getSetting("demographics", true), false);
+  assert.equal(createStore(brokenStorage).getSetting("demographics", true), true);
+});

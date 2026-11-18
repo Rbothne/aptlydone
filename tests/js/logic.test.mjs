@@ -188,3 +188,72 @@ test("availability wording", async () => {
   assert.equal(availability("2026-11-01", "2026-11-18"), "Available now");
   assert.equal(availability(null, "2026-11-18"), "");
 });
+
+test("violent crime limit needs a known count at or under it", async () => {
+  const { unitMatches: matches } = await import("../../site/js/logic.js");
+  assert.equal(matches(unit(), building({ crime: { violent: 3, property: 40 } }), f({ maxViolent: 3 })), true);
+  assert.equal(matches(unit(), building({ crime: { violent: 4, property: 40 } }), f({ maxViolent: 3 })), false);
+  assert.equal(matches(unit(), building({ crime: null }), f({ maxViolent: 3 })), false);
+  assert.equal(matches(unit(), building({ crime: null }), f()), true);
+  assert.equal(DEFAULT_FILTERS.maxViolent, null);
+});
+
+test("crime wording says when a county publishes nothing", async () => {
+  const { crimeText } = await import("../../site/js/logic.js");
+  assert.deepEqual(crimeText(building({ crime: { violent: 3, property: 41 } }), ["11001"]),
+    { text: "Within ½ mile, past 12 months: 3 violent · 41 property crimes", known: true });
+  assert.deepEqual(crimeText(building({ crime: null, county: "51013" }), ["11001"]),
+    { text: "No crime data for this county", known: false });
+  assert.deepEqual(crimeText(building({ crime: null, county: "11001" }), ["11001"]),
+    { text: "Crime nearby not counted yet", known: false });
+});
+
+test("area facts read as sentences, with race only when asked for", async () => {
+  const { areaFacts } = await import("../../site/js/logic.js");
+  const tract = { pop: 3521, income: 176111, rent: 2409, age: 50.3, degree: 89, renters: 38,
+    race: { white: 64, black: 9, asian: 6, hispanic: 9, other: 12 } };
+  const trend = { latest: 2541, month: "2025-11", year_change: 5.0 };
+  assert.deepEqual(areaFacts(tract, trend, "20015", true), [
+    "Typical rent in ZIP 20015: $2,541, up 5% in a year",
+    "Median household income $176,111",
+    "Median rent paid $2,409",
+    "Median age 50",
+    "89% of adults have a degree",
+    "38% of homes are rented",
+    "64% white · 9% Black · 6% Asian · 9% Hispanic · 12% other",
+  ]);
+  assert.equal(areaFacts(tract, trend, "20015", false).some((line) => line.includes("white")), false);
+  assert.deepEqual(areaFacts(null, { latest: 2000, month: "2025-11", year_change: -1.2 }, "22201", true),
+    ["Typical rent in ZIP 22201: $2,000, down 1.2% in a year"]);
+  assert.deepEqual(areaFacts({ pop: 10, income: null, rent: null, age: null, degree: null, renters: null, race: null }, null, null, true), []);
+  assert.deepEqual(areaFacts(null, { latest: 2000, month: "2025-11", year_change: null }, "22201", true), ["Typical rent in ZIP 22201: $2,000"]);
+});
+
+test("map points: one per located building, with its best tag, unit count and best unit", async () => {
+  const { mapPoints } = await import("../../site/js/logic.js");
+  const index = [building({ id: "A", lat: 38.9, lon: -77.0 }), building({ id: "B", lat: 38.95, lon: -77.05 }),
+    building({ id: "C", lat: null, lon: null })];
+  const units = {
+    A: [unit({ id: "A:1", building: "A", tag: "local", true: 2000 }), unit({ id: "A:2", building: "A", tag: "building", own: { pct: -16 }, true: 2600 }),
+      unit({ id: "A:3", building: "A", true: 1800 })],
+    B: [unit({ id: "B:1", building: "B", true: 2100 })],
+    C: [unit({ id: "C:1", building: "C", tag: "absolute" })],
+  };
+  const points = mapPoints(groupBuildings(index, units, f()));
+  assert.deepEqual(points.map((p) => [p.id, p.tag, p.count, p.best.id]), [["A", "building", 3, "A:2"], ["B", null, 1, "B:1"]]);
+  assert.deepEqual([points[0].lat, points[0].lon], [38.9, -77.0]);
+});
+
+test("minimum rating needs a known rating at or above it", () => {
+  assert.equal(DEFAULT_FILTERS.minRating, null);
+  assert.equal(unitMatches(unit(), building({ rating: 4.5 }), f({ minRating: 4.5 })), true);
+  assert.equal(unitMatches(unit(), building({ rating: 4.4 }), f({ minRating: 4.5 })), false);
+  assert.equal(unitMatches(unit(), building({ rating: null }), f({ minRating: 4.5 })), false);
+  assert.equal(unitMatches(unit(), building({ rating: null }), f()), true);
+});
+
+test("managed-by filter", () => {
+  assert.equal(DEFAULT_FILTERS.manager, "");
+  assert.equal(unitMatches(unit(), building({ manager: "Bozzuto" }), f({ manager: "Bozzuto" })), true);
+  assert.equal(unitMatches(unit(), building({ manager: "Camden" }), f({ manager: "Bozzuto" })), false);
+});

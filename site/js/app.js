@@ -1,8 +1,9 @@
 // Loads the data files and draws the page. Every decision (what matches, what order, what words) is in logic.js.
 
 import {
-  DEFAULT_FILTERS, ago, availability, cost, groupBuildings, money, perSqft, shortDate, sparkline, tagLabel, tagReason, unitMatches,
+  DEFAULT_FILTERS, ago, areaFacts, availability, cost, crimeText, driveLabel, mapPoints, groupBuildings, money, perSqft, shortDate, sparkline, tagLabel, tagReason, unitMatches,
 } from "./logic.js";
+import { driveTimes, geocode } from "./commute.js";
 import { createStore } from "./store.js";
 
 const COUNTY = {
@@ -20,7 +21,9 @@ try { storage = window.localStorage; } catch { /* blocked: the store works in me
 const store = createStore(storage);
 
 const state = {
-  updated: null, index: [], byId: {}, units: {}, unitsById: {},
+  updated: null, index: [], byId: {}, units: {}, unitsById: {}, tracts: {}, zips: {}, crimeCounties: [],
+  demographics: store.getSetting("demographics", true),
+  work: store.getSetting("work", null),             // {address, lat, lon, label}: kept in this browser only
   filters: store.getFilters(), tab: "buildings", shown: PAGE, expanded: new Set(), open: new Set(),
 };
 
@@ -160,11 +163,20 @@ function facts(building) {
   else items.push(["Parking not stated", "unknown"]);
   if (building.pets) items.push(["Pets allowed"]);
   if (building.one_time) items.push([`One-time fees ${money(building.one_time)}`]);
+  if (building.drive != null) items.push([driveLabel(building.drive)]);
+  const crime = crimeText(building, state.crimeCounties);
+  items.push([crime.text, crime.known ? null : "unknown"]);
   if (building.rank) items.push([`Pricier than ${building.rank.pct}% of ${building.rank.n} buildings within 2 miles`]);
   if (building.coming_soon) items.push(["Coming soon"]);
   if (building.senior) items.push(["Senior housing"]);
   if (building.stale) items.push([`Latest read failed; showing ${building.read ? shortDate(building.read) : "earlier data"}`, "stale"]);
   return h("ul", { class: "facts" }, items.map(([text, kind]) => h("li", { class: kind || null }, text)));
+}
+
+function aboutArea(building) {
+  const lines = areaFacts(state.tracts[building.tract], state.zips[building.zip], building.zip, state.demographics);
+  if (!lines.length) return null;
+  return h("details", { class: "area" }, h("summary", null, "About the area"), h("ul", null, lines.map((line) => h("li", null, line))));
 }
 
 function buildingCard(group) {
@@ -182,6 +194,7 @@ function buildingCard(group) {
     building.special && h("p", { class: "offer" }, building.special,
       h("small", null, "Building-wide offer: it may not apply to every unit.")),
     facts(building),
+    aboutArea(building),
     h("div", { class: "units" }, shown.flatMap((unit) => unitRow(unit, building))),
     units.length > best.length && h("button", {
       class: "more", type: "button",
@@ -223,6 +236,55 @@ function drawBuildings() {
     !groups.length && h("p", { class: "empty" }, "No units match these filters."),
     noPrices(),
   ].filter(Boolean));
+  return groups;
+}
+
+// ---------- map ----------
+
+const TAG_COLOUR = { absolute: "#c0392b", building: "#1f7a52", local: "#2d6fa8" };
+const chart = { map: null, layer: null, fitted: false };
+
+function popup(point) {
+  const { building, best } = point;
+  return h("div", null,
+    h("p", null, h("b", null, building.name), building.rating != null && ` ★ ${building.rating}`),
+    h("p", null, [building.neighborhood, address(building)].filter(Boolean).join(" · ")),
+    h("p", null, `${plural(point.count, "unit")} match`, point.tag && ` · best tag: ${tagLabel(point.tag)}`),
+    best && h("p", null, `Best: #${best.unit} · ${[bedsLabel(best.beds), best.sqft && `${best.sqft} sqft`].filter(Boolean).join(" · ")} · ${money(cost(best))}/mo`),
+    h("button", { type: "button", onclick: () => { state.filters.q = building.name; state.tab = "buildings"; changed(); window.scrollTo(0, 0); } },
+      "Show in the list"));
+}
+
+function drawMap(groups) {
+  if (state.tab !== "map" || !window.L) return;
+  const L = window.L;
+  if (!chart.map) {
+    chart.map = L.map("mapbox", { scrollWheelZoom: true }).setView([38.9, -77.03], 10);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(chart.map);
+    chart.layer = L.layerGroup().addTo(chart.map);
+  }
+  chart.map.invalidateSize();
+  chart.layer.clearLayers();
+  if (state.work) {
+    L.marker([state.work.lat, state.work.lon], {
+      icon: L.divIcon({ className: "workpin", html: "★", iconSize: [22, 22], iconAnchor: [11, 11] }), keyboard: false,
+    }).bindTooltip("Work").addTo(chart.layer);
+  }
+  const points = mapPoints(groups);
+  // Draw untagged buildings first so tagged ones sit on top.
+  points.sort((a, b) => Number(Boolean(a.tag)) - Number(Boolean(b.tag)));
+  for (const point of points) {
+    L.circleMarker([point.lat, point.lon], {
+      radius: 5 + Math.min(9, Math.sqrt(point.count)), weight: 1.5, color: "#ffffff",
+      fillColor: TAG_COLOUR[point.tag] || "#8a8a85", fillOpacity: 0.9,
+    }).bindPopup(() => popup(point)).bindTooltip(point.name).addTo(chart.layer);
+  }
+  if (!chart.fitted && points.length) {
+    chart.map.fitBounds(points.map((p) => [p.lat, p.lon]), { padding: [30, 30] });
+    chart.fitted = true;
+  }
 }
 
 function drawFollowed() {
@@ -248,10 +310,12 @@ function drawFollowed() {
 }
 
 function draw() {
-  drawBuildings();
+  const groups = drawBuildings();
   drawFollowed();
   $("buildings").hidden = state.tab !== "buildings";
   $("followed").hidden = state.tab !== "followed";
+  $("map").hidden = state.tab !== "map";
+  drawMap(groups);
   for (const button of document.querySelectorAll(".tabs button")) {
     button.setAttribute("aria-pressed", String(button.dataset.tab === state.tab));
   }
@@ -259,7 +323,59 @@ function draw() {
 
 // ---------- filters ----------
 
+// ---------- drive times ----------
+
+/** Put known drive times on the buildings and their units (units carry it so they can be sorted by it). */
+function applyDrive(times) {
+  for (const building of state.index) {
+    const minutes = times && building.id in times ? times[building.id] : null;
+    building.drive = minutes;
+    for (const unit of state.units[building.id] || []) unit.drive = minutes;
+  }
+}
+
+function showWork() {
+  $("work").value = state.work ? state.work.address : "";
+  const cached = store.getSetting("drive", null);
+  const known = state.work && cached && cached.key === `${state.work.lat},${state.work.lon}` ? cached.times : null;
+  applyDrive(known);
+  $("workstatus").textContent = !state.work ? "" : known
+    ? `${Object.keys(known).length} buildings timed from ${state.work.label.split(",").slice(0, 2).join(",")}`
+    : "Not timed yet";
+  return known;
+}
+
+async function timeDrives() {
+  const typed = $("work").value.trim();
+  if (!typed) {
+    state.work = null;
+    store.setSetting("work", null);
+    store.setSetting("drive", null);
+    state.filters.maxDrive = null;
+    showWork();
+    changed();
+    return;
+  }
+  $("workstatus").textContent = "Finding the address…";
+  try {
+    const found = await geocode(typed);
+    if (!found) { $("workstatus").textContent = "Could not find that address. Try adding the city and state."; return; }
+    state.work = { address: typed, ...found };
+    store.setSetting("work", state.work);
+    $("workstatus").textContent = "Timing drives…";
+    const times = await driveTimes(state.work, state.index);
+    store.setSetting("drive", { key: `${found.lat},${found.lon}`, times });
+    showWork();
+    if (!Object.keys(times).length) $("workstatus").textContent = "The routing service did not answer. Try again in a minute.";
+    draw();
+  } catch (error) {
+    $("workstatus").textContent = `Could not time drives (${error.message}). Try again in a minute.`;
+  }
+}
+
 const NUMBERS = ["minSqft", "maxCost", "floorMin", "floorMax"];
+const ANY_DRIVE = 95;      // the slider's last stop means "any"
+const ANY_CRIME = 61;      // the slider's last stop means "any"
 
 function showFilters() {
   const f = state.filters;
@@ -267,9 +383,16 @@ function showFilters() {
   for (const id of NUMBERS) $(id).value = f[id] ?? "";
   $("moveBy").value = f.moveBy || "";
   $("county").value = f.county;
+  $("manager").value = f.manager;
+  $("minRating").value = f.minRating == null ? "" : String(f.minRating);
   $("sort").value = f.sort;
   for (const button of document.querySelectorAll("[data-beds]")) button.setAttribute("aria-pressed", String(f.beds.includes(Number(button.dataset.beds))));
   for (const button of document.querySelectorAll("[data-toggle]")) button.setAttribute("aria-pressed", String(Boolean(f[button.dataset.toggle])));
+  $("maxViolent").value = f.maxViolent == null ? ANY_CRIME : Math.min(f.maxViolent, ANY_CRIME - 1);
+  $("maxViolentOut").textContent = f.maxViolent == null ? "any" : `${f.maxViolent} or fewer`;
+  $("demographics").checked = state.demographics;
+  $("maxDrive").value = f.maxDrive == null ? ANY_DRIVE : f.maxDrive;
+  $("maxDriveOut").textContent = f.maxDrive == null ? "any" : `${f.maxDrive} min`;
 }
 
 function changed() {
@@ -290,6 +413,8 @@ function wire() {
   }
   $("moveBy").addEventListener("change", () => { state.filters.moveBy = $("moveBy").value || null; changed(); });
   $("county").addEventListener("change", () => { state.filters.county = $("county").value; changed(); });
+  $("manager").addEventListener("change", () => { state.filters.manager = $("manager").value; changed(); });
+  $("minRating").addEventListener("change", () => { const v = $("minRating").value; state.filters.minRating = v === "" ? null : Number(v); changed(); });
   $("sort").addEventListener("change", () => { state.filters.sort = $("sort").value; changed(); });
   for (const button of document.querySelectorAll("[data-beds]")) {
     button.addEventListener("click", () => {
@@ -302,13 +427,35 @@ function wire() {
   for (const button of document.querySelectorAll("[data-toggle]")) {
     button.addEventListener("click", () => { state.filters[button.dataset.toggle] = !state.filters[button.dataset.toggle]; changed(); });
   }
+  $("maxViolent").addEventListener("input", () => {
+    const value = Number($("maxViolent").value);
+    state.filters.maxViolent = value >= ANY_CRIME ? null : value;
+    changed();
+  });
+  $("maxDrive").addEventListener("input", () => {
+    const value = Number($("maxDrive").value);
+    state.filters.maxDrive = value >= ANY_DRIVE ? null : value;
+    changed();
+  });
+  $("setwork").addEventListener("click", timeDrives);
+  $("work").addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); timeDrives(); } });
+  $("demographics").addEventListener("change", () => {
+    state.demographics = $("demographics").checked;
+    store.setSetting("demographics", state.demographics);
+    draw();
+  });
   $("reset").addEventListener("click", () => { state.filters = { ...DEFAULT_FILTERS }; changed(); });
   $("filtersbtn").addEventListener("click", () => {
     const open = $("filters").classList.toggle("open");
     $("filtersbtn").setAttribute("aria-expanded", String(open));
   });
   for (const button of document.querySelectorAll(".tabs button")) {
-    button.addEventListener("click", () => { state.tab = button.dataset.tab; draw(); window.scrollTo(0, 0); });
+    button.addEventListener("click", () => {
+      state.tab = button.dataset.tab;
+      try { history.replaceState(null, "", state.tab === "buildings" ? location.pathname + location.search : "#" + state.tab); } catch { /* no history */ }
+      draw();
+      window.scrollTo(0, 0);
+    });
   }
 }
 
@@ -321,6 +468,7 @@ async function getJson(path) {
 }
 
 async function load() {
+  if (["#map", "#followed"].includes(location.hash)) state.tab = location.hash.slice(1);      // a link can open a tab
   wire();
   showFilters();
   let index;
@@ -333,8 +481,14 @@ async function load() {
   state.updated = index.updated;
   state.index = index.buildings;
   state.byId = Object.fromEntries(index.buildings.map((b) => [b.id, b]));
+  state.tracts = index.tracts || {};
+  state.zips = index.zips || {};
+  state.crimeCounties = index.crime_counties || [];
+  if (state.crimeCounties.length) $("crime-counties").textContent = state.crimeCounties.map((fips) => COUNTY[fips] || fips).join("; ");
   const counties = Object.keys(index.counties).sort((a, b) => index.counties[b].units - index.counties[a].units);
   for (const fips of counties) $("county").append(h("option", { value: fips }, COUNTY[fips] || fips));
+  const managers = [...new Set(index.buildings.map((b) => b.manager).filter(Boolean))].sort();
+  for (const name of managers) $("manager").append(h("option", { value: name }, name));
   showFilters();
 
   const files = await Promise.allSettled(counties.map((fips) => getJson(`data/units-${fips}.json`)));
@@ -346,6 +500,7 @@ async function load() {
     }
   }
   store.refreshStars(state.unitsById, state.byId);
+  showWork();
   draw();
 }
 

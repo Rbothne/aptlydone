@@ -1,4 +1,4 @@
-name: Find buildings
+name: Find buildings and area data
 
 on:
   schedule:
@@ -24,6 +24,10 @@ jobs:
 
       - name: Find buildings
         run: python3 discover.py
+
+      # Census figures, crime near each building and ZIP rent trends change slowly: collect them here, weekly.
+      - name: Collect area data
+        run: python3 area.py
 
       - name: Save the data
         run: bash .github/scripts/data-branch.sh save

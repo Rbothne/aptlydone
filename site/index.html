@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Apartment tracker</title>
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
@@ -13,6 +14,7 @@
     <h1>Apartment tracker</h1>
     <nav class="tabs" aria-label="Views">
       <button type="button" data-tab="buildings" aria-pressed="true">Buildings <span class="n" id="n-buildings"></span></button>
+      <button type="button" data-tab="map" aria-pressed="false">Map</button>
       <button type="button" data-tab="followed" aria-pressed="false">Followed <span class="n" id="n-followed"></span></button>
     </nav>
   </div>
@@ -44,6 +46,16 @@
       <button type="button" data-toggle="showRestricted" aria-pressed="false" title="Income-restricted units and senior housing are hidden unless this is on">Income-restricted &amp; senior</button>
     </span>
 
+    <label title="Reported homicides, sex offences, robberies and aggravated assaults within half a mile in the past 12 months. Buildings in counties that publish no incident data are hidden while this is set.">Violent crime nearby
+      <input type="range" id="maxViolent" min="0" max="61" step="1" value="61"> <output id="maxViolentOut" for="maxViolent">any</output></label>
+
+    <label title="Drive time from your work address, ignoring traffic. Set a work address below first.">Max drive
+      <input type="range" id="maxDrive" min="10" max="95" step="5" value="95"> <output id="maxDriveOut" for="maxDrive">any</output></label>
+
+    <label title="The rating each manager publishes for the building. Buildings with no published rating are hidden while this is set.">Rating
+      <select id="minRating"><option value="">Any</option><option value="3.5">3.5+</option><option value="4">4.0+</option>
+        <option value="4.3">4.3+</option><option value="4.5">4.5+</option><option value="4.7">4.7+</option></select></label>
+    <label>Managed by <select id="manager"><option value="">Anyone</option></select></label>
     <label>County <select id="county"><option value="">All</option></select></label>
     <label>Sort <select id="sort">
       <option value="picks">Top picks</option>
@@ -53,8 +65,15 @@
       <option value="local">Furthest below nearby buildings</option>
       <option value="newest">Newest listings</option>
       <option value="size">Largest</option>
+      <option value="drive">Shortest drive to work</option>
     </select></label>
     <button type="button" class="pill" id="reset">Reset</button>
+
+    <span class="work">
+      <label>Work address <input type="text" id="work" placeholder="Street, city, state" autocomplete="off"></label>
+      <button type="button" class="pill" id="setwork">Time my drive</button>
+      <span id="workstatus" aria-live="polite"></span>
+    </span>
   </form>
 
   <p id="count" aria-live="polite">Loading…</p>
@@ -62,6 +81,11 @@
 
 <main>
   <section id="buildings"></section>
+  <section id="map" hidden>
+    <div id="mapbox" role="application" aria-label="Map of buildings that match the filters"></div>
+    <p class="legend"><span class="dot absolute"></span> Absolute steal <span class="dot building"></span> Building steal
+      <span class="dot local"></span> Local value <span class="dot none"></span> No tag · Bigger dots have more matching units.</p>
+  </section>
   <section id="followed" hidden></section>
 </main>
 
@@ -72,8 +96,16 @@
   <b>Building steal</b>: 15% or more below similar units in the same building. <b>Local value</b>: 20% or more below similar units
   in other buildings within one to two miles. <b>Absolute steal</b>: 10% or more below its building and 15% or more below its neighbors.
   Prices come from each building's own site and are only as good as what it publishes; check with the building before relying on one.</p>
+  <p><b>Crime</b> counts are incidents reported to police within half a mile in the past 12 months, from each county's open data
+  (so far: <span id="crime-counties">none</span>). Counties count offences differently, so compare across a border with care.
+  <b>About the area</b> figures are for the census tract (American Community Survey, 5-year) and the ZIP code (Zillow's rent index).</p>
+  <p><b>Drive times</b> are free-flow times with no traffic, so they compare buildings fairly but understate a rush-hour commute.
+  Your work address is kept in this browser only. To time drives it is sent to the OpenStreetMap Nominatim service to find its
+  coordinates, and those coordinates are sent to the public OSRM routing server along with the buildings' locations.</p>
+  <p><label><input type="checkbox" id="demographics"> Show race and ethnicity in "About the area"</label></p>
 </footer>
 
+<script src="vendor/leaflet/leaflet.js"></script>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>
