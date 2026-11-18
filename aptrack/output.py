@@ -2,7 +2,7 @@
 
 import os
 
-from . import files
+from . import costs, deals, files
 from .facts import laundry
 
 BUILDING_FIELDS = ("id", "name", "manager", "url", "platform", "address", "lat", "lon", "state", "county", "tract",
@@ -62,8 +62,23 @@ def assemble(buildings, results, state, out_dir):
     return entries, units_of
 
 
+def price(entries, units_of):
+    """Work out each unit's true monthly cost, how it compares, and its tag; and each building's cost facts."""
+    everything = []
+    for entry in entries:
+        fees = entry["fees"] or []
+        for unit in units_of[entry["id"]]:
+            costs.apply(unit, fees, entry.get("special"))
+            everything.append(unit)
+        entry.update(one_time=costs.one_time(fees), parking_from=costs.parking_from(fees),
+                     pets=costs.pets_allowed(fees), senior=deals.is_senior(entry))
+    deals.score(everything, entries)
+    deals.rank(everything, entries)
+
+
 def write_site(buildings, results, state, out_dir, now):
     entries, units_of = assemble(buildings, results, state, out_dir)
+    price(entries, units_of)
 
     counties, by_county = {}, {}
     for entry in entries:

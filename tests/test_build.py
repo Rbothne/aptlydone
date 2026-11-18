@@ -5,7 +5,7 @@ import unittest
 
 from tests.quiet import QuietTestCase
 import build
-from aptrack import fetch, history, output
+from aptrack import costs, fetch, history, output
 
 HERE = os.path.join(os.path.dirname(__file__), "fixtures")
 
@@ -136,6 +136,14 @@ class RunTests(QuietTestCase):
         self.assertEqual(building["feed_api"], API)
 
 
+class FailureShareTests(unittest.TestCase):
+    def test_too_many_failures(self):
+        chosen = [{"id": str(n)} for n in range(10)]
+        self.assertTrue(build.too_many_failures(chosen, {str(n): {} for n in range(7)}))        # 30% failed
+        self.assertFalse(build.too_many_failures(chosen, {str(n): {} for n in range(8)}))       # 20% is tolerated
+        self.assertFalse(build.too_many_failures([], {}))
+
+
 class TotalsTests(unittest.TestCase):
     def test_totals_count_new_gone_and_changed(self):
         state = history.new_state()
@@ -226,6 +234,34 @@ class WriteSiteTests(QuietTestCase):
         b = self.load("index.json")["buildings"][0]
         self.assertEqual((b["stale"], b["special"], b["rating"], b["neighborhood"]), (False, OFFER, 4.6, "Chevy Chase"))
         self.assertIn("Hickory wood floors", b["features"])
+
+    def test_units_carry_true_cost_and_comparisons(self):
+        self.build_and_write([bozzuto(), camden()], GOOD, history.new_state())
+        by_id = {b["id"]: b for b in self.load("index.json")["buildings"]}
+        units = {u["id"]: u for u in self.load("units-11001.json")["units"]}
+        studio = units["camden-noma:1215"]
+        self.assertEqual((studio["true"], studio["true_offer"]), (1829 + 124, None))
+        fees = by_id["bozzuto-5333-connecticut"]["fees"]
+        one_bed = units["bozzuto-5333-connecticut:204"]
+        self.assertEqual(one_bed["true"], costs.true_monthly(one_bed, fees))
+        self.assertEqual(one_bed["true_offer"], costs.true_monthly(one_bed, fees, special=OFFER))
+        self.assertLess(one_bed["true_offer"], one_bed["true"])
+        for key in ("own", "local", "tag"):
+            self.assertIn(key, one_bed)
+
+    def test_building_entry_has_cost_facts(self):
+        self.build_and_write([bozzuto()], GOOD, history.new_state())
+        b = self.load("index.json")["buildings"][0]
+        self.assertEqual((b["parking_from"], b["pets"], b["senior"], b["rank"]), (225.0, True, False, None))
+        self.assertEqual(b["one_time"], costs.one_time(b["fees"]))
+        self.assertGreater(b["one_time"], 0)
+
+    def test_stale_units_are_scored_again(self):
+        state = history.new_state()
+        self.build_and_write([camden()], GOOD, state)
+        self.build_and_write([camden()], {CAMDEN_FEED: OSError("down")}, state, day="2026-11-19")
+        unit = next(u for u in self.load("units-11001.json")["units"] if u["unit"] == "1215")
+        self.assertEqual((unit["true"], unit["tag"]), (1953, None))
 
     def test_stale_building_keeps_its_fees_and_amenities(self):
         state = history.new_state()

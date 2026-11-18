@@ -24,7 +24,8 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 BUILDINGS = os.path.join(ROOT, "data", "buildings.json")
 STATE = os.path.join(ROOT, "data", "state.json")
 SITE_DATA = os.path.join(ROOT, "site", "data")
-RETRY_WAIT = 60           # seconds to wait before going back to sites that said "too many requests"
+FAIL_SHARE = 0.2          # a run where more than this share of buildings fail ends in failure
+RETRY_WAIT = 60          # seconds to wait before going back to sites that said "too many requests"
 
 
 def readable(building):
@@ -98,6 +99,11 @@ def run(buildings, state, get, day, *, workers=4, sleep=time.sleep):
     return results
 
 
+def too_many_failures(chosen, results):
+    """True when so many buildings failed that the run should end in failure (and GitHub emails the owner)."""
+    return len(chosen) - len(results) > FAIL_SHARE * len(chosen)
+
+
 def totals(state, day):
     units = state["units"].values()
     return {
@@ -164,6 +170,8 @@ def main():
     count = totals(state, day)
     print(f"{len(results)} buildings read, {len(chosen) - len(results)} failed; {count['listed']} units listed, "
           f"{count['new']} new today, {count['gone']} gone today, {count['changed']} price changes today")
+    if too_many_failures(chosen, results):
+        sys.exit(f"More than {FAIL_SHARE:.0%} of buildings could not be read. The data was saved, but something is wrong.")
 
 
 if __name__ == "__main__":
