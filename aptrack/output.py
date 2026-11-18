@@ -57,6 +57,12 @@ def assemble(buildings, results, state, out_dir):
             for key in FACT_FIELDS:
                 entry[key] = old.get(key, [] if key == "features" else None)
             entry["neighborhood"] = old.get("neighborhood") or entry["neighborhood"]
+            if not entry["features"] and building.get("features"):               # found at discovery
+                entry["features"] = building["features"]
+            if entry["laundry"] is None:
+                entry["laundry"] = laundry.detect(entry["features"] + amenities)
+        if entry.get("rating") is None and building.get("rating") is not None:      # found at discovery
+            entry.update(rating=building["rating"], rating_count=building.get("rating_count"))
         entries.append(entry)
         units_of[building["id"]] = units
     return entries, units_of

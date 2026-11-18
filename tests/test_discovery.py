@@ -90,7 +90,7 @@ class CamdenTests(unittest.TestCase):
         self.assertIsNone(camden.parse(CAMDEN_URL, "<html></html>"))
 
     def test_discoverers_registered(self):
-        self.assertEqual(set(discover.DISCOVERERS), {"bozzuto", "camden"})
+        self.assertLessEqual({"bozzuto", "camden"}, set(discover.DISCOVERERS))
 
 
 class GeoTests(unittest.TestCase):

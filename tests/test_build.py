@@ -263,6 +263,18 @@ class WriteSiteTests(QuietTestCase):
         unit = next(u for u in self.load("units-11001.json")["units"] if u["unit"] == "1215")
         self.assertEqual((unit["true"], unit["tag"]), (1953, None))
 
+    def test_rating_found_at_discovery_is_used_when_no_daily_facts_give_one(self):
+        self.build_and_write([camden(rating=4.3, rating_count=161), bozzuto(rating=1.0, rating_count=2)], GOOD, history.new_state())
+        by_id = {b["id"]: b for b in self.load("index.json")["buildings"]}
+        self.assertEqual((by_id["camden-noma"]["rating"], by_id["camden-noma"]["rating_count"]), (4.3, 161))
+        self.assertEqual(by_id["bozzuto-5333-connecticut"]["rating"], 4.6)          # the daily facts win
+
+    def test_features_found_at_discovery_give_laundry_when_there_are_no_daily_facts(self):
+        windsor = bozzuto(id="windsor-courthouse", manager="Windsor", features=["In-home washer and dryer", "Quartz countertops"])
+        self.build_and_write([windsor], GOOD, history.new_state())
+        b = self.load("index.json")["buildings"][0]
+        self.assertEqual((b["laundry"], b["features"]), ("in_unit", ["In-home washer and dryer", "Quartz countertops"]))
+
     def test_stale_building_keeps_its_fees_and_amenities(self):
         state = history.new_state()
         self.build_and_write([bozzuto()], GOOD, state)
