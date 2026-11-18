@@ -6,7 +6,7 @@ from collections import Counter
 
 from .. import fetch
 from ..units import looks_restricted, make_unit, num, unique
-from . import ReadError
+from . import NotAnswering, ReadError
 
 API = re.compile(r"https:\\?/\\?/sightmap\.com\\?/app\\?/api\\?/v1\\?/(\w+)\\?/sightmaps\\?/(\d+)")
 
@@ -105,12 +105,12 @@ def read(building, get):
     if body is None:
         api = feed_url(get(building["feed"]).decode("utf-8", "replace"))
         if not api:
-            raise ReadError(f"{building['id']}: no feed address in {building['feed']}")
+            raise NotAnswering(f"{building['id']}: no feed address in {building['feed']}")
         body = get(api)
     try:
         feed = json.loads(body)
     except ValueError as error:
-        raise ReadError(f"{building['id']}: feed is not JSON") from error
+        raise NotAnswering(f"{building['id']}: feed is not JSON") from error
     result = parse(feed, building)
     result["feed_api"] = api
     return result

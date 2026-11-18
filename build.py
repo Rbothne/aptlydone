@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 
 from aptrack import fetch, files, history, output
 from aptrack.facts import FACTS
-from aptrack.readers import READERS
+from aptrack.readers import READERS, NotAnswering, ReadError
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 BUILDINGS = os.path.join(ROOT, "data", "buildings.json")
@@ -26,6 +26,7 @@ STATE = os.path.join(ROOT, "data", "state.json")
 AREA = os.path.join(ROOT, "data", "area.json")      # written by area.py; optional
 SITE_DATA = os.path.join(ROOT, "site", "data")
 FAIL_SHARE = 0.2          # a run where more than this share of buildings fail ends in failure
+SILENT_AFTER = 3          # failures in a row before a site is left alone until the end of the run
 RETRY_WAIT = 60          # seconds to wait before going back to sites that said "too many requests"
 
 
@@ -53,14 +54,34 @@ def read_one(building, get):
     return result, None
 
 
+def host(building):
+    """The site a building's units are read from."""
+    return urlparse(building.get("feed_api") or building["feed"]).netloc
+
+
+def site_trouble(error):
+    """Is this failure about the site (not answering, or answering with something that is not its data),
+    as opposed to one building's listing being unusable?"""
+    return error is not None and (isinstance(error, NotAnswering) or not isinstance(error, ReadError))
+
+
 def read_host(group, get):
-    """Read one site's buildings in order. Returns (outcomes, buildings left unread after a "too many requests")."""
-    outcomes = []
+    """Read one site's buildings in order. Returns (outcomes, buildings to come back to later).
+
+    A site is left alone for the rest of the pass when it says "too many requests", or when it fails
+    SILENT_AFTER times in a row; the run moves on to other sites and circles back once at the end.
+    """
+    outcomes, streak = [], 0
     for position, building in enumerate(group):
         try:
-            outcomes.append((building, *read_one(building, get)))
+            result, error = read_one(building, get)
         except fetch.RateLimited:
             return outcomes, group[position:]
+        outcomes.append((building, result, error))
+        streak = streak + 1 if site_trouble(error) else 0
+        if streak >= SILENT_AFTER:
+            del outcomes[-streak:]                      # those tries are not the last word: they get another go
+            return outcomes, group[position + 1 - streak:]
     return outcomes, []
 
 
@@ -69,7 +90,7 @@ def run(buildings, state, get, day, *, workers=4, sleep=time.sleep):
     groups = {}
     for building in buildings:
         if readable(building):
-            groups.setdefault(urlparse(building.get("feed_api") or building["feed"]).netloc, []).append(building)
+            groups.setdefault(host(building), []).append(building)
 
     outcomes, deferred = [], []
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
@@ -77,13 +98,20 @@ def run(buildings, state, get, day, *, workers=4, sleep=time.sleep):
             outcomes += done
             deferred += left
     if deferred:
-        print(f"{len(deferred)} buildings at rate-limited sites: waiting {RETRY_WAIT}s, then trying each once more")
+        print(f"{len(deferred)} buildings at sites that stopped answering: waiting {RETRY_WAIT}s, then trying each once more")
         sleep(RETRY_WAIT)
+        streaks = {}                                    # site -> failures in a row during this second pass
         for building in deferred:
+            site = host(building)
+            if streaks.get(site, 0) >= SILENT_AFTER:    # still silent: stop asking it today
+                outcomes.append((building, None, NotAnswering("the site is still not answering")))
+                continue
             try:
-                outcomes.append((building, *read_one(building, get)))
-            except fetch.RateLimited as error:
-                outcomes.append((building, None, error))
+                result, error = read_one(building, get)
+            except fetch.RateLimited as limited:
+                result, error = None, limited
+            outcomes.append((building, result, error))
+            streaks[site] = streaks.get(site, 0) + 1 if error is not None and (site_trouble(error) or isinstance(error, fetch.RateLimited)) else 0
 
     results = {}
     for building, result, error in outcomes:

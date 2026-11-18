@@ -97,6 +97,52 @@ class RunTests(QuietTestCase):
         results = self.run_it([camden()], {CAMDEN_FEED: [fetch.RateLimited("1"), fetch.RateLimited("2")]})
         self.assertEqual((results, self.state["buildings"]["camden-noma"]["failed"]), ({}, DAY))
 
+    def camden_site(self, count):
+        feeds = [CAMDEN_FEED + f"?{n}" for n in range(count)]
+        return feeds, [camden(id=f"c{n}", feed=feed) for n, feed in enumerate(feeds)]
+
+    def test_a_site_that_stops_answering_is_left_alone_until_the_end(self):
+        feeds, buildings = self.camden_site(5)
+        pages = dict(GOOD)
+        for feed in feeds[:3]:
+            pages[feed] = [OSError("timed out"), fixture("camden_available.html")]
+        for feed in feeds[3:]:
+            pages[feed] = fixture("camden_available.html")
+        results = self.run_it(buildings + [bozzuto()], pages)
+        # three failures in a row: the rest of that site waits; the other site is read; then the whole site is tried once more
+        self.assertEqual(self.web.asked, feeds[:3] + [API, BOZZUTO_URL] + feeds)
+        self.assertEqual((len(results), self.slept), (6, [60]))
+        self.assertFalse([b for b in self.state["buildings"].values() if b["failed"]])
+
+    def test_scattered_failures_do_not_stop_a_site(self):
+        feeds, buildings = self.camden_site(5)
+        pages = {feed: fixture("camden_available.html") for feed in feeds}
+        pages[feeds[0]] = OSError("timed out")
+        pages[feeds[2]] = OSError("timed out")
+        results = self.run_it(buildings, pages)
+        self.assertEqual((self.web.asked, len(results), self.slept), (feeds, 3, []))
+
+    def test_a_site_still_silent_on_the_second_pass_counts_as_failed(self):
+        feeds, buildings = self.camden_site(4)
+        results = self.run_it(buildings, {feed: OSError("timed out") for feed in feeds})
+        # the second pass gives up on the site after three more failures in a row, without asking for the fourth
+        self.assertEqual((self.web.asked, results), (feeds[:3] + feeds[:3], {}))
+        self.assertEqual([b["failed"] for b in self.state["buildings"].values()], [DAY] * 4)
+
+    def test_pages_without_data_count_as_the_site_not_answering(self):
+        feeds, buildings = self.camden_site(4)
+        self.run_it(buildings, {feed: "<html>Please verify you are human</html>" for feed in feeds})
+        self.assertEqual((self.web.asked, self.slept), (feeds[:3] + feeds[:3], [60]))
+
+    def test_buildings_that_publish_no_prices_do_not_count_as_the_site_not_answering(self):
+        unpriced = json.loads(fixture("sightmap_feed.json"))
+        for u in unpriced["data"]["units"]:
+            u["price"] = None
+        apis = [API + str(n) for n in range(4)]
+        buildings = [bozzuto(id=f"b{n}", feed_api=api, manager="Other") for n, api in enumerate(apis)]
+        self.run_it(buildings, {api: json.dumps(unpriced) for api in apis})
+        self.assertEqual((self.web.asked, self.slept), (apis, []))
+
     def test_no_wait_when_nothing_was_rate_limited(self):
         self.run_it([bozzuto()], GOOD)
         self.assertEqual(self.slept, [])

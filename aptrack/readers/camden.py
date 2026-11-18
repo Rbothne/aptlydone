@@ -5,7 +5,7 @@ import json
 import re
 
 from ..units import looks_restricted, make_unit, num, unique
-from . import ReadError
+from . import NotAnswering, ReadError
 
 NEXT_DATA = re.compile(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', re.S)
 # The page's banner is sometimes a price offer and sometimes an advert for tours. Only an offer is a "special".
@@ -31,7 +31,7 @@ def page_data(html):
     try:
         return json.loads(match.group(1))["props"]["pageProps"]
     except (AttributeError, ValueError, KeyError, TypeError) as error:
-        raise ReadError("no page data") from error
+        raise NotAnswering("no page data") from error
 
 
 def parse(html, building):
