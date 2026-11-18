@@ -32,6 +32,7 @@ def get(url, *, timeout=25, tries=3, opener=urllib.request.urlopen, sleep=time.s
                 body = response.read()
             return gzip.decompress(body) if body[:2] == b"\x1f\x8b" else body
         except urllib.error.HTTPError as error:
+            error.close()
             if error.code in (404, 410):
                 raise Gone(url) from error
             if error.code == 429:
