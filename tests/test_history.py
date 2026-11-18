@@ -6,8 +6,14 @@ from aptrack.units import make_unit
 D1, D2, D3, D4 = "2026-11-18", "2026-11-19", "2026-11-20", "2026-11-21"
 
 
-def unit(number, rent, *, building="b1", plan="A1", special=None, beds=1):
-    return make_unit(building, number, rent=rent, plan=plan, beds=beds, baths=1, sqft=700, special=special)
+def unit(number, rent, *, building="b1", plan="A1", special=None, beds=1, lease=None, fees=None):
+    return make_unit(building, number, rent=rent, plan=plan, beds=beds, baths=1, sqft=700, special=special,
+                     lease=lease, fees=fees)
+
+
+def pt(day, rent, special=None, lease=None, fees=None):
+    """A price point as stored: [day, rent, special, lease, fees]."""
+    return [day, rent, special, lease, fees]
 
 
 class RecordTests(unittest.TestCase):
@@ -26,34 +32,45 @@ class RecordTests(unittest.TestCase):
     def test_new_unit_gets_first_point(self):
         self.record(D1, unit("101", 2700))
         u = self.u()
-        self.assertEqual((u["first"], u["last"], u["gone"], u["points"], u["past"]), (D1, D1, None, [[D1, 2700, None]], []))
+        self.assertEqual((u["first"], u["last"], u["gone"], u["points"], u["past"]), (D1, D1, None, [pt(D1, 2700, None)], []))
         self.assertEqual((u["building"], u["plan"], u["beds"], u["baths"], u["sqft"]), ("b1", "A1", 1, 1, 700))
 
     def test_unchanged_rent_adds_no_point(self):
         self.record(D1, unit("101", 2700))
         self.record(D2, unit("101", 2700))
-        self.assertEqual((self.u()["last"], self.u()["points"]), (D2, [[D1, 2700, None]]))
+        self.assertEqual((self.u()["last"], self.u()["points"]), (D2, [pt(D1, 2700, None)]))
 
     def test_changed_rent_appends_point(self):
         self.record(D1, unit("101", 2700))
         self.record(D2, unit("101", 2650))
-        self.assertEqual(self.u()["points"], [[D1, 2700, None], [D2, 2650, None]])
+        self.assertEqual(self.u()["points"], [pt(D1, 2700, None), pt(D2, 2650, None)])
 
     def test_changed_special_appends_point(self):
         self.record(D1, unit("101", 2700))
         self.record(D2, unit("101", 2700, special="1 month free"))
-        self.assertEqual(self.u()["points"], [[D1, 2700, None], [D2, 2700, "1 month free"]])
+        self.assertEqual(self.u()["points"], [pt(D1, 2700, None), pt(D2, 2700, "1 month free")])
+
+    def test_changed_lease_or_fees_appends_point(self):
+        self.record(D1, unit("101", 2700, lease=12, fees=100))
+        self.record(D2, unit("101", 2700, lease=15, fees=100))
+        self.record(D3, unit("101", 2700, lease=15, fees=140))
+        self.assertEqual(self.u()["points"], [pt(D1, 2700, None, 12, 100), pt(D2, 2700, None, 15, 100), pt(D3, 2700, None, 15, 140)])
+
+    def test_record_keeps_the_latest_available_date(self):
+        self.record(D1, dict(unit("101", 2700), available="2026-12-01"))
+        self.record(D2, dict(unit("101", 2700), available="2026-12-15"))
+        self.assertEqual(self.u()["available"], "2026-12-15")
 
     def test_same_day_change_overwrites_point(self):
         self.record(D1, unit("101", 2700))
         self.record(D1, unit("101", 2650))
-        self.assertEqual(self.u()["points"], [[D1, 2650, None]])
+        self.assertEqual(self.u()["points"], [pt(D1, 2650, None)])
 
     def test_same_day_return_to_previous_drops_point(self):
         self.record(D1, unit("101", 2700))
         self.record(D2, unit("101", 2650))
         self.record(D2, unit("101", 2700))
-        self.assertEqual(self.u()["points"], [[D1, 2700, None]])
+        self.assertEqual(self.u()["points"], [pt(D1, 2700, None)])
 
     def test_absent_unit_marked_gone_once(self):
         self.record(D1, unit("101", 2700), unit("102", 2800))
@@ -72,8 +89,8 @@ class RecordTests(unittest.TestCase):
         self.record(D2)
         self.record(D4, unit("101", 2500))
         u = self.u()
-        self.assertEqual((u["first"], u["last"], u["gone"], u["points"]), (D4, D4, None, [[D4, 2500, None]]))
-        self.assertEqual(u["past"], [{"first": D1, "last": D1, "gone": D2, "points": [[D1, 2700, None]]}])
+        self.assertEqual((u["first"], u["last"], u["gone"], u["points"]), (D4, D4, None, [pt(D4, 2500, None)]))
+        self.assertEqual(u["past"], [{"first": D1, "last": D1, "gone": D2, "points": [pt(D1, 2700, None)]}])
 
     def test_building_marked_ok(self):
         self.record(D1, unit("101", 2700))

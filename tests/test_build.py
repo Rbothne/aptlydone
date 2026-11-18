@@ -112,7 +112,7 @@ class TotalsTests(unittest.TestCase):
     def test_totals_count_new_gone_and_changed(self):
         state = history.new_state()
         unit = lambda n, rent: {"id": f"b:{n}", "building": "b", "unit": n, "plan": "A", "beds": 1, "baths": 1, "sqft": 700,
-                                "rent": rent, "special": None}
+                                "rent": rent, "special": None, "lease": 12, "fees": None, "available": None}
         history.record(state, "b", [unit("1", 2000), unit("2", 2000), unit("3", 2000)], "2026-11-17")
         history.record(state, "b", [unit("1", 1900), unit("2", 2000), unit("4", 2500)], DAY)
         self.assertEqual(build.totals(state, DAY), {"listed": 3, "new": 1, "gone": 1, "changed": 1})
@@ -145,7 +145,7 @@ class WriteSiteTests(QuietTestCase):
     def test_units_carry_first_seen_and_history(self):
         self.build_and_write([camden()], GOOD, history.new_state())
         unit = next(u for u in self.load("units-11001.json")["units"] if u["unit"] == "1215")
-        self.assertEqual((unit["first"], unit["history"], unit["rent"], unit["sqft"]), (DAY, [[DAY, 1829, None]], 1829, 495))
+        self.assertEqual((unit["first"], unit["history"], unit["rent"], unit["sqft"]), (DAY, [[DAY, 1829, None, 15, 124]], 1829, 495))
 
     def test_index_describes_each_building(self):
         self.build_and_write([bozzuto(), camden(platform="link", feed=None)], GOOD, history.new_state())

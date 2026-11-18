@@ -2,7 +2,8 @@
 
 state = {
   "version": 1,
-  "units":     {unit id: {building, plan, beds, baths, sqft, first, last, gone, points: [[day, rent, special]], past: [...]}},
+  "units":     {unit id: {building, plan, beds, baths, sqft, available, first, last, gone,
+                          points: [[day, rent, special, lease months, monthly fees]], past: [...]}},
   "plans":     {"<building id>|<plan>": {beds, points: [[day, lowest rent, median rent, units listed]]}},
   "buildings": {building id: {ok: day of last good read, failed: day of last failed read since then}},
 }
@@ -52,8 +53,9 @@ def record(state, building_id, units, day):
             entry.update(first=day, gone=None, points=[])
         if not entry:
             entry = known[unit["id"]] = {"building": building_id, "first": day, "gone": None, "points": [], "past": []}
-        entry.update(plan=unit["plan"], beds=unit["beds"], baths=unit["baths"], sqft=unit["sqft"], last=day)
-        put(entry["points"], [day, unit["rent"], unit["special"]])
+        entry.update(plan=unit["plan"], beds=unit["beds"], baths=unit["baths"], sqft=unit["sqft"],
+                     available=unit.get("available"), last=day)
+        put(entry["points"], [day, unit["rent"], unit["special"], unit.get("lease"), unit.get("fees")])
 
     for unit_id, entry in known.items():
         if entry["building"] == building_id and unit_id not in listed and not entry["gone"]:

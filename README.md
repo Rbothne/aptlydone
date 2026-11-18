@@ -12,7 +12,7 @@ Status: tracking (this README) is built. The full page (filters, deal labels, ma
 - `aptrack/`: the code behind both.
   - `discover/`: one module per company (`bozzuto`, `camden`).
   - `readers/`: one module per listing system (`sightmap`, `camden`). Every reader writes the same unit format (`units.py`).
-  - `history.py`: what is remembered: a point each time a unit's rent or concession text changes, when a unit appears and disappears, and each floor plan's lowest and median rent over time.
+  - `history.py`: what is remembered: a point each time a unit's rent, concession text, quoted lease length or monthly fees change, when a unit appears and disappears, and each floor plan's lowest and median rent over time.
 - `site/`: the page GitHub Pages serves.
 - `.github/workflows/`: `update.yml` reads units twice a day and publishes the page; `discover.yml` finds buildings weekly; `probe.yml` (run by hand) checks that GitHub's servers can read the building sites.
 - The **`data` branch** holds `buildings.json`, `state.json` and `site-data/` as a single commit that each run replaces. On the first of each month the same commit is also kept as `data-YYYY-MM`.
