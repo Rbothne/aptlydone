@@ -175,7 +175,7 @@ def main():
     buildings = files.load(BUILDINGS, None)
     if buildings is None:
         sys.exit("data/buildings.json is missing: run discover.py first")
-    get = fetch.polite(settings["delay_seconds"])
+    get = fetch.polite(settings["delay_seconds"], settings.get("site_delays"))
     if args.probe:
         sys.exit(0 if probe(buildings, get) else 1)
 

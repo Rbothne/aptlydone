@@ -96,6 +96,31 @@ class ThrottleTests(unittest.TestCase):
         self.assertLess(time.monotonic() - start, 0.4)
 
 
+class SiteDelayTests(unittest.TestCase):
+    def test_a_site_can_have_its_own_shorter_delay(self):
+        throttle = fetch.Throttle(0.5, delays={"fast.test": 0.0})
+        start = time.monotonic()
+        throttle.wait("https://fast.test/1")
+        throttle.wait("https://fast.test/2")
+        throttle.wait("https://fast.test/3")
+        self.assertLess(time.monotonic() - start, 0.3)
+
+    def test_a_site_can_have_its_own_longer_delay(self):
+        throttle = fetch.Throttle(0.0, delays={"slow.test": 0.2})
+        start = time.monotonic()
+        throttle.wait("https://slow.test/1")
+        throttle.wait("https://slow.test/2")
+        self.assertGreaterEqual(time.monotonic() - start, 0.2)
+
+    def test_polite_get_takes_site_delays(self):
+        op = Opener(b"one", b"two")
+        get = fetch.polite(0.0, delays={"a.test": 0.2}, opener=op)
+        start = time.monotonic()
+        get("https://a.test/1")
+        get("https://a.test/2")
+        self.assertGreaterEqual(time.monotonic() - start, 0.2)
+
+
 class PoliteTests(unittest.TestCase):
     def test_polite_get_fetches_and_spaces_requests_to_one_host(self):
         op = Opener(b"one", b"two")

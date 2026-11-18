@@ -27,7 +27,7 @@ def main():
         sys.exit("data/buildings.json is missing: run discover.py first")
     buildings = [b for b in buildings if b.get("in_region")]
     settings = files.load(os.path.join(ROOT, "managers.json"), None)["settings"]
-    get = fetch.polite(settings["delay_seconds"])
+    get = fetch.polite(settings["delay_seconds"], settings.get("site_delays"))
 
     collected = area.collect(buildings, files.load(AREA, {}), get, files.today(), files.now(),
                              parts=(args.only,) if args.only else area.PARTS)

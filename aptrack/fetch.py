@@ -47,10 +47,12 @@ def get(url, *, timeout=25, tries=3, headers=None, opener=urllib.request.urlopen
 
 
 class Throttle:
-    """Keeps requests to the same host at least `delay` seconds apart, across threads."""
+    """Keeps requests to the same host at least `delay` seconds apart, across threads.
+    `delays` gives particular hosts their own spacing: shorter for a site known to cope, longer for a touchy one."""
 
-    def __init__(self, delay=1.0):
+    def __init__(self, delay=1.0, delays=None):
         self.delay = delay
+        self.delays = delays or {}
         self._next = {}
         self._lock = threading.Lock()
 
@@ -59,14 +61,14 @@ class Throttle:
         with self._lock:
             now = time.monotonic()
             at = max(now, self._next.get(host, now))
-            self._next[host] = at + self.delay
+            self._next[host] = at + self.delays.get(host, self.delay)
         if at > now:
             time.sleep(at - now)
 
 
-def polite(delay=1.0, **defaults):
+def polite(delay=1.0, delays=None, **defaults):
     """A `get(url, **options)` that waits its turn for each host before fetching."""
-    throttle = Throttle(delay)
+    throttle = Throttle(delay, delays)
 
     def polite_get(url, **options):
         throttle.wait(url)

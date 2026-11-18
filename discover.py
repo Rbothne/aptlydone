@@ -30,7 +30,7 @@ def main():
     managers = [m for m in config["managers"] if not args.only or m["name"].lower() == args.only.lower()]
     if not managers:
         parser.error(f"no company named {args.only!r} in managers.json")
-    get = fetch.polite(settings["delay_seconds"])
+    get = fetch.polite(settings["delay_seconds"], settings.get("site_delays"))
 
     found = discovery.run_all(managers, DISCOVERERS, get, limit=args.limit, workers=settings["workers"])
 

@@ -6,7 +6,7 @@ Status: tracking, true monthly cost, deal tags, the page, area data (census, cri
 
 ## Files
 
-- `managers.json`: the only hand-kept file. One line per management company, plus settings: seconds between requests to one site, sites read at once, and the counties that count as the region (5-digit FIPS codes). Adding a company adds all its buildings.
+- `managers.json`: the only hand-kept file. One line per management company, plus settings: seconds between requests to one site (with per-site exceptions), sites read at once, and the counties that count as the region (5-digit FIPS codes). Adding a company adds all its buildings.
 - `discover.py`: finds every building each company lists in DC, Maryland and Virginia, and looks up each one's census tract, county and neighborhood. Writes `data/buildings.json`. A building that stops being listed is dropped after three discoveries in a row without it.
 - `area.py`: collects what changes slowly around the buildings into `data/area.json`: census figures per tract (through Census Reporter, no key), reported crime within half a mile of each building (one reader per county in `aptrack/area/crime.py`; DC and Montgomery County so far), and Zillow's rent index per ZIP code. Runs weekly with discovery.
 - `build.py`: reads every building's available units, updates the price history in `data/state.json`, and writes the files the page loads into `site/data/` (`index.json`, and one `units-<county>.json` per county).
@@ -24,7 +24,7 @@ Status: tracking, true monthly cost, deal tags, the page, area data (census, cri
 ## Rules the tracking follows
 
 - Nothing about a building is typed in by hand. A fact that cannot be collected automatically is left blank.
-- At most one request per second per site.
+- At most one request per second per site, unless `site_delays` in `managers.json` gives a site its own spacing. SightMap and Bozzuto are set to four a second: a ramp test on 2026-11-18 (short bursts up to 15 and 23 requests a second) drew no refusals or slowdown from either. No site here publishes a crawl delay or rate-limit headers, so these are tested guesses, and the circle-back rule below is the safety net. OpenStreetMap's lookup service stays at one a second because its usage policy says so.
 - A site that stops answering is not hammered. When a site says "too many requests", or fails three times in a row (timeouts, errors, or pages that load without their data), the run leaves it alone, carries on with the other sites, and comes back to it once at the end after a minute's wait. If it is still silent then, its buildings keep yesterday's units and are marked stale.
 - Discovery works the same way: a company whose site fails or starts returning empty pages is come back to once after the others. A company that suddenly lists under half the buildings it had is not believed, and its known buildings are kept.
 - A failed read changes nothing: the building keeps its previous units and is marked stale. Units are marked gone only when a successful read no longer lists them.
