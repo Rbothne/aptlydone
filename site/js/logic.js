@@ -38,7 +38,7 @@ export function unitMatches(unit, building, filters) {
   if (filters.floorMax != null && !(unit.floor != null && unit.floor <= filters.floorMax)) return false;
   if (filters.ground && !GROUND_FLOORS.includes(unit.floor)) return false;
   if (filters.laundry && building.laundry !== "in_unit") return false;
-  if (filters.parking && building.parking_from == null) return false;
+  if (filters.parking && building.parking_from == null && building.parking !== true) return false;
   if (filters.pets && building.pets !== true) return false;
   if (filters.tagged && !isSteal(unit.tag)) return false;
   if (filters.maxViolent != null && !(building.crime && building.crime.violent <= filters.maxViolent)) return false;

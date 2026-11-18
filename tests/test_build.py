@@ -309,7 +309,7 @@ class WriteSiteTests(QuietTestCase):
     def test_building_entry_has_cost_facts(self):
         self.build_and_write([bozzuto()], GOOD, history.new_state())
         b = self.load("index.json")["buildings"][0]
-        self.assertEqual((b["parking_from"], b["pets"], b["senior"], b["rank"]), (225.0, True, False, None))
+        self.assertEqual((b["parking_from"], b["pets"], b["senior"], b["rank"], b["parking"]), (225.0, True, False, None, True))
         self.assertEqual(b["one_time"], costs.one_time(b["fees"]))
         self.assertGreater(b["one_time"], 0)
 

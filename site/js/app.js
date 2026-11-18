@@ -182,6 +182,7 @@ function facts(building) {
   else if (building.laundry === "shared") items.push(["Shared laundry"]);
   else items.push(["Laundry not stated", "unknown"]);
   if (building.parking_from != null) items.push([`Parking from ${money(building.parking_from)}/mo`]);
+  else if (building.parking) items.push(["Parking available, price not stated"]);
   else items.push(["Parking not stated", "unknown"]);
   if (building.pets) items.push(["Pets allowed"]);
   if (building.one_time) items.push([`One-time fees ${money(building.one_time)}`]);

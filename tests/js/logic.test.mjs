@@ -300,3 +300,8 @@ test("follow criteria: taken from the filters, put into words, and turned back i
   assert.equal(unitMatches(unit({ beds: 1, sqft: 800, true: 2500 }), building(), back), true);
   assert.equal(unitMatches(unit({ beds: 1, sqft: 650, true: 2500 }), building(), back), false);
 });
+
+test("parking filter accepts a building that says it has parking without a price", () => {
+  assert.equal(unitMatches(unit(), building({ parking_from: null, parking: true }), f({ parking: true })), true);
+  assert.equal(unitMatches(unit(), building({ parking_from: null, parking: null }), f({ parking: true })), false);
+});

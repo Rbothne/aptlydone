@@ -10,6 +10,7 @@
     {"name": "Camden", "site": "www.camdenliving.com", "discover": "camden"},
     {"name": "Windsor", "site": "www.windsorcommunities.com", "discover": "windsor"},
     {"name": "Willow Bridge", "site": "www.willowbridgepc.com", "discover": "willowbridge"},
-    {"name": "Greystar", "site": "www.greystar.com", "discover": "greystar"}
+    {"name": "Greystar", "site": "www.greystar.com", "discover": "greystar"},
+    {"name": "AvalonBay", "site": "www.avaloncommunities.com", "discover": "avalon"}
   ]
 }

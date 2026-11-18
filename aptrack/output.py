@@ -8,7 +8,7 @@ from .facts import laundry
 
 BUILDING_FIELDS = ("id", "name", "manager", "url", "platform", "address", "lat", "lon", "state", "county", "tract",
                    "neighborhood", "zip", "first_seen")
-FACT_FIELDS = ("special", "rating", "rating_count", "coming_soon", "features", "laundry")
+FACT_FIELDS = ("special", "rating", "rating_count", "coming_soon", "features", "laundry", "pets", "parking")
 
 
 def assemble(buildings, results, state, out_dir):
@@ -51,7 +51,7 @@ def assemble(buildings, results, state, out_dir):
             features = facts.get("features") or []
             entry.update(special=facts.get("special"), rating=facts.get("rating"), rating_count=facts.get("rating_count"),
                          coming_soon=bool(facts.get("coming_soon")), features=features,
-                         laundry=laundry.detect(features + amenities))
+                         laundry=laundry.detect(features + amenities), pets=facts.get("pets"), parking=facts.get("parking"))
             if facts.get("neighborhood"):                 # the manager's own name for the area beats the map lookup
                 entry["neighborhood"] = facts["neighborhood"]
         else:
@@ -78,7 +78,8 @@ def price(entries, units_of):
             costs.apply(unit, fees, entry.get("special"))
             everything.append(unit)
         entry.update(one_time=costs.one_time(fees), parking_from=costs.parking_from(fees),
-                     pets=costs.pets_allowed(fees), senior=deals.is_senior(entry))
+                     pets=costs.pets_allowed(fees) or entry.get("pets"), senior=deals.is_senior(entry),
+                     parking=True if costs.parking_from(fees) is not None else entry.get("parking"))
     deals.score(everything, entries)
     deals.rank(everything, entries)
 
