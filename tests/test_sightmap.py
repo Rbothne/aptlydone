@@ -28,7 +28,7 @@ class MakeUnitTests(unittest.TestCase):
     def test_keys_are_the_common_format(self):
         u = units.make_unit("b", "1", rent=2000)
         self.assertEqual(list(u), ["id", "building", "unit", "floor", "plan", "beds", "baths", "sqft", "rent", "fees",
-                                   "lease", "available", "special", "notes", "url", "restricted", "plan_image"])
+                                   "lease", "available", "special", "notes", "url", "restricted", "plan_image", "count"])
         self.assertEqual((u["id"], u["building"], u["unit"]), ("b:1", "b", "1"))
 
     def test_no_rent_means_no_unit(self):

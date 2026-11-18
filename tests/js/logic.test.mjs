@@ -330,3 +330,12 @@ test("income rule of thumb: rent should be no more than a third of monthly incom
   assert.equal(affordable(unit({ rent: 2500 }), null), null);
   assert.equal(affordable(unit({ rent: null }), 90000), null);
 });
+
+test("a floor-plan-level entry is titled by its plan and says how many are available", async () => {
+  const { unitTitle, availableNote } = await import("../../site/js/logic.js");
+  assert.equal(unitTitle(unit({ unit: "215", count: null })), "#215");
+  assert.equal(unitTitle(unit({ unit: "Studio A", plan: "Studio A", count: 3 })), "Studio A");
+  assert.equal(availableNote(unit({ count: 3 })), "3 available");
+  assert.equal(availableNote(unit({ count: 1 })), "1 available");
+  assert.equal(availableNote(unit({ count: null })), "");
+});

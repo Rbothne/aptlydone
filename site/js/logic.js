@@ -159,6 +159,15 @@ export function affordable(unit, income) {
   return needed == null || income == null ? null : income >= needed;
 }
 
+/** "#215" for a unit; the plan's name when the source prices by floor plan and not by unit. */
+export function unitTitle(unit) {
+  return unit.count != null ? unit.plan || unit.unit : `#${unit.unit}`;
+}
+
+export function availableNote(unit) {
+  return unit.count != null ? `${unit.count} available` : "";
+}
+
 export function tagLabel(tag) {
   return TAG_LABELS[tag] || "";
 }

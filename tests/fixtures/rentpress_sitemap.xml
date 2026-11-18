@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><?xml-stylesheet type="text/xsl" href="//wcsmith.com/main-sitemap.xsl"?>
+<urlset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd http://www.google.com/schemas/sitemap-image/1.1 http://www.google.com/schemas/sitemap-image/1.1/sitemap-image.xsd" xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+	<url>
+		<loc>https://wcsmith.com/apartments/clarence-house/</loc>
+		<lastmod>2026-06-08T15:56:57+00:00</lastmod>
+		<image:image>
+			<image:loc>https://wcsmith.com/wp-content/uploads/2022/11/Clarence-House-Washington-DC-Apartments-North-West-Van-Ness-Livingroom.jpg</image:loc>
+		</image:image>
+	</url>
+<url>
+		<loc>https://wcsmith.com/apartments/1370-1372-ft-stevens-dr/</loc>
+		<lastmod>2026-07-30T15:28:54+00:00</lastmod>
+		<image:image>
+			<image:loc>https://wcsmith.com/wp-content/uploads/2022/11/1370-stevens-living-e1785176299133.jpg</image:loc>
+		</image:image>
+	</url>
+<url>
+		<loc>https://wcsmith.com/apartments/manor-village/</loc>
+		<lastmod>2026-07-23T18:46:04+00:00</lastmod>
+		<image:image>
+			<image:loc>https://wcsmith.com/wp-content/uploads/2019/06/Manor-Village-Affordable-Southeast-Rental.jpg</image:loc>
+		</image:image>
+	</url>
+<url>
+		<loc>https://wcsmith.com/apartments/battery-lane-apartments/</loc>
+		<lastmod>2026-07-15T17:08:07+00:00</lastmod>
+		<image:image>
+			<image:loc>https://wcsmith.com/wp-content/uploads/2025/01/exterior-2.jpg</image:loc>
+		</image:image>
+	</url>
+<url>
+		<loc>https://wcsmith.com/apartments/whitelaw/</loc>
+		<lastmod>2026-07-14T19:40:46+00:00</lastmod>
+		<image:image>
+			<image:loc>https://wcsmith.com/wp-content/uploads/2022/11/whitelaw-color.png</image:loc>
+		</image:image>
+	</url>
+</urlset>

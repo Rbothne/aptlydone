@@ -2,7 +2,7 @@
 
 import {
   DEFAULT_FILTERS, affordable, ago, areaFacts, availability, cost, crimeText, criteriaFilters, criteriaFrom, criteriaLabel, driveLabel, incomeNeeded,
-  isSteal, mapPoints, standing, groupBuildings, money, perSqft, shortDate, sparkline, tagLabel, tagReason, unitMatches,
+  availableNote, isSteal, mapPoints, standing, unitTitle, groupBuildings, money, perSqft, shortDate, sparkline, tagLabel, tagReason, unitMatches,
 } from "./logic.js";
 import { driveTimes, geocode } from "./commute.js";
 import { createStore } from "./store.js";
@@ -94,9 +94,12 @@ function unitRow(unit, building, listed = true) {
         class: `tag ${unit.tag}`,
         title: unit.tag === "check" ? "30% or more under similar units in its own building. That is usually an income-restricted unit the building did not label, or a mistake. Ask before counting on it." : null,
       }, tagLabel(unit.tag)),
-      h("b", null, `#${unit.unit}`), " · ",
+      h("b", null, unitTitle(unit)), " · ",
       [bedsLabel(unit.beds), unit.baths != null && `${unit.baths} bath`, unit.sqft && `${unit.sqft.toLocaleString("en-US")} sqft`,
         unit.floor != null && `floor ${unit.floor}`].filter(Boolean).join(" · "),
+      availableNote(unit) && h("span", {
+        class: "note", title: "This building publishes prices per floor plan, not per unit. The price is the lowest for this floor plan.",
+      }, availableNote(unit)),
       unit.sqft && unit.sqft < ROOM_SQFT && h("span", { class: "note" }, "room"),
       unit.restricted === true && h("span", { class: "note" }, "income-restricted"),
       affordable(unit, state.income) === false && h("span", {
@@ -104,7 +107,7 @@ function unitRow(unit, building, listed = true) {
       }, `needs income of ${money(incomeNeeded(unit))}`),
       !listed && h("span", { class: "note" }, "no longer listed")),
     h("div", { class: "price" },
-      h("b", null, money(cost(unit))), h("small", null, "/mo "), h("small", null, perSqft(unit)),
+      unit.count != null && h("small", null, "from "), h("b", null, money(cost(unit))), h("small", null, "/mo "), h("small", null, perSqft(unit)),
       unit.true_offer != null && h("small", { class: "if" }, `${money(unit.true_offer)} if the building's offer applies`)),
     h("div", { class: "vs" }, comparison(unit)),
     h("div", { class: "when" },
@@ -293,7 +296,7 @@ function popup(point) {
     h("p", null, h("b", null, building.name), building.rating != null && ` ★ ${building.rating}`),
     h("p", null, [building.neighborhood, address(building)].filter(Boolean).join(" · ")),
     h("p", null, `${plural(point.count, "unit")} match`, point.tag && ` · best tag: ${tagLabel(point.tag)}`),
-    best && h("p", null, `Best: #${best.unit} · ${[bedsLabel(best.beds), best.sqft && `${best.sqft} sqft`].filter(Boolean).join(" · ")} · ${money(cost(best))}/mo`),
+    best && h("p", null, `Best: ${unitTitle(best)} · ${[bedsLabel(best.beds), best.sqft && `${best.sqft} sqft`].filter(Boolean).join(" · ")} · ${money(cost(best))}/mo`),
     h("button", { type: "button", onclick: () => { state.filters.q = building.name; state.tab = "buildings"; changed(); window.scrollTo(0, 0); } },
       "Show in the list"),
     building.zip && h("button", { type: "button", style: "margin-left:6px;background:none;color:#a8321f;border-color:#a8321f",

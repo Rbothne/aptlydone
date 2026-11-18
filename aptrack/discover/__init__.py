@@ -1,6 +1,6 @@
 """One discoverer per management company. Each is `discover(get, limit=None) -> [building, ...]`."""
 
-from . import avalon, bozzuto, camden, greystar, willowbridge, windsor
+from . import avalon, bozzuto, camden, greystar, rentpress, willowbridge, windsor
 
 DISCOVERERS = {
     "bozzuto": bozzuto.discover,
@@ -9,4 +9,5 @@ DISCOVERERS = {
     "willowbridge": willowbridge.discover,
     "greystar": greystar.discover,
     "avalon": avalon.discover,
+    "wcsmith": rentpress.discoverer("WC Smith", "wcsmith.com"),
 }

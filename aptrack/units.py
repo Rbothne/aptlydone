@@ -24,7 +24,7 @@ def beds_count(value):
 
 
 def make_unit(building_id, unit, *, rent, plan=None, beds=None, baths=None, sqft=None, floor=None, fees=None,
-              lease=None, available=None, special=None, notes=None, url=None, restricted=None, plan_image=None):
+              lease=None, available=None, special=None, notes=None, url=None, restricted=None, plan_image=None, count=None):
     """One available unit, or None when it has no usable rent."""
     rent = num(rent)
     if not rent or rent <= 0:
@@ -48,6 +48,7 @@ def make_unit(building_id, unit, *, rent, plan=None, beds=None, baths=None, sqft
         "url": url,
         "restricted": restricted,          # income-restricted: True, False, or None when the source does not say
         "plan_image": plan_image or None,  # address of the floor-plan drawing
+        "count": num(count),               # set when a source prices by floor plan: how many units are available at this one
     }
 
 
