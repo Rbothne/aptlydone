@@ -363,3 +363,14 @@ The Luxury / Standard tier from section 6 is dropped. Each building gets a rank 
 
 - A run in which more than a fifth of buildings fail ends in failure, so GitHub emails the owner **(call: the threshold)**.
 - Four Bozzuto buildings publish unit maps without prices; they are listed as "no prices published".
+
+## 16. Later the same day: what changed again
+
+- **More companies.** Windsor, Willow Bridge and Greystar are discovered alongside Bozzuto and Camden. All use SightMap unit maps where a map exists; a building without one is a plain link. Windsor is discovered through its regional location pages, because reading every building nationwide made its site stop answering properly.
+- **Census figures need no key.** They come through Census Reporter (the Census Bureau's own API now requires a key).
+- **Crime** is counted within half a mile over 12 months for DC and Montgomery County. Other counties show "No crime data for this county" until a reader is written for them.
+- **ZIP codes** come from the map lookup at discovery. A ZIP from a manager's page is believed only if it starts with 2, since some put the street number there.
+- **Commute, first version.** No key: the work address is turned into coordinates by OpenStreetMap's Nominatim and timed by the public OSRM server, both called from the browser. Times ignore traffic and say so. Rush-hour times through a Google key remain a later option.
+- **Map view.** A tab showing each matching building as a dot coloured by its best tag, with the work place marked.
+- **No-go regions, first version.** A ZIP code is marked no-go from any building card or map popup and hidden everywhere until removed. Clicking ZIP areas on the map is still to come.
+- **More filters:** minimum rating, managed by, violent crime nearby (slider), maximum drive (slider).
