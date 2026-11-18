@@ -174,6 +174,17 @@ class RunTests(QuietTestCase):
         self.assertEqual(self.state["buildings"]["bozzuto-5333-connecticut"]["failed"], None)
         self.assertEqual(self.slept, [])
 
+    def test_a_facts_site_that_keeps_failing_is_left_alone_for_the_rest_of_the_run(self):
+        apis = [API + str(n) for n in range(5)]
+        pages = [f"https://www.bozzuto.com/b{n}" for n in range(5)]
+        buildings = [bozzuto(id=f"b{n}", feed_api=apis[n], url=pages[n]) for n in range(5)]
+        answers = {api: fixture("sightmap_feed.json") for api in apis}
+        answers.update({page: fetch.RateLimited("slow down") for page in pages})
+        results = self.run_it(buildings, answers)
+        self.assertEqual(len(results), 5)                                        # every building's units were still read
+        self.assertEqual([u for u in self.web.asked if u in pages], pages[:3])   # the facts site was asked three times, then left alone
+        self.assertEqual(self.slept, [])
+
     def test_special_recorded_in_history(self):
         self.run_it([bozzuto()], GOOD)
         self.assertEqual(self.state["buildings"]["bozzuto-5333-connecticut"]["specials"], [[DAY, OFFER]])
@@ -331,6 +342,12 @@ class WriteSiteTests(QuietTestCase):
         self.build_and_write([windsor], GOOD, history.new_state())
         b = self.load("index.json")["buildings"][0]
         self.assertEqual((b["laundry"], b["features"]), ("in_unit", ["In-home washer and dryer", "Quartz countertops"]))
+
+    def test_a_corrected_neighborhood_from_discovery_shows_up(self):
+        state = history.new_state()
+        self.build_and_write([camden(neighborhood="Washington")], GOOD, state)
+        self.build_and_write([camden(neighborhood="NoMa")], GOOD, state, day="2026-11-19")
+        self.assertEqual(self.load("index.json")["buildings"][0]["neighborhood"], "NoMa")
 
     def test_stale_building_keeps_its_fees_and_amenities(self):
         state = history.new_state()

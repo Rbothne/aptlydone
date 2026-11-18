@@ -8,7 +8,7 @@ from .facts import laundry
 
 BUILDING_FIELDS = ("id", "name", "manager", "url", "platform", "address", "lat", "lon", "state", "county", "tract",
                    "neighborhood", "zip", "first_seen")
-FACT_FIELDS = ("special", "rating", "rating_count", "coming_soon", "features", "laundry", "pets", "parking")
+FACT_FIELDS = ("special", "rating", "rating_count", "coming_soon", "features", "laundry", "pets", "parking", "manager_area")
 
 
 def assemble(buildings, results, state, out_dir):
@@ -51,17 +51,17 @@ def assemble(buildings, results, state, out_dir):
             features = facts.get("features") or []
             entry.update(special=facts.get("special"), rating=facts.get("rating"), rating_count=facts.get("rating_count"),
                          coming_soon=bool(facts.get("coming_soon")), features=features,
-                         laundry=laundry.detect(features + amenities), pets=facts.get("pets"), parking=facts.get("parking"))
-            if facts.get("neighborhood"):                 # the manager's own name for the area beats the map lookup
-                entry["neighborhood"] = facts["neighborhood"]
+                         laundry=laundry.detect(features + amenities), pets=facts.get("pets"), parking=facts.get("parking"),
+                         manager_area=facts.get("neighborhood"))
         else:
             for key in FACT_FIELDS:
                 entry[key] = old.get(key, [] if key == "features" else None)
-            entry["neighborhood"] = old.get("neighborhood") or entry["neighborhood"]
             if not entry["features"] and building.get("features"):               # found at discovery
                 entry["features"] = building["features"]
             if entry["laundry"] is None:
                 entry["laundry"] = laundry.detect(entry["features"] + amenities)
+        if entry.get("manager_area"):                     # the manager's own name for the area beats the map lookup
+            entry["neighborhood"] = entry["manager_area"]
         if entry.get("rating") is None and building.get("rating") is not None:      # found at discovery
             entry.update(rating=building["rating"], rating_count=building.get("rating_count"))
         entries.append(entry)

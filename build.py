@@ -34,8 +34,11 @@ def readable(building):
     return bool(building.get("in_region")) and building.get("platform") in READERS
 
 
-def read_one(building, get):
-    """(result, error): exactly one is None. RateLimited is raised, not returned."""
+def read_one(building, get, facts_trouble=None):
+    """(result, error): exactly one is None. RateLimited is raised, not returned.
+
+    `facts_trouble` counts, per manager, facts reads that failed in a row during this run; once a facts site has
+    failed SILENT_AFTER times running it is not asked again today, and its buildings keep the facts they had."""
     try:
         result = READERS[building["platform"]](building, get)
     except fetch.RateLimited:
@@ -44,13 +47,17 @@ def read_one(building, get):
         return None, error
     # Facts about the building (concession, rating...) are a bonus: failing to get them never fails the read.
     result.setdefault("facts", None)
-    facts_reader = FACTS.get(building.get("manager"))
-    if facts_reader:
+    manager = building.get("manager")
+    facts_reader = FACTS.get(manager)
+    trouble = facts_trouble if facts_trouble is not None else {}
+    if facts_reader and trouble.get(manager, 0) < SILENT_AFTER:
         try:
             result["facts"] = facts_reader(building, get)
+            trouble[manager] = 0
         except Exception as error:
             print(f"  no facts for {building['id']}: {error!r}")
             result["facts"] = None
+            trouble[manager] = trouble.get(manager, 0) + 1
     return result, None
 
 
@@ -65,7 +72,7 @@ def site_trouble(error):
     return error is not None and (isinstance(error, NotAnswering) or not isinstance(error, ReadError))
 
 
-def read_host(group, get):
+def read_host(group, get, facts_trouble=None):
     """Read one site's buildings in order. Returns (outcomes, buildings to come back to later).
 
     A site is left alone for the rest of the pass when it says "too many requests", or when it fails
@@ -74,7 +81,7 @@ def read_host(group, get):
     outcomes, streak = [], 0
     for position, building in enumerate(group):
         try:
-            result, error = read_one(building, get)
+            result, error = read_one(building, get, facts_trouble)
         except fetch.RateLimited:
             return outcomes, group[position:]
         outcomes.append((building, result, error))
@@ -92,9 +99,9 @@ def run(buildings, state, get, day, *, workers=4, sleep=time.sleep):
         if readable(building):
             groups.setdefault(host(building), []).append(building)
 
-    outcomes, deferred = [], []
+    outcomes, deferred, facts_trouble = [], [], {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
-        for done, left in pool.map(lambda group: read_host(group, get), groups.values()):
+        for done, left in pool.map(lambda group: read_host(group, get, facts_trouble), groups.values()):
             outcomes += done
             deferred += left
     if deferred:
@@ -111,7 +118,7 @@ def run(buildings, state, get, day, *, workers=4, sleep=time.sleep):
                 outcomes.append((building, None, NotAnswering("the site is still not answering")))
                 continue
             try:
-                result, error = read_one(building, get)
+                result, error = read_one(building, get, facts_trouble)
             except fetch.RateLimited as limited:
                 result, error = None, limited
             outcomes.append((building, result, error))
