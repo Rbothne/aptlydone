@@ -59,6 +59,11 @@ main { padding: 14px 16px 30px; max-width: 1180px; margin: 0 auto; }
 .building h2 { font-size: 16px; margin: 0; }
 .building h2 a { text-decoration: none; }
 .building h2 a:hover { text-decoration: underline; }
+.follow { border: 1px solid var(--line); background: none; border-radius: 999px; padding: 1px 9px; font-size: 12px; font-weight: 400;
+          color: var(--muted); margin-left: 6px; vertical-align: 2px; }
+.follow[aria-pressed="true"] { color: #d99a00; border-color: #d99a00; }
+.following { margin: 0 14px 8px; color: var(--muted); font-size: 12.5px; }
+h3.group { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 18px 2px 8px; }
 .rating { font-weight: 600; white-space: nowrap; }
 .rating small { font-weight: 400; }
 .where { color: var(--muted); grid-column: 1 / -1; }

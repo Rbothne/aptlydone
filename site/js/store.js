@@ -6,6 +6,7 @@ import { DEFAULT_FILTERS } from "./logic.js";
 const FILTERS = "apt.filters";
 const STARS = "apt.stars";
 const SETTINGS = "apt.settings";
+const FOLLOWS = "apt.follows";
 
 export function createStore(storage) {
   const memory = {};
@@ -58,6 +59,23 @@ export function createStore(storage) {
     },
     setFilters(filters) { write(FILTERS, filters); },
     stars,
+
+    /** Buildings being followed: [{id, name, criteria}]. */
+    follows() {
+      const saved = read(FOLLOWS, []);
+      return Array.isArray(saved) ? saved.filter((follow) => follow && follow.id) : [];
+    },
+    isFollowing(id) { return this.follows().some((follow) => follow.id === id); },
+
+    /** Follow or stop following a building. Returns true when it is now followed. */
+    toggleFollow(building, criteria) {
+      const current = this.follows();
+      const without = current.filter((follow) => follow.id !== building.id);
+      const following = without.length === current.length;
+      if (following) without.push({ id: building.id, name: building.name, criteria });
+      write(FOLLOWS, without);
+      return following;
+    },
     isStarred(id) { return stars().some((star) => star.unit.id === id); },
 
     /** Star or unstar a unit. Returns true when it is now starred. */

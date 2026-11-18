@@ -285,3 +285,18 @@ test("crime counts from an older year say which year", async () => {
   assert.deepEqual(crimeText(old, ["51013"]),
     { text: "Within ½ mile, Jun 2021 to Jun 2022 (the last year published here): 2 violent · 30 property crimes", known: true });
 });
+
+test("follow criteria: taken from the filters, put into words, and turned back into filters", async () => {
+  const { criteriaFrom, criteriaLabel, criteriaFilters } = await import("../../site/js/logic.js");
+  const criteria = criteriaFrom(f({ beds: [1, 2], minSqft: 700, maxCost: 2600, q: "chevy", tagged: true, county: "11001" }));
+  assert.deepEqual(criteria, { beds: [1, 2], minSqft: 700, maxCost: 2600 });
+  assert.equal(criteriaLabel(criteria), "1 or 2 bed · 700+ sqft · up to $2,600");
+  assert.equal(criteriaLabel({ beds: [0], minSqft: null, maxCost: null }), "Studio");
+  assert.equal(criteriaLabel({ beds: [3], minSqft: null, maxCost: 4000 }), "3+ bed · up to $4,000");
+  assert.equal(criteriaLabel({ beds: [], minSqft: null, maxCost: null }), "any unit");
+  assert.equal(criteriaLabel(undefined), "any unit");
+  const back = criteriaFilters(criteria);
+  assert.deepEqual([back.beds, back.minSqft, back.maxCost, back.q, back.tagged, back.county], [[1, 2], 700, 2600, "", false, ""]);
+  assert.equal(unitMatches(unit({ beds: 1, sqft: 800, true: 2500 }), building(), back), true);
+  assert.equal(unitMatches(unit({ beds: 1, sqft: 650, true: 2500 }), building(), back), false);
+});

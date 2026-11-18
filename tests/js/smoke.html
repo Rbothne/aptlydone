@@ -73,6 +73,19 @@ async function run() {
   slide("maxViolent", "61");
   out.area = (doc.querySelector(".area") || {}).textContent || null;
   out.crimeChip = [...doc.querySelectorAll(".facts li")].map((li) => li.textContent).find((t) => /crime/i.test(t)) || null;
+  doc.querySelector('[data-beds="1"]').click();
+  set("minSqft", "700");
+  const follow = doc.querySelector(".follow");
+  out.followButton = follow.textContent;
+  follow.click();
+  out.followPressed = doc.querySelector(".follow").getAttribute("aria-pressed");
+  doc.getElementById("reset").click();
+  doc.querySelector('[data-tab="followed"]').click();
+  out.followedHeadings = [...doc.querySelectorAll("#followed h3")].map((h) => h.textContent);
+  out.followNote = (doc.querySelector("#followed .following") || {}).textContent || null;
+  out.followedBuildingUnits = doc.querySelector("#followed .building") ? doc.querySelector("#followed .building").querySelectorAll(".unit").length : 0;
+  out.followedBeds = [...new Set([...doc.querySelector("#followed .building").querySelectorAll(".unit .what")].map((w) => (w.textContent.match(/(Studio|\d bed)/) || [])[0]))];
+  doc.querySelector('[data-tab="buildings"]').click();
   const nogo = doc.querySelector(".facts button");
   if (nogo) {
     out.nogoButton = nogo.textContent;

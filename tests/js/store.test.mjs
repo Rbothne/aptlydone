@@ -99,3 +99,16 @@ test("settings are remembered, with a fallback", () => {
   assert.equal(createStore(storage).getSetting("demographics", true), false);
   assert.equal(createStore(brokenStorage).getSetting("demographics", true), true);
 });
+
+test("following a building remembers the criteria it was followed with", () => {
+  const storage = fakeStorage();
+  const store = createStore(storage);
+  assert.equal(store.isFollowing("b1"), false);
+  assert.equal(store.toggleFollow(building, { beds: [1], minSqft: 700, maxCost: 2600 }), true);
+  assert.equal(store.isFollowing("b1"), true);
+  const [follow] = createStore(storage).follows();
+  assert.deepEqual(follow, { id: "b1", name: "The Example", criteria: { beds: [1], minSqft: 700, maxCost: 2600 } });
+  assert.equal(store.toggleFollow(building, {}), false);
+  assert.deepEqual(store.follows(), []);
+  assert.equal(createStore(brokenStorage).toggleFollow(building, {}), true);
+});

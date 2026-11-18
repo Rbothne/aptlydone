@@ -1,7 +1,7 @@
 // Loads the data files and draws the page. Every decision (what matches, what order, what words) is in logic.js.
 
 import {
-  DEFAULT_FILTERS, ago, areaFacts, availability, cost, crimeText, driveLabel, isSteal, mapPoints, groupBuildings, money, perSqft, shortDate, sparkline, tagLabel, tagReason, unitMatches,
+  DEFAULT_FILTERS, ago, areaFacts, availability, cost, crimeText, criteriaFilters, criteriaFrom, criteriaLabel, driveLabel, isSteal, mapPoints, groupBuildings, money, perSqft, shortDate, sparkline, tagLabel, tagReason, unitMatches,
 } from "./logic.js";
 import { driveTimes, geocode } from "./commute.js";
 import { createStore } from "./store.js";
@@ -204,23 +204,35 @@ function aboutArea(building) {
   return h("details", { class: "area" }, h("summary", null, "About the area"), h("ul", null, lines.map((line) => h("li", null, line))));
 }
 
-function buildingCard(group) {
+function followButton(building) {
+  const following = store.isFollowing(building.id);
+  const criteria = criteriaFrom(state.filters);
+  return h("button", {
+    class: "follow", type: "button", "aria-pressed": String(following),
+    title: following ? "Stop following this building" : `Follow this building for: ${criteriaLabel(criteria)}. It stays under Followed and shows whatever matches each day.`,
+    onclick: () => { store.toggleFollow(building, criteria); draw(); },
+  }, following ? "★ Following" : "☆ Follow building");
+}
+
+function buildingCard(group, note) {
   const { building, units, best } = group;
   const all = state.expanded.has(building.id);
   const shown = all ? units : best;
   return h("article", { class: "building" },
     h("header", null,
-      h("h2", null, h("a", { href: building.url, target: "_blank", rel: "noopener" }, building.name)),
+      h("h2", null, h("a", { href: building.url, target: "_blank", rel: "noopener" }, building.name), " ", followButton(building)),
       building.rating != null
         ? h("span", { class: "rating", title: "Rating published on the manager's site" }, `★ ${building.rating}`,
             building.rating_count != null && h("small", null, ` (${building.rating_count.toLocaleString("en-US")})`))
         : h("span", null),
       h("div", { class: "where" }, [building.neighborhood, address(building), building.manager].filter(Boolean).join(" · "))),
+    note && h("p", { class: "following" }, note),
     building.special && h("p", { class: "offer" }, building.special,
       h("small", null, "Building-wide offer: it may not apply to every unit.")),
     facts(building),
     aboutArea(building),
     h("div", { class: "units" }, shown.flatMap((unit) => unitRow(unit, building))),
+    !units.length && h("p", { class: "following" }, "Nothing here matches right now."),
     units.length > best.length && h("button", {
       class: "more", type: "button",
       onclick: () => { if (all) state.expanded.delete(building.id); else state.expanded.add(building.id); draw(); },
@@ -314,12 +326,25 @@ function drawMap(groups) {
   }
 }
 
+function followedBuildings() {
+  return store.follows().map((follow) => {
+    const building = state.byId[follow.id];
+    if (!building) {
+      return h("article", { class: "building" }, h("header", null, h("h2", null, follow.name), h("span", null),
+        h("div", { class: "where" }, "This building is no longer tracked.")));
+    }
+    const [group] = groupBuildings([building], state.units, { ...criteriaFilters(follow.criteria), nogo: [] }, BEST);
+    return buildingCard(group || { building, units: [], best: [] }, `Following for: ${criteriaLabel(follow.criteria)}`);
+  });
+}
+
 function drawFollowed() {
   const stars = store.stars();
-  $("n-followed").textContent = stars.length ? String(stars.length) : "";
+  const follows = store.follows();
+  $("n-followed").textContent = stars.length + follows.length ? String(stars.length + follows.length) : "";
   const section = $("followed");
-  if (!stars.length) {
-    section.replaceChildren(h("p", { class: "empty" }, "Nothing followed yet. Use the ☆ on any unit to follow it; it stays here even after it stops being listed."));
+  if (!stars.length && !follows.length) {
+    section.replaceChildren(h("p", { class: "empty" }, "Nothing followed yet. Use the ☆ on a unit to follow that unit, or \"Follow building\" to keep a building here with whatever matches your size and price filters each day."));
     return;
   }
   const groups = new Map();
@@ -328,7 +353,11 @@ function drawFollowed() {
     if (!groups.has(building.id)) groups.set(building.id, { building, stars: [] });
     groups.get(building.id).stars.push(star);
   }
-  section.replaceChildren(...[...groups.values()].map(({ building, stars: mine }) => h("article", { class: "building" },
+  section.replaceChildren(
+    follows.length ? h("h3", { class: "group" }, "Buildings you follow") : "",
+    ...followedBuildings(),
+    stars.length ? h("h3", { class: "group" }, "Units you follow") : "",
+    ...[...groups.values()].map(({ building, stars: mine }) => h("article", { class: "building" },
     h("header", null,
       h("h2", null, h("a", { href: building.url, target: "_blank", rel: "noopener" }, building.name)),
       h("span", null),

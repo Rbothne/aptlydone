@@ -115,6 +115,29 @@ export function mapPoints(groups) {
     }));
 }
 
+/** What "follow this building" remembers: the size and price filters in force when it was followed. */
+export function criteriaFrom(filters) {
+  return { beds: [...filters.beds], minSqft: filters.minSqft, maxCost: filters.maxCost };
+}
+
+export function criteriaFilters(criteria) {
+  const c = criteria || {};
+  return { ...DEFAULT_FILTERS, beds: Array.isArray(c.beds) ? c.beds : [], minSqft: c.minSqft ?? null, maxCost: c.maxCost ?? null };
+}
+
+export function criteriaLabel(criteria) {
+  const c = criteria || {};
+  const parts = [];
+  const beds = (Array.isArray(c.beds) ? [...c.beds] : []).sort();
+  if (beds.length) {
+    const names = beds.map((n) => (n === 0 ? "Studio" : n === 3 ? "3+" : String(n)));
+    parts.push(names.join(" or ") + (beds.length === 1 && beds[0] === 0 ? "" : " bed"));
+  }
+  if (c.minSqft != null) parts.push(`${c.minSqft}+ sqft`);
+  if (c.maxCost != null) parts.push(`up to ${money(c.maxCost)}`);
+  return parts.join(" · ") || "any unit";
+}
+
 export function tagLabel(tag) {
   return TAG_LABELS[tag] || "";
 }
