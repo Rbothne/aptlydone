@@ -1,12 +1,28 @@
 """Camden: each building's "available apartments" page embeds its floor plans and units as JSON."""
 
+import html as htmllib
 import json
 import re
 
-from ..units import make_unit, num
+from ..units import make_unit, num, unique
 from . import ReadError
 
 NEXT_DATA = re.compile(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', re.S)
+# The page's banner is sometimes a price offer and sometimes an advert for tours. Only an offer is a "special".
+OFFER = re.compile(r"\bfree\b|\boff\b|\bsav(e|ings?)\b|waiv|\bcredit|discount|concession|reduced|\$\s?\d", re.I)
+
+
+def plain(text):
+    """Text without HTML tags or entities."""
+    text = " ".join(htmllib.unescape(re.sub(r"<[^>]+>", " ", text or "")).split())
+    return re.sub(r"\s+([.,!?;:])", r"\1", text)
+
+
+def banner(title, description):
+    """The banner as one sentence-ended string, or None when it is empty or not a price offer."""
+    parts = [part for part in (plain(title), plain(description)) if part]
+    text = " ".join(part if part[-1] in ".!?" else part + "." for part in parts)
+    return text if text and OFFER.search(text) else None
 
 
 def page_data(html):
@@ -23,9 +39,7 @@ def parse(html, building):
     plans = (props.get("data") or {}).get("availableApartments")
     if plans is None:
         raise ReadError(f"{building['id']}: page has no listing data")
-    special = ". ".join(part.strip().rstrip(".") for part in
-                        (props.get("specialCtaTitle"), props.get("specialCtaDescription")) if part and part.strip())
-    special = special + "." if special else None
+    special = banner(props.get("specialCtaTitle"), props.get("specialCtaDescription"))
 
     units = []
     for plan in plans:
@@ -53,7 +67,7 @@ def parse(html, building):
     listed = sum(len(plan.get("availableUnitRefs") or []) for plan in plans)
     if listed and not units:
         raise ReadError(f"{building['id']}: {listed} units listed, none with a price")
-    return {"units": units, "fees": [], "amenities": []}
+    return {"units": unique(units), "fees": [], "amenities": []}
 
 
 def read(building, get):

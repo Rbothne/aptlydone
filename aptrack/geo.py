@@ -35,5 +35,5 @@ def pick_name(address):
 
 def neighborhood(get, lat, lon):
     """The neighborhood (or failing that the town) OpenStreetMap gives for a point."""
-    answer = json.loads(get(f"{NOMINATIM}?format=jsonv2&zoom=14&lat={lat}&lon={lon}"))
+    answer = json.loads(get(f"{NOMINATIM}?format=jsonv2&zoom=16&lat={lat}&lon={lon}"))
     return pick_name(answer.get("address") or {})

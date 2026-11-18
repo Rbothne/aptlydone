@@ -50,6 +50,27 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(by_unit(camden.parse(edited(change), B))["1215"]["special"],
                          "Up to 6 weeks free. On select homes.")
 
+    def test_special_html_is_stripped(self):
+        def change(pp):
+            pp["specialCtaTitle"] = "<p>Up to <b>6 weeks free</b>!</p>"
+            pp["specialCtaDescription"] = '<p>On select homes. <a href="https://x.test/tour">Details</a></p>'
+        self.assertEqual(by_unit(camden.parse(edited(change), B))["1215"]["special"],
+                         "Up to 6 weeks free! On select homes. Details.")
+
+    def test_banner_that_is_not_an_offer_is_not_a_special(self):
+        def change(pp):
+            pp["specialCtaTitle"] = "<p>Tour your way! Choose from in-person, live video, or self-guided tours.</p>"
+            pp["specialCtaDescription"] = "<p>Self-guided tours are available daily from 7 am to 7 pm. Call 610-686-7146!</p>"
+        self.assertIsNone(by_unit(camden.parse(edited(change), B))["1215"]["special"])
+
+    def test_unit_listed_under_two_floor_plans_appears_once(self):
+        def change(pp):
+            plans = pp["data"]["availableApartments"]
+            plans[1]["availableUnitRefs"].append(dict(plans[0]["availableUnitRefs"][0]))
+        result = camden.parse(edited(change), B)
+        ids = [u["id"] for u in result["units"]]
+        self.assertEqual((len(ids), len(set(ids))), (5, 5))
+
     def test_building_number_is_part_of_the_unit_label(self):
         def change(pp):
             pp["data"]["availableApartments"][1]["availableUnitRefs"][0]["buildingNumber"] = "3"

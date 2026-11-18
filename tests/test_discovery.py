@@ -116,7 +116,7 @@ class GeoTests(unittest.TestCase):
         self.assertIsNone(geo.locate(Web({url: fixture("census_nomatch.json")}), address="nowhere"))
 
     def test_neighborhood_from_reverse_lookup(self):
-        url = geo.NOMINATIM + "?format=jsonv2&zoom=14&lat=38.960622&lon=-77.072685"
+        url = geo.NOMINATIM + "?format=jsonv2&zoom=16&lat=38.960622&lon=-77.072685"
         self.assertEqual(geo.neighborhood(Web({url: fixture("nominatim_reverse.json")}), 38.960622, -77.072685), "Chevy Chase")
 
     def test_neighborhood_prefers_neighbourhood_then_suburb(self):

@@ -86,6 +86,12 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(len(ids), len(set(ids)))
         self.assertEqual({u["unit"] for u in result["units"] if u["sqft"] == 827}, {"1-215", "2-215"})
 
+    def test_same_unit_listed_twice_appears_once(self):
+        feed = copy.deepcopy(FEED)
+        feed["data"]["units"].append(copy.deepcopy(next(u for u in feed["data"]["units"] if u["unit_number"] == "204")))
+        ids = [u["id"] for u in sightmap.parse(feed, B)["units"]]
+        self.assertEqual(len(ids), len(set(ids)))
+
     def test_all_units_unpriced_raises_read_error(self):
         feed = copy.deepcopy(FEED)
         for u in feed["data"]["units"]:

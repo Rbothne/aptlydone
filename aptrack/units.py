@@ -47,3 +47,8 @@ def make_unit(building_id, unit, *, rent, plan=None, beds=None, baths=None, sqft
         "notes": (notes or "").strip() or None,
         "url": url,
     }
+
+
+def unique(units):
+    """Each unit once: some sources list the same unit twice (under two floor plans, say). The first listing wins."""
+    return list({unit["id"]: unit for unit in reversed(units)}.values())[::-1]

@@ -5,7 +5,7 @@ import re
 from collections import Counter
 
 from .. import fetch
-from ..units import make_unit, num
+from ..units import make_unit, num, unique
 from . import ReadError
 
 API = re.compile(r"https:\\?/\\?/sightmap\.com\\?/app\\?/api\\?/v1\\?/(\w+)\\?/sightmaps\\?/(\d+)")
@@ -83,7 +83,7 @@ def parse(feed, building):
         raise ReadError(f"{building['id']}: {len(listed)} units listed, none with a price")
 
     return {
-        "units": units,
+        "units": unique(units),
         "fees": parse_fees(data),
         "amenities": [a["title"].strip() for a in data.get("amenities") or [] if (a.get("title") or "").strip()],
     }
