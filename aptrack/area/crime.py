@@ -10,6 +10,7 @@ are approximate:
 import datetime
 import json
 import math
+from urllib.parse import quote
 
 RADIUS_MILES = 0.5
 DC_VIOLENT = {"HOMICIDE", "SEX ABUSE", "ASSAULT W/DANGEROUS WEAPON", "ROBBERY"}
@@ -19,6 +20,10 @@ NIBRS_PROPERTY_PREFIXES = ("200", "220", "23", "240")
 
 DC_SERVICE = "https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/FeatureServer"
 MONTGOMERY = "https://data.montgomerycountymd.gov/resource/icn6-v9z3.json"
+PRINCE_GEORGES = "https://data.princegeorgescountymd.gov/resource/xjru-idbe.json"      # "Crime Incidents July 2023 to Present"
+FAIRFAX = "https://services9.arcgis.com/kYvfX7YK8OobHItA/arcgis/rest/services"          # Fairfax County Police open data
+FAIRFAX_LAYERS = ("CrimesAgainstPerson_CST_FCPOD_FC", "CrimesAgainstProperty_CST_FCPOD_FC")
+PG_VIOLENT = {"HOMICIDE", "SEX OFFENSE", "ASSAULT, SHOOTING", "ASSAULT, WEAPON"}
 PAGE = 2000
 MAX_PAGES = 300          # far more than a year of incidents needs; beyond it something is wrong with the feed
 
@@ -115,7 +120,80 @@ def montgomery(get, start, today):
     return since(incidents, start)
 
 
-SOURCES = {"11001": dc, "24031": montgomery}          # county FIPS -> reader(get, start day, today)
+# ---------- Prince George's County, MD ----------
+
+def classify_pg(kind):
+    """The county's own incident types. A plain "ASSAULT" is left out: it does not say whether a weapon was involved."""
+    if not kind:
+        return None
+    if kind in PG_VIOLENT or kind.startswith("ROBBERY"):
+        return "violent"
+    if kind in ("THEFT", "THEFT FROM AUTO") or kind.startswith(("AUTO, STOLEN", "B & E")):
+        return "property"
+    return None
+
+
+def pg_incidents(rows):
+    incidents = []
+    for row in rows:
+        kind = classify_pg(row.get("clearance_code_inc_type"))
+        try:
+            lat, lon = float(row.get("latitude")), float(row.get("longitude"))
+        except (TypeError, ValueError):
+            continue
+        if kind and lat and lon and row.get("date"):
+            incidents.append((lat, lon, kind, row["date"][:10]))
+    return incidents
+
+
+def prince_georges(get, start, today):
+    incidents, offset, page_size = [], 0, 50000
+    for _ in range(MAX_PAGES):
+        rows = json.loads(get(f"{PRINCE_GEORGES}?$select=clearance_code_inc_type,latitude,longitude,date"
+                              f"&$where=date%20%3E=%20'{start}T00:00:00'&$order=incident_case_id&$limit={page_size}&$offset={offset}"))
+        incidents += pg_incidents(rows)
+        if len(rows) < page_size:
+            break
+        offset += page_size
+    return since(incidents, start)
+
+
+# ---------- Fairfax County, VA ----------
+
+def fairfax_incidents(page):
+    incidents = []
+    for feature in page.get("features") or []:
+        a, point = feature.get("attributes") or {}, feature.get("geometry") or {}
+        kind = classify_nibrs((a.get("IBRCode") or "").strip())
+        if not kind or point.get("x") is None or point.get("y") is None or a.get("DateReported") is None:
+            continue
+        day = datetime.datetime.fromtimestamp(a["DateReported"] / 1000, datetime.timezone.utc).date().isoformat()
+        incidents.append((point["y"], point["x"], kind, day))
+    return incidents
+
+
+def fairfax(get, start, today, max_pages=MAX_PAGES):
+    """Fairfax County Police publish crimes against persons and against property as two map layers, coded by NIBRS."""
+    where = quote(f"DateReported >= TIMESTAMP '{start} 00:00:00'")
+    incidents = []
+    for service in FAIRFAX_LAYERS:
+        layer = json.loads(get(f"{FAIRFAX}/{service}/FeatureServer?f=json"))["layers"][0]["id"]
+        offset = 0
+        for _ in range(max_pages):
+            page = json.loads(get(f"{FAIRFAX}/{service}/FeatureServer/{layer}/query?where={where}&outFields=IBRCode,DateReported"
+                                  f"&outSR=4326&resultOffset={offset}&resultRecordCount={PAGE}&f=json"))
+            features = page.get("features") or []
+            if not features:
+                break
+            incidents += fairfax_incidents(page)
+            offset += len(features)
+        else:
+            raise RuntimeError(f"Fairfax crime layer {service} did not end after {max_pages} pages")
+    return since(incidents, start)
+
+
+# county FIPS -> reader(get, start day, today)
+SOURCES = {"11001": dc, "24031": montgomery, "24033": prince_georges, "51059": fairfax}
 
 
 # ---------- counting ----------

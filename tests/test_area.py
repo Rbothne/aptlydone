@@ -145,3 +145,60 @@ class DcPagingTests(unittest.TestCase):
                                                            "LATITUDE": 38.9, "LONGITUDE": -77.0}}]}).encode()
         with self.assertRaises(RuntimeError):
             crime.dc(get, "2026-01-01", "2026-11-18", max_pages=5)
+
+
+class PrinceGeorgesTests(unittest.TestCase):
+    def test_incident_types(self):
+        for kind in ("HOMICIDE", "SEX OFFENSE", "ROBBERY, OTHER", "ROBBERY, VEHICLE", "ASSAULT, SHOOTING", "ASSAULT, WEAPON"):
+            self.assertEqual(crime.classify_pg(kind), "violent", kind)
+        for kind in ("THEFT", "THEFT FROM AUTO", "AUTO, STOLEN", "AUTO, STOLEN & RECOVERED", "B & E, RESIDENTIAL", "B & E, OTHER"):
+            self.assertEqual(crime.classify_pg(kind), "property", kind)
+        for kind in ("ACCIDENT", "ACCIDENT WITH IMPOUND", "ASSAULT", None, ""):       # plain "ASSAULT" may be a simple assault
+            self.assertIsNone(crime.classify_pg(kind), kind)
+
+    def test_incidents(self):
+        rows = [{"date": "2026-10-22T00:00:00.000", "clearance_code_inc_type": "THEFT FROM AUTO", "latitude": "38.8673", "longitude": "-76.8384"},
+                {"date": "2026-10-22T00:00:00.000", "clearance_code_inc_type": "ACCIDENT", "latitude": "38.8673", "longitude": "-76.8384"},
+                {"date": "2026-10-21T00:00:00.000", "clearance_code_inc_type": "ROBBERY, OTHER", "latitude": "0", "longitude": "0"},
+                {"date": "2026-10-21T00:00:00.000", "clearance_code_inc_type": "ROBBERY, OTHER"}]
+        self.assertEqual(crime.pg_incidents(rows), [(38.8673, -76.8384, "property", "2026-10-22")])
+
+    def test_reader_pages_until_a_short_page_and_is_registered(self):
+        asked = []
+
+        def get(url, **options):
+            asked.append(url)
+            return json.dumps([{"date": "2026-10-22T00:00:00.000", "clearance_code_inc_type": "HOMICIDE", "latitude": "38.9", "longitude": "-76.9"}]).encode()
+        incidents = crime.prince_georges(get, "2025-11-18", "2026-11-18")
+        self.assertEqual((len(incidents), len(asked)), (1, 1))
+        self.assertTrue(asked[0].startswith(crime.PRINCE_GEORGES + "?"))
+        self.assertIn("2025-11-18T00:00:00", asked[0])
+        self.assertIs(crime.SOURCES["24033"], crime.prince_georges)
+
+
+class FairfaxTests(unittest.TestCase):
+    def feature(self, code, x=-77.3, y=38.85, when=1794973517000):
+        return {"attributes": {"IBRCode": code, "DateReported": when}, "geometry": {"x": x, "y": y}}
+
+    def test_incidents_use_the_offence_code_and_the_point(self):
+        page = {"features": [self.feature("120"), self.feature("23F"), self.feature("13B"), self.feature("290"),
+                             {"attributes": {"IBRCode": "220", "DateReported": 1794973517000}},            # no point
+                             {"attributes": {"IBRCode": "13A", "DateReported": None}, "geometry": {"x": -77.3, "y": 38.85}}]}
+        self.assertEqual(crime.fairfax_incidents(page), [(38.85, -77.3, "violent", "2026-11-18"), (38.85, -77.3, "property", "2026-11-18")])
+
+    def test_reader_reads_both_layers_page_by_page(self):
+        asked = []
+
+        def get(url, **options):
+            asked.append(url)
+            if url.endswith("FeatureServer?f=json"):
+                return json.dumps({"layers": [{"id": 1 if "Person" in url else 0, "name": "x"}]}).encode()
+            offset = int(url.split("resultOffset=")[1].split("&")[0])
+            if "Person" in url:
+                return json.dumps({"features": [self.feature("13A")] if offset == 0 else []}).encode()
+            return json.dumps({"features": {0: [self.feature("23F"), self.feature("240")], 2: [self.feature("220")]}.get(offset, [])}).encode()
+        incidents = crime.fairfax(get, "2025-11-18", "2026-11-18")
+        self.assertEqual(sorted(kind for _, _, kind, _ in incidents), ["property", "property", "property", "violent"])
+        self.assertTrue(any("/FeatureServer/1/query" in u and "Person" in u for u in asked))
+        self.assertTrue(all("2025-11-18" in u for u in asked if "/query" in u))
+        self.assertIs(crime.SOURCES["51059"], crime.fairfax)

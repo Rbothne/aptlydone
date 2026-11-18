@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Changelog · Apartment tracker</title>
+<link rel="stylesheet" href="app.css">
+<style>
+  main.log { max-width: 760px; }
+  main.log h2 { font-size: 15px; margin: 26px 0 6px; padding-top: 14px; border-top: 1px solid var(--line); }
+  main.log h2:first-of-type { border-top: 0; padding-top: 0; }
+  main.log h2 small { font-weight: 400; margin-left: 6px; }
+  main.log ul { margin: 0; padding-left: 20px; }
+  main.log li { margin: 4px 0; }
+  main.log .lead { color: var(--muted); }
+  main.log .open li { color: var(--muted); }
+</style>
+</head>
+<body>
+<header id="top">
+  <div class="bar">
+    <h1>Changelog</h1>
+    <nav class="tabs"><a class="pill" href="./" style="text-decoration:none">← Back to the tracker</a></nav>
+  </div>
+</header>
+<main class="log">
+  <p class="lead">What changed on the tracker, newest first, written while you were away. This page is temporary.
+  Times are US Eastern on 18 November 2026.</p>
+
+  <!-- NEW ENTRIES GO DIRECTLY BELOW THIS LINE -->
+
+  <h2>Published about 2:05 pm <small>the big one</small></h2>
+  <ul>
+    <li><b>Three more companies.</b> Greystar, Willow Bridge and Windsor are tracked alongside Bozzuto and Camden: 354 buildings
+      found in the region, 293 with unit prices, about 8,000 units. The three buildings you named are in: The Earl, The Wendy and Windsor Courthouse.</li>
+    <li><b>Map tab.</b> Every building that matches your filters is a dot, coloured by its best tag and sized by how many units match.
+      Click a dot for its best unit and a jump to the list.</li>
+    <li><b>Drive times.</b> Type a work address under the filters and press "Time my drive". Each building then shows a drive time,
+      and there is a "Max drive" slider and a "Shortest drive to work" sort. These are no-traffic times, so they understate rush hour.
+      The address stays in your browser.</li>
+    <li><b>Crime nearby.</b> Buildings in DC and Montgomery County show reported violent and property crimes within half a mile over
+      the past 12 months, with a "Violent crime nearby" slider. Other counties say "No crime data for this county" for now.</li>
+    <li><b>About the area.</b> Each building has a fold-out with the census tract's income, rent, age, education, renter share and
+      race and ethnicity, plus the ZIP code's typical rent and how it moved in a year. A switch at the bottom of the page hides race and ethnicity.</li>
+    <li><b>No-go ZIP codes.</b> "No-go ZIP" on any building or map popup hides that ZIP code everywhere until you remove it from the line under the filters.</li>
+    <li><b>Rating and "Managed by" filters.</b></li>
+    <li><b>"Check price" tag.</b> A unit 30% or more under similar units in its own building is no longer called a steal. It is almost
+      always an income-restricted unit the building did not label, or a mistake, so it is marked "Check price" and sorted last.
+      This is my call: before it, the top "Absolute steals" were units 40% under their neighbours with floor plans named things like "TEMP".</li>
+    <li><b>Faster and sturdier reads.</b> SightMap and Bozzuto are read four times a second (a test showed no pushback).
+      A site that stops answering is left alone after three failures in a row and come back to once at the end, at the slow speed.</li>
+    <li><b>Fixed:</b> some managers put the street number where the ZIP code belongs; ZIP codes now come from a map lookup.</li>
+  </ul>
+
+  <h2>Published about 1:20 pm</h2>
+  <ul>
+    <li><b>The real page replaced the status page:</b> buildings first, each with its five best units; tags; true monthly cost;
+      floor-plan drawings; filters; followed units.</li>
+    <li><b>True monthly cost</b> counts free months stated for the unit, required monthly fees and required one-time fees.
+      Building-wide "select units" offers show as a second "if the offer applies" price.</li>
+    <li><b>Three tags:</b> Building steal, Local value and Absolute steal, using the thresholds you approved.</li>
+    <li>Income-restricted units and senior housing are hidden unless switched on.</li>
+  </ul>
+
+  <h2>Published about 1:00 pm</h2>
+  <ul>
+    <li><b>Tracking started.</b> Bozzuto and Camden buildings are found automatically and read twice a day; every price change is recorded from today.</li>
+  </ul>
+
+  <h2>Not done yet</h2>
+  <ul class="open">
+    <li>Crime for the counties beyond DC and Montgomery.</li>
+    <li>Rush-hour drive times (needs a Google key).</li>
+    <li>Buildings with no SightMap unit map (61 plain links today).</li>
+    <li>The 30-days-of-history condition on Absolute steal (needs 30 days of history).</li>
+  </ul>
+</main>
+</body>
+</html>
