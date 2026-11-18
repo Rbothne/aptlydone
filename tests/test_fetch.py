@@ -28,7 +28,7 @@ class Opener:
         self.requests.append(request)
         step = self.script.pop(0)
         if isinstance(step, int):
-            raise urllib.error.HTTPError(request.full_url, step, "error", {}, None)
+            raise urllib.error.HTTPError(request.full_url, step, "error", {}, io.BytesIO(b""))
         return Response(step)
 
 
