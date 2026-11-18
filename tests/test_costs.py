@@ -43,6 +43,35 @@ class FreeMonthsTests(unittest.TestCase):
         self.assertEqual(costs.free_months("Receive 2 months of free rent"), 2)
         self.assertEqual(costs.free_months("One month's rent free"), 1)
 
+    def test_wordings_seen_on_live_building_pages(self):
+        seen = {
+            "Make Central home this season and enjoy up to ONE MONTH OFF base rent!": 1,
+            "Up To 2 Months Off Base Rent On Select Apartment Homes + Waived Parking": 2,
+            "Receive up to 1 month of base rent FREE on select apartments.": 1,
+            "For a limited time, get a half-month base free on any home.": 0.5,
+            "Apply by 11/30 To Receive One Month Free Base Rent on Select Floorplans + Waived Amenity Fee!": 1,
+            "For a limited time, enjoy up to 4 weeks of free base rent on select apartment homes.": 4 / 4.345,
+            "Move In before 11/21 & Enjoy 6-Weeks of Complimentary Living + $500 Off Select Homes.": 6 / 4.345,
+            "Apply starting 10.20.2026 & receive one full month free!": 1,
+            "Lease today and receive up to one free month on one-bedrooms": 1,
+            "Apply within 24 hrs of your first tour on a 12+ mo. lease & move in by 11/30 for up to 1 mo. off rent": 1,
+        }
+        for text, months in seen.items():
+            self.assertAlmostEqual(costs.free_months(text), months, places=3, msg=text)
+
+    def test_vague_offers_stay_unread(self):
+        for text in ("Limited time only, up to two months on select homes.", "Special pricing on select apartment homes this season.",
+                     "Receive half off your amenity fee of up to $250 if you apply within 48 hours", "Look & Lease: Waived Amenity Fee Special!",
+                     "12 month leases available. Free bike storage."):
+            self.assertIsNone(costs.free_months(text), text)
+
+    def test_dollars_off(self):
+        self.assertEqual(costs.dollars_off("Lease Now to Get $500 off Move In Costs Plus New Lower Pricing!"), 500)
+        self.assertEqual(costs.dollars_off("Lease now and get $1,000 off up First Month's Base Rent Plus Waived Amenity Fee!"), 1000)
+        self.assertEqual(costs.dollars_off("Enjoy 6-Weeks of Complimentary Living + $500 Off Select Homes."), 500)
+        for text in (None, "", "One month free", "Receive half off your amenity fee of up to $250", "Parking from $225"):
+            self.assertIsNone(costs.dollars_off(text), text)
+
     def test_up_to_counts_as_the_number(self):
         self.assertEqual(costs.free_months("Up to 2 months free"), 2)
 
@@ -91,6 +120,10 @@ class TrueMonthlyTests(unittest.TestCase):
 
     def test_unparsed_special_changes_nothing(self):
         self.assertEqual(costs.true_monthly(unit(special="Ask about our specials"), []), 2400)
+
+    def test_dollars_off_are_spread_over_the_lease(self):
+        self.assertEqual(costs.true_monthly(unit(special="$600 off your move-in costs"), []), 2350)
+        self.assertEqual(costs.true_monthly(unit(special="One month free + $600 off"), []), 2150)
 
     def test_missing_lease_defaults_to_twelve_without_a_concession(self):
         self.assertEqual(costs.true_monthly(unit(lease=None), [AMENITY]), 2450)

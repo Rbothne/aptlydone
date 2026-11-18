@@ -354,6 +354,7 @@ The Luxury / Standard tier from section 6 is dropped. Each building gets a rank 
 - **Stars** work on a unit, or on a building with criteria ("any one-bedroom of 700+ sqft under $X").
 - **Filters, not setup gates:** move-in date and budget are ordinary filters. Crime and maximum commute are sliders.
 - **Region:** the whole region shows by default; no-go ZIP codes remove areas.
+- **Floor filter:** a lowest and highest floor, with a one-click "ground floor only". Ground floor means floor 0 or 1 **(call)**; 98% of units state their floor.
 - **Floor-plan drawings** appear on unit cards.
 - **Honesty:** a building that publishes no prices says so; a unit is "no longer listed", never "leased"; every price shows when it was read.
 - **First screen:** left open until the owner has used the first version.

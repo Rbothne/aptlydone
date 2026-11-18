@@ -6,9 +6,15 @@ WORDS = {"half": 0.5, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six
          "nine": 9, "ten": 10, "eleven": 11, "twelve": 12}
 NUMBER = r"(\d+/\d+|\d+(?:\.\d+)?|" + "|".join(WORDS) + r")"
 FREE = re.compile(
-    NUMBER + r"(?:\s+an?)?[\s-]+(month|week)(?:'s|s)?\s+(?:(?:base\s+)?rent\s+)?free"      # "2 months free", "one month's rent free"
-    + r"|" + NUMBER + r"[\s-]+(month|week)s?\s+of\s+free\s+(?:base\s+)?rent",               # "2 months of free rent"
+    # "2 months free", "one month's rent free", "1 month of base rent free", "one month off base rent", "half-month base free"
+    # also "one full month free" and "1 mo. off rent"
+    NUMBER + r"(?:\s+an?)?(?:\s+full)?[\s-]+(month|week|mo\b\.?)(?:'s|s)?\s+(?:of\s+)?(?:base\s+)?(?:rent\s+)?(?:free|off)\b"
+    # "2 months of free rent", "6 weeks of complimentary living"
+    + r"|" + NUMBER + r"[\s-]+(month|week)s?\s+of\s+(?:free\s+(?:base\s+)?rent|complimentary)"
+    # "one free month"
+    + r"|" + NUMBER + r"[\s-]+free[\s-]+(month|week)s?\b",
     re.I)
+DOLLARS_OFF = re.compile(r"\$\s?(\d[\d,]*(?:\.\d+)?)\s+off\b", re.I)
 WEEKS_PER_MONTH = 4.345
 DEFAULT_LEASE = 12
 
@@ -18,7 +24,8 @@ def free_months(text):
     match = FREE.search(text or "")
     if not match:
         return None
-    amount, period = (match.group(1), match.group(2)) if match.group(1) else (match.group(3), match.group(4))
+    groups = match.groups()
+    amount, period = next((groups[i], groups[i + 1]) for i in (0, 2, 4) if groups[i])
     amount = amount.lower()
     if amount in WORDS:
         number = WORDS[amount]
@@ -29,8 +36,14 @@ def free_months(text):
         number = float(top) / float(bottom)
     else:
         number = float(amount)
-    months = number / WEEKS_PER_MONTH if period.lower() == "week" else number
+    months = number / WEEKS_PER_MONTH if period.lower().startswith("w") else number
     return int(months) if months == int(months) else months
+
+
+def dollars_off(text):
+    """A one-time dollar credit a concession text promises ("$500 off"), or None."""
+    match = DOLLARS_OFF.search(text or "")
+    return float(match.group(1).replace(",", "")) if match else None
 
 
 def is_deposit(fee):
@@ -65,20 +78,26 @@ def true_monthly(unit, fees, special=None):
     `special` is the concession text to count; by default the unit's own. None when the figures do not add up
     (a concession but no lease term, or more free months than the lease has).
     """
-    free = free_months(special if special is not None else unit.get("special")) or 0
+    text = special if special is not None else unit.get("special")
+    free, credit = free_months(text) or 0, dollars_off(text) or 0
     lease = unit.get("lease")
     if not lease:
-        if free:
+        if free or credit:
             return None
         lease = DEFAULT_LEASE
     if free >= lease:
         return None
-    return round(unit["rent"] * (lease - free) / lease + (unit.get("fees") or 0) + one_time(fees) / lease)
+    return round(unit["rent"] * (lease - free) / lease + (unit.get("fees") or 0) + (one_time(fees) - credit) / lease)
+
+
+def counts(text):
+    """Does this concession text say something we can put a number on?"""
+    return bool(free_months(text) or dollars_off(text))
 
 
 def apply(unit, fees, building_special):
     """Set `true` (counting the unit's own concession) and `true_offer` (if the building-wide offer applied)."""
     unit["true"] = true_monthly(unit, fees)
     unit["true_offer"] = None
-    if not unit.get("special") and free_months(building_special):
+    if not unit.get("special") and counts(building_special):
         unit["true_offer"] = true_monthly(unit, fees, special=building_special)
