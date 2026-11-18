@@ -6,9 +6,9 @@ Every part is optional: a source that fails leaves what was collected before in 
 
 import re
 
-from . import census, crime, rents
+from . import affordable, census, crime, rents
 
-PARTS = ("census", "crime", "rents")
+PARTS = ("census", "crime", "rents", "affordable")
 
 
 def zip_code(building):
@@ -63,6 +63,15 @@ def collect(buildings, previous, get, today, now, parts=PARTS):
             trends = None
         if trends:
             area["zips"] = trends
+
+    if "affordable" in parts:
+        mine = [b for b in buildings if b.get("county") == "11001"]
+        if mine:
+            try:
+                area["affordable"] = affordable.match(mine, affordable.dc(get))
+                print(f"  {len(area['affordable'])} DC buildings stand on an affordable-housing project")
+            except Exception as error:
+                print(f"  no affordable-housing list this time: {error!r}")
 
     area["updated"] = now
     return area

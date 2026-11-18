@@ -1,7 +1,7 @@
 """Collect the slow-changing data around the buildings: census figures, crime nearby, and ZIP rent trends.
 
     py area.py                 everything
-    py area.py --only crime    one part: census, crime or rents
+    py area.py --only crime    one part: census, crime, rents or affordable
 
 Reads data/buildings.json and writes data/area.json. The next build.py run puts it on the page.
 """
@@ -33,7 +33,8 @@ def main():
                              parts=(args.only,) if args.only else area.PARTS)
     files.save(AREA, collected)
     print(f"{len(collected.get('tracts', {}))} tracts, crime counts for {len(collected.get('crime', {}))} buildings in "
-          f"{len(collected.get('crime_counties', []))} counties, rent trends for {len(collected.get('zips', {}))} ZIP codes")
+          f"{len(collected.get('crime_counties', []))} counties, rent trends for {len(collected.get('zips', {}))} ZIP codes, "
+          f"{len(collected.get('affordable', {}))} buildings on affordable-housing projects")
 
 
 if __name__ == "__main__":

@@ -339,3 +339,10 @@ test("a floor-plan-level entry is titled by its plan and says how many are avail
   assert.equal(availableNote(unit({ count: 1 })), "1 available");
   assert.equal(availableNote(unit({ count: null })), "");
 });
+
+test("affordable-housing note for a building", async () => {
+  const { affordableNote } = await import("../../site/js/logic.js");
+  assert.equal(affordableNote({ name: "P", affordable: 40, total: 50 }), "City records: 40 of 50 units here are income-restricted");
+  assert.equal(affordableNote({ name: "P", affordable: 12, total: null }), "City records: 12 income-restricted units here");
+  assert.equal(affordableNote(null), "");
+});

@@ -4,6 +4,7 @@ import os
 
 from . import costs, deals, files
 from .area import zip_code
+from .area.affordable import mostly
 from .facts import laundry
 
 BUILDING_FIELDS = ("id", "name", "manager", "url", "platform", "address", "lat", "lon", "state", "county", "tract",
@@ -88,6 +89,12 @@ def write_site(buildings, results, state, out_dir, now, area=None):
     """`area` is what area.py collected (census, crime, rent trends), or None when it has not run yet."""
     area = area or {}
     entries, units_of = assemble(buildings, results, state, out_dir)
+    projects = area.get("affordable") or {}
+    for entry in entries:                      # before pricing, so restricted units are neither tagged nor used as comparisons
+        entry["affordable"] = projects.get(entry["id"])
+        if mostly(entry["affordable"]):
+            for unit in units_of[entry["id"]]:
+                unit["restricted"] = True
     price(entries, units_of)
     crime = area.get("crime") or {}
     for entry in entries:

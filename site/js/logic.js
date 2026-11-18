@@ -168,6 +168,14 @@ export function availableNote(unit) {
   return unit.count != null ? `${unit.count} available` : "";
 }
 
+/** What the city's affordable-housing list says about a building, in words. */
+export function affordableNote(project) {
+  if (!project || !project.affordable) return "";
+  return project.total
+    ? `City records: ${project.affordable} of ${project.total} units here are income-restricted`
+    : `City records: ${project.affordable} income-restricted units here`;
+}
+
 export function tagLabel(tag) {
   return TAG_LABELS[tag] || "";
 }

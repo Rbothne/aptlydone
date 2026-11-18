@@ -1,7 +1,7 @@
 // Loads the data files and draws the page. Every decision (what matches, what order, what words) is in logic.js.
 
 import {
-  DEFAULT_FILTERS, affordable, ago, areaFacts, availability, cost, crimeText, criteriaFilters, criteriaFrom, criteriaLabel, driveLabel, incomeNeeded,
+  DEFAULT_FILTERS, affordable, affordableNote, ago, areaFacts, availability, cost, crimeText, criteriaFilters, criteriaFrom, criteriaLabel, driveLabel, incomeNeeded,
   availableNote, isSteal, mapPoints, standing, unitTitle, groupBuildings, money, perSqft, shortDate, sparkline, tagLabel, tagReason, unitMatches,
 } from "./logic.js";
 import { driveTimes, geocode } from "./commute.js";
@@ -92,7 +92,7 @@ function unitRow(unit, building, listed = true) {
     h("div", { class: "what" },
       unit.tag && h("span", {
         class: `tag ${unit.tag}`,
-        title: unit.tag === "check" ? "30% or more under similar units in its own building. That is usually an income-restricted unit the building did not label, or a mistake. Ask before counting on it." : null,
+        title: unit.tag === "check" ? "30% or more under similar units in its own building, or 40% or more under similar units nearby. That is usually income-restricted housing the building did not label, or a mistake. Ask before counting on it." : null,
       }, tagLabel(unit.tag)),
       h("b", null, unitTitle(unit)), " · ",
       [bedsLabel(unit.beds), unit.baths != null && `${unit.baths} bath`, unit.sqft && `${unit.sqft.toLocaleString("en-US")} sqft`,
@@ -198,6 +198,7 @@ function facts(building) {
   const crime = crimeText(building, state.crimeCounties);
   items.push([crime.text, crime.known ? null : "unknown"]);
   if (building.rank) items.push([`${standing(building.rank)} (pricier than ${building.rank.pct}% of ${building.rank.n} buildings within 2 miles)`]);
+  if (affordableNote(building.affordable)) items.push([affordableNote(building.affordable), "stale"]);
   if (building.coming_soon) items.push(["Coming soon"]);
   if (building.senior) items.push(["Senior housing"]);
   if (building.stale) items.push([`Latest read failed; showing ${building.read ? shortDate(building.read) : "earlier data"}`, "stale"]);
