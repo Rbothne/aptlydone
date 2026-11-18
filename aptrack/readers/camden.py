@@ -4,7 +4,7 @@ import html as htmllib
 import json
 import re
 
-from ..units import make_unit, num, unique
+from ..units import looks_restricted, make_unit, num, unique
 from . import ReadError
 
 NEXT_DATA = re.compile(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', re.S)
@@ -61,13 +61,16 @@ def parse(html, building):
                 available=ref.get("moveInDate"),
                 special=special,
                 url=building.get("url"),
+                restricted=True if looks_restricted(plan.get("name")) else None,
+                plan_image=(plan.get("media") or {}).get("floorPlanImage"),
             )
             if unit:
                 units.append(unit)
     listed = sum(len(plan.get("availableUnitRefs") or []) for plan in plans)
     if listed and not units:
         raise ReadError(f"{building['id']}: {listed} units listed, none with a price")
-    return {"units": unique(units), "fees": [], "amenities": []}
+    about = plain((props.get("data") or {}).get("metaDescription"))
+    return {"units": unique(units), "fees": [], "amenities": [], "facts": {"features": [about] if about else []}}
 
 
 def read(building, get):

@@ -24,7 +24,7 @@ def beds_count(value):
 
 
 def make_unit(building_id, unit, *, rent, plan=None, beds=None, baths=None, sqft=None, floor=None, fees=None,
-              lease=None, available=None, special=None, notes=None, url=None):
+              lease=None, available=None, special=None, notes=None, url=None, restricted=None, plan_image=None):
     """One available unit, or None when it has no usable rent."""
     rent = num(rent)
     if not rent or rent <= 0:
@@ -46,7 +46,17 @@ def make_unit(building_id, unit, *, rent, plan=None, beds=None, baths=None, sqft
         "special": (special or "").strip() or None,
         "notes": (notes or "").strip() or None,
         "url": url,
+        "restricted": restricted,          # income-restricted: True, False, or None when the source does not say
+        "plan_image": plan_image or None,  # address of the floor-plan drawing
     }
+
+
+RESTRICTED = re.compile(r"\b(ADU|WDU\d*|MPDU|IZ|affordable|workforce|income)\b", re.I)
+
+
+def looks_restricted(plan_name):
+    """Floor-plan names that mark income-restricted programs (ADU, WDU, MPDU, IZ, "affordable"...)."""
+    return bool(plan_name and RESTRICTED.search(plan_name))
 
 
 def unique(units):

@@ -5,7 +5,7 @@ import re
 from collections import Counter
 
 from .. import fetch
-from ..units import make_unit, num, unique
+from ..units import looks_restricted, make_unit, num, unique
 from . import ReadError
 
 API = re.compile(r"https:\\?/\\?/sightmap\.com\\?/app\\?/api\\?/v1\\?/(\w+)\\?/sightmaps\\?/(\d+)")
@@ -42,6 +42,7 @@ def parse_fees(data):
             "category": expense.get("category"),
             "required": bool(expense.get("is_required")),
             "when": expense.get("classification"),
+            "refundable": bool(expense.get("is_refundable")),
             "amount": float(amount["amount"]) if num(amount.get("amount")) is not None else None,
             "text": amount.get("display_amount"),
         })
@@ -63,10 +64,14 @@ def parse(feed, building):
         label = f"{u.get('building')}-{number}" if number in repeated and u.get("building") else number
         rent, total = num(u.get("price")), u.get("total_price")
         total = num(total[0]) if isinstance(total, list) and total else num(total)
+        name = plan_name(plan.get("name"))
+        flagged = (u.get("affordable_housing_info") or {}).get("is_affordable_housing_unit")
         unit = make_unit(
             building["id"], label,
             rent=rent,
-            plan=plan_name(plan.get("name")),
+            plan=name,
+            restricted=True if flagged or looks_restricted(name) else flagged,
+            plan_image=plan.get("image_url"),
             beds=plan.get("bedroom_count"),
             baths=plan.get("bathroom_count"),
             sqft=u.get("area"),
