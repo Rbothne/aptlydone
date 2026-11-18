@@ -54,7 +54,10 @@ class Web:
         return answer.encode()
 
 
-GOOD = {API: fixture("sightmap_feed.json"), CAMDEN_FEED: fixture("camden_available.html")}
+BOZZUTO_URL = "https://www.bozzuto.com/apartments-for-rent/dc/washington/5333-connecticut"
+GOOD = {API: fixture("sightmap_feed.json"), CAMDEN_FEED: fixture("camden_available.html"),
+        BOZZUTO_URL: fixture("bozzuto_page.html")}
+OFFER = "Move in by November 30th to enjoy two months free of base rent on select units *Restrictions May Apply"
 
 
 class RunTests(QuietTestCase):
@@ -68,8 +71,9 @@ class RunTests(QuietTestCase):
         results = self.run_it([bozzuto(), camden()], {API: fixture("sightmap_feed.json"), CAMDEN_FEED: OSError("timed out")})
         self.assertEqual(set(results), {"bozzuto-5333-connecticut"})
         self.assertEqual(len(results["bozzuto-5333-connecticut"]["units"]), 5)
-        self.assertEqual(self.state["buildings"], {"bozzuto-5333-connecticut": {"ok": DAY, "failed": None},
-                                                   "camden-noma": {"ok": None, "failed": DAY}})
+        self.assertEqual(self.state["buildings"]["camden-noma"], {"ok": None, "failed": DAY})
+        self.assertEqual((self.state["buildings"]["bozzuto-5333-connecticut"]["ok"],
+                          self.state["buildings"]["bozzuto-5333-connecticut"]["failed"]), (DAY, None))
         self.assertEqual(len(self.state["units"]), 5)
 
     def test_unreadable_page_counts_as_failure(self):
@@ -80,7 +84,7 @@ class RunTests(QuietTestCase):
         results = self.run_it([camden(), bozzuto()],
                               {API: fixture("sightmap_feed.json"), CAMDEN_FEED: [fetch.RateLimited("slow down"), fixture("camden_available.html")]})
         self.assertEqual(set(results), {"bozzuto-5333-connecticut", "camden-noma"})
-        self.assertEqual(self.web.asked, [CAMDEN_FEED, API, CAMDEN_FEED])
+        self.assertEqual(self.web.asked, [CAMDEN_FEED, API, BOZZUTO_URL, CAMDEN_FEED])
         self.assertEqual(self.slept, [60])
 
     def test_rest_of_a_rate_limited_host_waits_for_the_retry(self):
@@ -100,6 +104,30 @@ class RunTests(QuietTestCase):
     def test_out_of_region_and_link_buildings_are_not_read(self):
         results = self.run_it([bozzuto(in_region=False), camden(platform="link", feed=None)], GOOD)
         self.assertEqual((results, self.web.asked, self.state["buildings"]), ({}, [], {}))
+
+    def test_facts_are_read_after_the_units(self):
+        results = self.run_it([bozzuto()], GOOD)
+        self.assertEqual(self.web.asked, [API, BOZZUTO_URL])
+        self.assertEqual(results["bozzuto-5333-connecticut"]["facts"]["rating"], 4.6)
+
+    def test_facts_failure_keeps_units(self):
+        results = self.run_it([bozzuto()], {API: fixture("sightmap_feed.json"), BOZZUTO_URL: fetch.RateLimited("slow down")})
+        self.assertEqual(len(results["bozzuto-5333-connecticut"]["units"]), 5)
+        self.assertIsNone(results["bozzuto-5333-connecticut"]["facts"])
+        self.assertEqual(self.state["buildings"]["bozzuto-5333-connecticut"]["failed"], None)
+        self.assertEqual(self.slept, [])
+
+    def test_special_recorded_in_history(self):
+        self.run_it([bozzuto()], GOOD)
+        self.assertEqual(self.state["buildings"]["bozzuto-5333-connecticut"]["specials"], [[DAY, OFFER]])
+
+    def test_unknown_facts_record_no_special(self):
+        self.run_it([bozzuto()], {API: fixture("sightmap_feed.json"), BOZZUTO_URL: OSError("down")})
+        self.assertNotIn("specials", self.state["buildings"]["bozzuto-5333-connecticut"])
+
+    def test_reader_supplied_facts_are_kept(self):
+        results = self.run_it([camden()], GOOD)
+        self.assertEqual(results["camden-noma"]["facts"], {"features": []})
 
     def test_feed_api_is_cached_on_the_building(self):
         building = bozzuto()
@@ -174,6 +202,30 @@ class WriteSiteTests(QuietTestCase):
         units = self.load("units-11001.json")["units"]
         self.assertEqual(len([u for u in units if u["building"] == "camden-noma"]), 5)
         self.assertEqual(len(units), 10)
+
+    def test_facts_are_written_to_the_index(self):
+        self.build_and_write([bozzuto(neighborhood="Northwest"), camden()], GOOD, history.new_state())
+        by_id = {b["id"]: b for b in self.load("index.json")["buildings"]}
+        b = by_id["bozzuto-5333-connecticut"]
+        self.assertEqual((b["special"], b["rating"], b["rating_count"], b["coming_soon"], b["neighborhood"]),
+                         (OFFER, 4.6, 483, False, "Chevy Chase"))
+        self.assertIn("Hickory wood floors", b["features"])
+        self.assertIsNone(b["laundry"])
+        c = by_id["camden-noma"]
+        self.assertEqual((c["special"], c["rating"], c["features"], c["neighborhood"]), (None, None, [], "NoMa"))
+
+    def test_laundry_from_feature_text(self):
+        page = fixture("camden_available.html").replace('"lastUpdate"', '"metaDescription": "Full-size washer and dryer.", "lastUpdate"')
+        self.build_and_write([camden()], dict(GOOD, **{CAMDEN_FEED: page}), history.new_state())
+        self.assertEqual(self.load("index.json")["buildings"][0]["laundry"], "in_unit")
+
+    def test_previous_facts_kept_when_read_fails(self):
+        state = history.new_state()
+        self.build_and_write([bozzuto(neighborhood="Northwest")], GOOD, state)
+        self.build_and_write([bozzuto(neighborhood="Northwest")], dict(GOOD, **{BOZZUTO_URL: OSError("down")}), state, day="2026-11-19")
+        b = self.load("index.json")["buildings"][0]
+        self.assertEqual((b["stale"], b["special"], b["rating"], b["neighborhood"]), (False, OFFER, 4.6, "Chevy Chase"))
+        self.assertIn("Hickory wood floors", b["features"])
 
     def test_stale_building_keeps_its_fees_and_amenities(self):
         state = history.new_state()

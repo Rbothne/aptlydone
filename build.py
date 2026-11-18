@@ -17,6 +17,7 @@ import time
 from urllib.parse import urlparse
 
 from aptrack import fetch, files, history, output
+from aptrack.facts import FACTS
 from aptrack.readers import READERS
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -33,11 +34,21 @@ def readable(building):
 def read_one(building, get):
     """(result, error): exactly one is None. RateLimited is raised, not returned."""
     try:
-        return READERS[building["platform"]](building, get), None
+        result = READERS[building["platform"]](building, get)
     except fetch.RateLimited:
         raise
     except Exception as error:
         return None, error
+    # Facts about the building (concession, rating...) are a bonus: failing to get them never fails the read.
+    result.setdefault("facts", None)
+    facts_reader = FACTS.get(building.get("manager"))
+    if facts_reader:
+        try:
+            result["facts"] = facts_reader(building, get)
+        except Exception as error:
+            print(f"  no facts for {building['id']}: {error!r}")
+            result["facts"] = None
+    return result, None
 
 
 def read_host(group, get):
@@ -79,6 +90,8 @@ def run(buildings, state, get, day, *, workers=4, sleep=time.sleep):
             history.record_failure(state, building["id"], day)
             continue
         history.record(state, building["id"], result["units"], day)
+        if result["facts"] is not None and "special" in result["facts"]:
+            history.record_special(state, building["id"], result["facts"]["special"], day)
         if result.get("feed_api"):
             building["feed_api"] = result["feed_api"]
         results[building["id"]] = result
