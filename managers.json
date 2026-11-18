@@ -1,0 +1,15 @@
+{
+  "settings": {
+    "delay_seconds": 1.0,
+    "workers": 4,
+    "counties": [
+      "11001",
+      "51013", "51510", "51059", "51600", "51610", "51107", "51153", "51683", "51685",
+      "24031", "24033", "24027", "24003"
+    ]
+  },
+  "managers": [
+    {"name": "Bozzuto", "site": "www.bozzuto.com", "discover": "bozzuto"},
+    {"name": "Camden", "site": "www.camdenliving.com", "discover": "camden"}
+  ]
+}
