@@ -2,13 +2,13 @@
 
 Follows available units at professionally managed apartment buildings across the DC, Maryland and Virginia region and records every price change, so unusually low prices can be spotted against a unit's own history and its neighbors.
 
-Status: tracking, true monthly cost, deal tags, the page, area data (census, crime for DC and Montgomery County, ZIP rent trend), a map view and no-traffic drive times are built. No-go regions and rush-hour drive times are not yet. The design is in `docs/superpowers/specs/`.
+Status: tracking, true monthly cost, deal tags, the page, area data (census, crime for five counties, ZIP rent trend), a map view and no-traffic drive times are built. No-go regions and rush-hour drive times are not yet. The design is in `docs/superpowers/specs/`.
 
 ## Files
 
 - `managers.json`: the only hand-kept file. One line per management company, plus settings: seconds between requests to one site (with per-site exceptions), sites read at once, and the counties that count as the region (5-digit FIPS codes). Adding a company adds all its buildings.
 - `discover.py`: finds every building each company lists in DC, Maryland and Virginia, and looks up each one's census tract, county and neighborhood. Writes `data/buildings.json`. A building that stops being listed is dropped after three discoveries in a row without it.
-- `area.py`: collects what changes slowly around the buildings into `data/area.json`: census figures per tract (through Census Reporter, no key), reported crime within half a mile of each building (one reader per county in `aptrack/area/crime.py`; DC and Montgomery County so far), and Zillow's rent index per ZIP code. Runs weekly with discovery.
+- `area.py`: collects what changes slowly around the buildings into `data/area.json`: census figures per tract (through Census Reporter, no key), reported crime within half a mile of each building (one reader per county in `aptrack/area/crime.py`: DC, Montgomery, Prince George's, Fairfax County, and Arlington for the last year it published locations, mid-2021 to mid-2022), and Zillow's rent index per ZIP code. Runs weekly with discovery.
 - `build.py`: reads every building's available units, updates the price history in `data/state.json`, and writes the files the page loads into `site/data/` (`index.json`, and one `units-<county>.json` per county).
 - `aptrack/`: the code behind both.
   - `discover/`: one module per company (`bozzuto`, `camden`, `windsor`, `willowbridge`, `greystar`); `common.py` holds what they share (reading a page's structured description, finding a SightMap unit map, looking on a building's own website).

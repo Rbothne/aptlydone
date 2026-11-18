@@ -23,6 +23,7 @@ MONTGOMERY = "https://data.montgomerycountymd.gov/resource/icn6-v9z3.json"
 PRINCE_GEORGES = "https://data.princegeorgescountymd.gov/resource/xjru-idbe.json"      # "Crime Incidents July 2023 to Present"
 FAIRFAX = "https://services9.arcgis.com/kYvfX7YK8OobHItA/arcgis/rest/services"          # Fairfax County Police open data
 FAIRFAX_LAYERS = ("CrimesAgainstPerson_CST_FCPOD_FC", "CrimesAgainstProperty_CST_FCPOD_FC")
+ARLINGTON = "https://datahub-v2.arlingtonva.us/api/Police/IncidentLog"
 PG_VIOLENT = {"HOMICIDE", "SEX OFFENSE", "ASSAULT, SHOOTING", "ASSAULT, WEAPON"}
 PAGE = 2000
 MAX_PAGES = 300          # far more than a year of incidents needs; beyond it something is wrong with the feed
@@ -192,8 +193,47 @@ def fairfax(get, start, today, max_pages=MAX_PAGES):
     return since(incidents, start)
 
 
-# county FIPS -> reader(get, start day, today)
-SOURCES = {"11001": dc, "24031": montgomery, "24033": prince_georges, "51059": fairfax}
+# ---------- Arlington County, VA ----------
+# Arlington stopped publishing incidents with locations in June 2022 (its newer "Crime Data Hub" shows totals only).
+# The last year it did publish is used, and labelled as such: old, but it still tells one block from another.
+
+ARLINGTON_VIOLENT = ("ROBBERY", "CARJACK", "WOUNDING", "STRANGULATION", "MURDER", "MANSLAUGHTER", "HOMICIDE", "RAPE", "SODOMY",
+                     "SEXUAL BATTERY", "OBJECT SEXUAL PENETRATION", "SHOOT")
+ARLINGTON_PROPERTY = ("LARCENY", "BURGLARY", "ARSON", "UNAUTHORIZED USE OF VEHICLE")
+
+
+def classify_arlington(text):
+    text = (text or "").upper()
+    if any(word in text for word in ARLINGTON_VIOLENT):
+        return "violent"
+    if any(word in text for word in ARLINGTON_PROPERTY):
+        return "property"
+    return None
+
+
+def arlington_incidents(rows):
+    incidents = []
+    for row in rows:
+        kind = classify_arlington(row.get("offenseDsc"))
+        try:
+            lat, lon = float(row.get("latitudeCrd")), float(row.get("longitudeCrd"))
+        except (TypeError, ValueError):
+            continue
+        if kind and lat and lon and row.get("firstReportDtm"):
+            incidents.append((lat, lon, kind, row["firstReportDtm"][:10]))
+    return incidents
+
+
+def arlington(get, start, today):
+    rows = json.loads(get(f"{ARLINGTON}?$filter=firstReportDtm%20ge%20{start}T00:00:00.000Z&$top=50000"
+                          f"&$select=offenseDsc,latitudeCrd,longitudeCrd,firstReportDtm", timeout=120))
+    return [incident for incident in since(arlington_incidents(rows), start) if incident[3] <= today]
+
+
+# county FIPS -> reader(get, start day, end day)
+SOURCES = {"11001": dc, "24031": montgomery, "24033": prince_georges, "51059": fairfax, "51013": arlington}
+# Counties whose data has stopped: the fixed (start, end) their reader is asked for, shown beside their counts.
+FROZEN = {"51013": ("2021-06-28", "2022-06-28")}
 
 
 # ---------- counting ----------

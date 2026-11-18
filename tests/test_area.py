@@ -202,3 +202,37 @@ class FairfaxTests(unittest.TestCase):
         self.assertTrue(any("/FeatureServer/1/query" in u and "Person" in u for u in asked))
         self.assertTrue(all("2025-11-18" in u for u in asked if "/query" in u))
         self.assertIs(crime.SOURCES["51059"], crime.fairfax)
+
+
+class ArlingtonTests(unittest.TestCase):
+    def test_offence_wording(self):
+        violent = ["ROBBERY (ROBBERY)", "CARJACKING", "MALICIOUS/UNLAWFUL WOUNDING", "AGGRAVATED MALICIOUS WOUNDING", "STRANGULATION",
+                   "MURDER: FIRST DEGREE", "RAPE", "FORCIBLE SODOMY", "SEXUAL BATTERY", "AGGRAVATED SEXUAL BATTERY"]
+        prop = ["PETIT LARCENY: ALL OTHER LARCENY", "GRAND LARCENY: MOTOR VEHICLE THEFT", "PETIT LARCENY: SHOPLIFTING",
+                "BURGLARY: W/ INTENT TO COMMIT LARCENY/ASSAULT & BATTERY", "ARSON", "UNAUTHORIZED USE OF VEHICLE"]
+        neither = ["VANDALISM/DESTRUCTION OF PROPERTY", "INCLUDES SIMPLE ASSAULT W/O BATTERY", "ASSAULT & BATTERY: FAMILY MEMBER",
+                   "IDENTITY THEFT: FRAUD. USE OF ID, LOSS >$500", "CREDIT CARD THEFT", "DUI", "TRESPASSING", "DRUNK IN PUBLIC/DIP", None, ""]
+        for text in violent:
+            self.assertEqual(crime.classify_arlington(text), "violent", text)
+        for text in prop:
+            self.assertEqual(crime.classify_arlington(text), "property", text)
+        for text in neither:
+            self.assertIsNone(crime.classify_arlington(text), text)
+
+    def test_incidents(self):
+        rows = [{"offenseDsc": "ROBBERY", "latitudeCrd": "38.8553", "longitudeCrd": "-77.1077", "firstReportDtm": "2022-06-28T07:45:00.000Z"},
+                {"offenseDsc": "DUI", "latitudeCrd": "38.8553", "longitudeCrd": "-77.1077", "firstReportDtm": "2022-06-28T07:45:00.000Z"},
+                {"offenseDsc": "ROBBERY", "latitudeCrd": None, "longitudeCrd": None, "firstReportDtm": "2022-06-28T07:45:00.000Z"}]
+        self.assertEqual(crime.arlington_incidents(rows), [(38.8553, -77.1077, "violent", "2022-06-28")])
+
+    def test_arlington_is_read_for_the_last_year_it_published(self):
+        asked = []
+
+        def get(url, **options):
+            asked.append(url)
+            return b"[]"
+        start, end = crime.FROZEN["51013"]
+        crime.arlington(get, start, end)
+        self.assertIn(start, asked[0])
+        self.assertEqual((start, end), ("2021-06-28", "2022-06-28"))
+        self.assertIs(crime.SOURCES["51013"], crime.arlington)

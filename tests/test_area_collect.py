@@ -35,6 +35,9 @@ def web(montgomery_fails=False):
             return json.dumps([{"start_date": "2026-11-01T10:00:00.000", "nibrs_code": "120", "latitude": "39.0", "longitude": "-77.1"}]).encode()
         if url == rents.SOURCE:
             return ZORI.encode()
+        if url.startswith(crime.ARLINGTON):
+            return json.dumps([{"offenseDsc": "ROBBERY", "latitudeCrd": "38.89", "longitudeCrd": "-77.08",
+                                "firstReportDtm": "2022-03-01T07:45:00.000Z"}]).encode()
         if url.startswith((crime.PRINCE_GEORGES, crime.FAIRFAX)):
             raise OSError("not part of this test")
         raise AssertionError("unexpected request: " + url)
@@ -62,8 +65,9 @@ class CollectTests(QuietTestCase):
                      building("va", county="51013", tract="51013101701", zip_code="22201", lat=38.89, lon=-77.08)]
         got = area.collect(buildings, {}, web(), TODAY, "2026-11-18T12:00Z")
         self.assertEqual(set(got["tracts"]), {"11001001402"})
-        self.assertEqual(got["crime"], {"dc": {"violent": 0, "property": 1}, "moco": {"violent": 1, "property": 0}})
-        self.assertEqual(got["crime_counties"], ["11001", "24031"])
+        self.assertEqual(got["crime"], {"dc": {"violent": 0, "property": 1}, "moco": {"violent": 1, "property": 0},
+                                        "va": {"violent": 1, "property": 0, "period": ["2021-06-28", "2022-06-28"]}})
+        self.assertEqual(got["crime_counties"], ["11001", "24031", "51013"])
         self.assertEqual(set(got["zips"]), {"20015", "22201"})
         self.assertEqual(got["updated"], "2026-11-18T12:00Z")
 

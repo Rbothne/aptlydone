@@ -139,7 +139,9 @@ export function tagReason(unit) {
 export function crimeText(building, crimeCounties) {
   const crime = building.crime;
   if (crime) {
-    return { text: `Within ½ mile, past 12 months: ${crime.violent} violent · ${crime.property} property crimes`, known: true };
+    const month = (day) => `${MONTHS[Number(day.slice(5, 7)) - 1]} ${day.slice(0, 4)}`;
+    const when = crime.period ? `${month(crime.period[0])} to ${month(crime.period[1])} (the last year published here)` : "past 12 months";
+    return { text: `Within ½ mile, ${when}: ${crime.violent} violent · ${crime.property} property crimes`, known: true };
   }
   const covered = (crimeCounties || []).includes(building.county);
   return { text: covered ? "Crime nearby not counted yet" : "No crime data for this county", known: false };

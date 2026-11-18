@@ -278,3 +278,10 @@ test("a unit marked for checking is not a steal: not in tagged-only, not a top p
   const groups = groupBuildings([building({ id: "A", lat: 1, lon: 1 })], { A: [unit({ id: "A:1", building: "A", tag: "check" })] }, f());
   assert.equal(points(groups)[0].tag, null);
 });
+
+test("crime counts from an older year say which year", async () => {
+  const { crimeText } = await import("../../site/js/logic.js");
+  const old = building({ county: "51013", crime: { violent: 2, property: 30, period: ["2021-06-28", "2022-06-28"] } });
+  assert.deepEqual(crimeText(old, ["51013"]),
+    { text: "Within ½ mile, Jun 2021 to Jun 2022 (the last year published here): 2 violent · 30 property crimes", known: true });
+});

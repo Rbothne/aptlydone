@@ -40,12 +40,17 @@ def collect(buildings, previous, get, today, now, parts=PARTS):
             mine = [b for b in buildings if b.get("county") == county]
             if not mine:
                 continue
+            start, end = crime.FROZEN.get(county, (crime.year_ago(today), today))
             try:
-                incidents = reader(get, crime.year_ago(today), today)
+                incidents = reader(get, start, end)
             except Exception as error:
                 print(f"  no crime data for county {county} this time: {error!r}")
                 continue
-            counts.update(crime.near(mine, incidents))
+            found = crime.near(mine, incidents)
+            if county in crime.FROZEN:                  # say which year these counts are from
+                for tally in found.values():
+                    tally["period"] = [start, end]
+            counts.update(found)
             covered.add(county)
             print(f"  county {county}: {len(incidents)} incidents in 12 months, {len(mine)} buildings")
         area["crime"], area["crime_counties"] = counts, sorted(covered)
