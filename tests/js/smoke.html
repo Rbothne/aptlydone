@@ -73,6 +73,15 @@ async function run() {
   slide("maxViolent", "61");
   out.area = (doc.querySelector(".area") || {}).textContent || null;
   out.crimeChip = [...doc.querySelectorAll(".facts li")].map((li) => li.textContent).find((t) => /crime/i.test(t)) || null;
+  const nogo = doc.querySelector(".facts button");
+  if (nogo) {
+    out.nogoButton = nogo.textContent;
+    nogo.click();
+    out.afterNogo = count();
+    out.nogoLine = doc.getElementById("nogo").textContent;
+    doc.querySelector("#nogo button").click();
+    out.afterNogoRemoved = count();
+  }
   doc.querySelector('[data-tab="map"]').click();
   await wait(1500);
   out.mapDots = doc.querySelectorAll("#mapbox path.leaflet-interactive").length;

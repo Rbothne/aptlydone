@@ -40,6 +40,7 @@ export function unitMatches(unit, building, filters) {
   if (filters.maxDrive != null && !(building.drive != null && building.drive <= filters.maxDrive)) return false;
   if (filters.minRating != null && !(building.rating != null && building.rating >= filters.minRating)) return false;
   if (filters.manager && building.manager !== filters.manager) return false;
+  if (filters.nogo && building.zip && filters.nogo.includes(building.zip)) return false;
   if (filters.county && building.county !== filters.county) return false;
   const q = filters.q.trim().toLowerCase();
   if (q && !searchable(building).includes(q)) return false;

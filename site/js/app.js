@@ -23,6 +23,7 @@ const store = createStore(storage);
 const state = {
   updated: null, index: [], byId: {}, units: {}, unitsById: {}, tracts: {}, zips: {}, crimeCounties: [],
   demographics: store.getSetting("demographics", true),
+  nogo: store.getSetting("nogo", []),              // ZIP codes the user never wants to see
   work: store.getSetting("work", null),             // {address, lat, lon, label}: kept in this browser only
   filters: store.getFilters(), tab: "buildings", shown: PAGE, expanded: new Set(), open: new Set(),
 };
@@ -154,6 +155,24 @@ function detail(unit, building) {
 
 // ---------- building cards ----------
 
+/** The filters plus the standing no-go ZIP codes. */
+function active() {
+  return { ...state.filters, nogo: state.nogo };
+}
+
+function setNogo(zip, on) {
+  state.nogo = on ? [...new Set([...state.nogo, zip])].sort() : state.nogo.filter((z) => z !== zip);
+  store.setSetting("nogo", state.nogo);
+  draw();
+}
+
+function drawNogo() {
+  const line = $("nogo");
+  line.hidden = !state.nogo.length;
+  line.replaceChildren("No-go ZIP codes (hidden everywhere):",
+    ...state.nogo.map((zip) => h("button", { type: "button", title: "Show this ZIP code again", onclick: () => setNogo(zip, false) }, `${zip} ✕`)));
+}
+
 function facts(building) {
   const items = [];
   if (building.laundry === "in_unit") items.push(["In-unit laundry"]);
@@ -170,7 +189,10 @@ function facts(building) {
   if (building.coming_soon) items.push(["Coming soon"]);
   if (building.senior) items.push(["Senior housing"]);
   if (building.stale) items.push([`Latest read failed; showing ${building.read ? shortDate(building.read) : "earlier data"}`, "stale"]);
-  return h("ul", { class: "facts" }, items.map(([text, kind]) => h("li", { class: kind || null }, text)));
+  return h("ul", { class: "facts" }, items.map(([text, kind]) => h("li", { class: kind || null }, text)),
+    building.zip && h("li", { class: "plain" }, h("button", {
+      type: "button", title: `Hide every building in ZIP code ${building.zip}`, onclick: () => setNogo(building.zip, true),
+    }, `No-go ZIP ${building.zip}`)));
 }
 
 function aboutArea(building) {
@@ -218,7 +240,7 @@ function noPrices() {
 // ---------- drawing ----------
 
 function drawBuildings() {
-  const groups = groupBuildings(state.index, state.units, state.filters, BEST);
+  const groups = groupBuildings(state.index, state.units, active(), BEST);
   const matching = groups.reduce((n, group) => n + group.units.length, 0);
   const tagged = groups.reduce((n, group) => n + group.units.filter((u) => u.tag).length, 0);
   $("count").replaceChildren(
@@ -252,7 +274,9 @@ function popup(point) {
     h("p", null, `${plural(point.count, "unit")} match`, point.tag && ` · best tag: ${tagLabel(point.tag)}`),
     best && h("p", null, `Best: #${best.unit} · ${[bedsLabel(best.beds), best.sqft && `${best.sqft} sqft`].filter(Boolean).join(" · ")} · ${money(cost(best))}/mo`),
     h("button", { type: "button", onclick: () => { state.filters.q = building.name; state.tab = "buildings"; changed(); window.scrollTo(0, 0); } },
-      "Show in the list"));
+      "Show in the list"),
+    building.zip && h("button", { type: "button", style: "margin-left:6px;background:none;color:#a8321f;border-color:#a8321f",
+      onclick: () => setNogo(building.zip, true) }, `No-go ZIP ${building.zip}`));
 }
 
 function drawMap(groups) {
@@ -310,6 +334,7 @@ function drawFollowed() {
 }
 
 function draw() {
+  drawNogo();
   const groups = drawBuildings();
   drawFollowed();
   $("buildings").hidden = state.tab !== "buildings";
@@ -507,4 +532,4 @@ async function load() {
 load();
 
 // Kept for the console: which units match right now.
-window.aptMatches = () => state.index.flatMap((b) => (state.units[b.id] || []).filter((u) => unitMatches(u, b, state.filters)));
+window.aptMatches = () => state.index.flatMap((b) => (state.units[b.id] || []).filter((u) => unitMatches(u, b, active())));

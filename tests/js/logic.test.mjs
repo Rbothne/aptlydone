@@ -257,3 +257,11 @@ test("managed-by filter", () => {
   assert.equal(unitMatches(unit(), building({ manager: "Bozzuto" }), f({ manager: "Bozzuto" })), true);
   assert.equal(unitMatches(unit(), building({ manager: "Camden" }), f({ manager: "Bozzuto" })), false);
 });
+
+test("no-go ZIP codes hide their buildings; a building with no ZIP is never hidden by it", () => {
+  assert.equal(unitMatches(unit(), building({ zip: "20002" }), f({ nogo: ["20002", "20020"] })), false);
+  assert.equal(unitMatches(unit(), building({ zip: "20015" }), f({ nogo: ["20002"] })), true);
+  assert.equal(unitMatches(unit(), building({ zip: null }), f({ nogo: ["20002"] })), true);
+  assert.equal(unitMatches(unit(), building({ zip: "20002" }), f()), true);
+  assert.equal("nogo" in DEFAULT_FILTERS, false);          // it is a standing choice, not a filter that Reset clears
+});

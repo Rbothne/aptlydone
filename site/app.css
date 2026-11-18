@@ -40,6 +40,11 @@ h1 { font-size: 16px; margin: 0; letter-spacing: .01em; }
 #filtersbtn { display: none; }
 #count { color: var(--muted); margin: 8px 0 2px; }
 #count b { color: var(--ink); font-weight: 600; }
+#nogo { color: var(--muted); margin: 0 0 4px; font-size: 12.5px; }
+#nogo button, .facts button { border: 1px dashed var(--line); background: none; border-radius: 6px; padding: 1px 7px; margin-left: 4px;
+  font-size: 12.5px; color: var(--muted); }
+#nogo button:hover, .facts button:hover { color: var(--steal); border-color: var(--steal); }
+.facts li.plain { background: none; padding: 0; }
 @media (max-width: 760px) {
   #top { max-height: 100vh; overflow-y: auto; }
   #filtersbtn { display: inline-block; }
