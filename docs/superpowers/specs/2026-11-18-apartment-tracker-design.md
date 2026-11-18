@@ -300,3 +300,65 @@ Carried over from the wishlist site: stars, the Settings panel, backup and resto
 - The keyword lists for laundry and premium amenities.
 - The look of the page, starting from the wishlist site's.
 - How the per-county data files are compacted.
+
+## 15. Revisions after the first live run (2026-11-18)
+
+Decided with the owner after the first full read (181 buildings, 4,502 units). Where this section disagrees with sections 6, 7 or 10, this section wins.
+
+### True monthly cost
+
+One number per unit, used everywhere a price is compared:
+
+- rent spread over the lease after free months or weeks,
+- plus required monthly fees with fixed amounts,
+- plus required one-time fees (an amenity fee, say) spread over the lease.
+
+A concession stated for the whole building ("two months free on select units") cannot be pinned to a unit. The card shows the true monthly cost without it, and an "if the offer applies" figure beside it. Parking stays a separate, optional add-on using the lowest listed price ("from $X").
+
+The lease term is noted on the card and never disqualifies a unit.
+
+### Three tags replace Steal / Good / Normal / High
+
+All compare true monthly cost per sqft against units with the same bed count.
+
+| Tag | Rule | Units on day one |
+|---|---|---|
+| BUILDING STEAL | 15% or more below similar units (size within 20%, at least three of them) in the same building | 58 of 4,054 scored |
+| LOCAL VALUE | 20% or more below similar units (size within 15%) in other buildings within one mile, widening to two; needs five units from three buildings | 143 of 2,725 scored |
+| ABSOLUTE STEAL | 10% or more below its own building and 15% or more below neighbors | 42 |
+
+- Thresholds are named constants. The owner approved these as a starting point.
+- A unit never compares against itself, and neighbors never include its own building.
+- Once a floor plan has 30 days of history, ABSOLUTE STEAL also requires the unit to be within 3% of that plan's lowest tracked true monthly cost **(call)**.
+- Excluded from tags and from everyone else's comparisons: income-restricted units, senior housing, and rooms rented singly (under 300 sqft).
+
+### Income-restricted units
+
+Flagged from the feed's affordable-housing field where present, otherwise from the floor-plan name (ADU, WDU, MPDU, IZ, "affordable", "workforce"). Hidden by default, with a switch. Where a source states an income cap, the page compares it with the income in the profile; no source read so far states one.
+
+### "Fancy"
+
+The Luxury / Standard tier from section 6 is dropped. Each building gets a rank instead: its one-bedroom rent per sqft against buildings within two miles **(call, to be checked against the buildings the owner named once their managers are covered)**.
+
+### More facts, all from pages already being read
+
+- Bozzuto building page, read daily: building-wide concession text, rating and review count, the manager's own neighborhood name, "coming soon" and "under construction" flags, the unit-feature list (source for in-unit laundry).
+- SightMap feed: income-restricted flag, floor-plan drawing address, one-time fees.
+- Camden: floor-plan drawing address; amenity lists from the building's home page.
+- Google ratings are no longer needed for buildings whose manager publishes a rating.
+- Price points are `[day, rent, special, lease, fees]`, and each building's concession text is kept as its own dated series, so true monthly cost can be recomputed for any past day.
+
+### The page
+
+- **Buildings first.** The main list is buildings, each showing its five best units for the current filters, with "show all N". Starred units still appear as unit cards under Followed.
+- **Stars** work on a unit, or on a building with criteria ("any one-bedroom of 700+ sqft under $X").
+- **Filters, not setup gates:** move-in date and budget are ordinary filters. Crime and maximum commute are sliders.
+- **Region:** the whole region shows by default; no-go ZIP codes remove areas.
+- **Floor-plan drawings** appear on unit cards.
+- **Honesty:** a building that publishes no prices says so; a unit is "no longer listed", never "leased"; every price shows when it was read.
+- **First screen:** left open until the owner has used the first version.
+
+### Running it
+
+- A run in which more than a fifth of buildings fail ends in failure, so GitHub emails the owner **(call: the threshold)**.
+- Four Bozzuto buildings publish unit maps without prices; they are listed as "no prices published".
