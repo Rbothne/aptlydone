@@ -139,6 +139,7 @@ def main():
     day = files.today()
 
     results = run(chosen, state, get, day, workers=settings["workers"])
+    history.retire(state, {b["id"] for b in buildings}, day)
     history.prune(state, day)
     if not history.safe_to_save(before, state):
         sys.exit(f"The new history has {len(state['units'])} unit records, under 80% of the {len(before['units'])} before. "

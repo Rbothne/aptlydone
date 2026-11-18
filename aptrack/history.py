@@ -79,6 +79,13 @@ def record_failure(state, building_id, day):
     building["failed"] = day
 
 
+def retire(state, building_ids, day):
+    """Units of buildings that are no longer tracked stop counting as listed."""
+    for entry in state["units"].values():
+        if entry["building"] not in building_ids and not entry["gone"]:
+            entry["gone"] = day
+
+
 def prune(state, day):
     cutoff = (datetime.date.fromisoformat(day) - datetime.timedelta(days=UNIT_KEEP_DAYS)).isoformat()
     for unit_id in [u for u, entry in state["units"].items() if entry["gone"] and entry["gone"] < cutoff]:

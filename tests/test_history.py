@@ -146,6 +146,15 @@ class PruneAndGuardTests(unittest.TestCase):
         history.prune(state, "2026-02-06")
         self.assertIn("b1:old", state["units"])
 
+    def test_retire_marks_units_of_dropped_buildings_gone(self):
+        state = history.new_state()
+        history.record(state, "kept", [unit("1", 2000, building="kept")], D1)
+        history.record(state, "dropped", [unit("1", 2000, building="dropped"), unit("2", 2100, building="dropped")], D1)
+        history.record(state, "dropped", [unit("1", 2000, building="dropped")], D2)       # unit 2 already gone on D2
+        history.retire(state, {"kept"}, D3)
+        self.assertEqual((state["units"]["dropped:1"]["gone"], state["units"]["dropped:2"]["gone"]), (D3, D2))
+        self.assertIsNone(state["units"]["kept:1"]["gone"])
+
     def test_safe_to_save_refuses_big_drop(self):
         def state(n):
             return {"units": {str(i): {} for i in range(n)}}
