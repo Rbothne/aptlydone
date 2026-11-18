@@ -56,6 +56,11 @@ class Throttle:
         self._next = {}
         self._lock = threading.Lock()
 
+    def slow_down(self, host):
+        """Put a site that has pushed back on the default spacing for the rest of the run (never faster than it was)."""
+        with self._lock:
+            self.delays[host] = max(self.delays.get(host, self.delay), self.delay)
+
     def wait(self, url):
         host = urlparse(url).netloc
         with self._lock:
@@ -73,4 +78,5 @@ def polite(delay=1.0, delays=None, **defaults):
     def polite_get(url, **options):
         throttle.wait(url)
         return get(url, **{**defaults, **options})
+    polite_get.throttle = throttle
     return polite_get

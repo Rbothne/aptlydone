@@ -114,6 +114,17 @@ class RunTests(QuietTestCase):
         self.assertEqual((len(results), self.slept), (6, [60]))
         self.assertFalse([b for b in self.state["buildings"].values() if b["failed"]])
 
+    def test_a_site_that_pushed_back_is_read_slowly_when_we_come_back(self):
+        slowed = []
+
+        class Throttle:
+            def slow_down(self, site):
+                slowed.append(site)
+        web = Web({CAMDEN_FEED: [fetch.RateLimited("slow down"), fixture("camden_available.html")], **{k: v for k, v in GOOD.items() if k != CAMDEN_FEED}})
+        web.throttle = Throttle()
+        build.run([camden(), bozzuto()], history.new_state(), web, DAY, workers=1, sleep=lambda s: None)
+        self.assertEqual(slowed, ["www.camdenliving.com"])
+
     def test_scattered_failures_do_not_stop_a_site(self):
         feeds, buildings = self.camden_site(5)
         pages = {feed: fixture("camden_available.html") for feed in feeds}

@@ -100,6 +100,10 @@ def run(buildings, state, get, day, *, workers=4, sleep=time.sleep):
     if deferred:
         print(f"{len(deferred)} buildings at sites that stopped answering: waiting {RETRY_WAIT}s, then trying each once more")
         sleep(RETRY_WAIT)
+        throttle = getattr(get, "throttle", None)
+        if throttle:                                    # whatever speed those sites were on, come back at the default one
+            for site in {host(building) for building in deferred}:
+                throttle.slow_down(site)
         streaks = {}                                    # site -> failures in a row during this second pass
         for building in deferred:
             site = host(building)

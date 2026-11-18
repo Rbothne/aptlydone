@@ -112,6 +112,23 @@ class SiteDelayTests(unittest.TestCase):
         throttle.wait("https://slow.test/2")
         self.assertGreaterEqual(time.monotonic() - start, 0.2)
 
+    def test_slow_down_puts_a_fast_site_back_on_the_default_delay(self):
+        throttle = fetch.Throttle(0.2, delays={"fast.test": 0.0})
+        throttle.slow_down("fast.test")
+        start = time.monotonic()
+        throttle.wait("https://fast.test/1")
+        throttle.wait("https://fast.test/2")
+        self.assertGreaterEqual(time.monotonic() - start, 0.2)
+
+    def test_slow_down_never_speeds_a_site_up(self):
+        throttle = fetch.Throttle(0.0, delays={"slow.test": 0.2})
+        throttle.slow_down("slow.test")
+        self.assertEqual(throttle.delays["slow.test"], 0.2)
+
+    def test_polite_get_exposes_its_throttle(self):
+        get = fetch.polite(0.0, delays={"a.test": 0.0}, opener=Opener(b"x"))
+        self.assertIsInstance(get.throttle, fetch.Throttle)
+
     def test_polite_get_takes_site_delays(self):
         op = Opener(b"one", b"two")
         get = fetch.polite(0.0, delays={"a.test": 0.2}, opener=op)
