@@ -76,10 +76,20 @@ async function run() {
   doc.querySelector(".more").click();
   out.expandedRows = doc.querySelector(".building").querySelectorAll(".unit").length;
 
-  doc.querySelector(".star").click();
+  // following a unit puts its whole building under Followed, as the same card the list shows
+  const starredName = doc.querySelector("#buildings .building h2 a").textContent;
+  const listRows = doc.querySelector("#buildings .building").querySelectorAll(".unit").length;
+  doc.querySelector("#buildings .building .star").click();
   out.followedCount = doc.getElementById("n-followed").textContent;
   doc.querySelector('[data-tab="followed"]').click();
+  out.followedCards = doc.querySelectorAll("#followed article.building").length;
+  out.followedIsThatBuilding = doc.querySelector("#followed .building h2 a").textContent === starredName;
   out.followedRows = doc.querySelectorAll("#followed .unit").length;
+  out.followedShowsTheBuildingsListings = out.followedRows === listRows && listRows > 1;
+  out.followedFirstRowIsTheStar = doc.querySelector("#followed .unit .star").getAttribute("aria-pressed") === "true";
+  out.followedOtherRowsAreNot = [...doc.querySelectorAll("#followed .unit .star")].filter((s) => s.getAttribute("aria-pressed") === "true").length === 1;
+  out.followedCardIsFull = Boolean(doc.querySelector("#followed .building .facts")) && Boolean(doc.querySelector("#followed .building .onmap"));
+  out.followedCountLine = doc.getElementById("count").textContent;
   out.buildingsHidden = doc.getElementById("buildings").hidden;
   doc.querySelector('[data-tab="buildings"]').click();
 
@@ -170,10 +180,22 @@ async function run() {
   out.followPressed = doc.querySelector(".follow").getAttribute("aria-pressed");
   doc.getElementById("reset").click();
   doc.querySelector('[data-tab="followed"]').click();
+  // Followed is the list under the same filters: no headings, no remembered sizes, and the filters narrow it like any list
   out.followedHeadings = [...doc.querySelectorAll("#followed h3")].map((h) => h.textContent);
-  out.followNote = (doc.querySelector("#followed .following") || {}).textContent || null;
-  out.followedBuildingUnits = doc.querySelector("#followed .building") ? doc.querySelector("#followed .building").querySelectorAll(".unit").length : 0;
-  out.followedBeds = [...new Set([...doc.querySelector("#followed .building").querySelectorAll(".unit .what")].map((w) => (w.textContent.match(/(Studio|\d bed)/) || [])[0]))];
+  out.followedNoCriteriaNote = ![...doc.querySelectorAll("#followed .following")].some((p) => /Following for/.test(p.textContent));
+  out.followedBuildings = doc.querySelectorAll("#followed article.building").length;
+  out.followedTabCount = doc.getElementById("n-followed").textContent;
+  const unstarredBeds = () => [...new Set([...doc.querySelectorAll("#followed .unit")]
+    .filter((row) => row.querySelector(".star").getAttribute("aria-pressed") !== "true")
+    .map((row) => (row.querySelector(".what").textContent.match(/(Studio|\d bed)/) || [])[0]))].sort();
+  for (const more of doc.querySelectorAll("#followed .more")) if (/Show all/.test(more.textContent)) more.click();
+  out.followedBedsUnfiltered = unstarredBeds();
+  doc.querySelector('[data-beds="2"]').click();
+  for (const more of doc.querySelectorAll("#followed .more")) if (/Show all/.test(more.textContent)) more.click();
+  out.followedBedsTwoBedFilter = unstarredBeds();
+  out.followedStillAllThere = doc.querySelectorAll("#followed article.building").length === out.followedBuildings;
+  out.followedStarStillShown = [...doc.querySelectorAll("#followed .unit .star")].some((s) => s.getAttribute("aria-pressed") === "true");
+  doc.getElementById("reset").click();
   doc.querySelector('[data-tab="buildings"]').click();
   const nogo = doc.querySelector(".facts button");
   if (nogo) {

@@ -100,24 +100,24 @@ test("settings are remembered, with a fallback", () => {
   assert.equal(createStore(brokenStorage).getSetting("demographics", true), true);
 });
 
-test("following a building remembers the criteria it was followed with", () => {
+test("following a building remembers which building, and nothing about the filters of the day", () => {
   const storage = fakeStorage();
   const store = createStore(storage);
   assert.equal(store.isFollowing("b1"), false);
-  assert.equal(store.toggleFollow(building, { beds: [1], minSqft: 700, maxCost: 2600 }), true);
+  assert.equal(store.toggleFollow(building), true);
   assert.equal(store.isFollowing("b1"), true);
   const [follow] = createStore(storage).follows();
-  assert.deepEqual(follow, { id: "b1", name: "The Example", criteria: { beds: [1], minSqft: 700, maxCost: 2600 } });
-  assert.equal(store.toggleFollow(building, {}), false);
+  assert.deepEqual(follow, { id: "b1", name: "The Example" });
+  assert.equal(store.toggleFollow(building), false);
   assert.deepEqual(store.follows(), []);
-  assert.equal(createStore(brokenStorage).toggleFollow(building, {}), true);
+  assert.equal(createStore(brokenStorage).toggleFollow(building), true);
 });
 
 test("everything can be exported as text and imported in another browser", () => {
   const here = createStore(fakeStorage());
   here.setFilters({ ...DEFAULT_FILTERS, beds: [1], minSqft: 700 });
   here.toggleStar(unit(), building);
-  here.toggleFollow(building, { beds: [1], minSqft: 700, maxCost: null });
+  here.toggleFollow(building);
   here.setSetting("nogo", ["20002"]);
   here.setSetting("income", 90000);
   here.setSetting("work", { address: "1 Main St", lat: 39.1, lon: -76.8, label: "1 Main St" });

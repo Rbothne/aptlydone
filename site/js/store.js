@@ -88,7 +88,7 @@ export function createStore(storage) {
       return { ok: true, stars: stars().length, follows: this.follows().length };
     },
 
-    /** Buildings being followed: [{id, name, criteria}]. */
+    /** Buildings being followed: [{id, name}]. */
     follows() {
       const saved = read(FOLLOWS, []);
       return Array.isArray(saved) ? saved.filter((follow) => follow && follow.id) : [];
@@ -96,11 +96,11 @@ export function createStore(storage) {
     isFollowing(id) { return this.follows().some((follow) => follow.id === id); },
 
     /** Follow or stop following a building. Returns true when it is now followed. */
-    toggleFollow(building, criteria) {
+    toggleFollow(building) {
       const current = this.follows();
       const without = current.filter((follow) => follow.id !== building.id);
       const following = without.length === current.length;
-      if (following) without.push({ id: building.id, name: building.name, criteria });
+      if (following) without.push({ id: building.id, name: building.name });
       write(FOLLOWS, without);
       return following;
     },

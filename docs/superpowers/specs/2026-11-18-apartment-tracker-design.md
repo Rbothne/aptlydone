@@ -351,7 +351,7 @@ The Luxury / Standard tier from section 6 is dropped. Each building gets a rank 
 ### The page
 
 - **Buildings first.** The main list is buildings, each showing its five best units for the current filters, with "show all N". Starred units still appear as unit cards under Followed.
-- **Stars** work on a unit, or on a building with criteria ("any one-bedroom of 700+ sqft under $X").
+- **Stars** work on a unit or on a building. (Until 2026-11-19 a followed building remembered the size and price filters of the day; see the last bullet.)
 - **Filters, not setup gates:** move-in date and budget are ordinary filters. Crime and maximum commute are sliders.
 - **Region:** the whole region shows by default; no-go ZIP codes remove areas.
 - **Floor filter:** a lowest and highest floor, with a one-click "ground floor only". Ground floor means floor 0 or 1 **(call)**; 98% of units state their floor.
@@ -421,4 +421,4 @@ Asked for by the owner after reading the changelog.
 - **Locations audited.** Every address is placed by the Census Bureau weekly. ZIP: the published one, then the Census Bureau's, then the coordinate lookup (which was wrong for 246 of 564 buildings and had been preferred). Coordinates: the site's, unless an exactly matched address is more than a quarter mile away (8 buildings on 2026-11-19). Moves trigger re-location and re-collection of per-place data.
 - **Map and list together.** "Go to it in the list" keeps the filters, pages the list far enough and scrolls to the building; "On the map" does the reverse. Each tab returns to where it was left. The pop-up shows the building's best deal with its two comparisons, walkability, median age and (when switched on) race.
 - **DC violations and reviews, assessed.** DC's dashboard offers a download of the current budget year's violations (27 of 212 tracked buildings have any). No case-level data found for Virginia. Violations are judged worth building as a red flag; awaiting the owner's word. Google's terms forbid pre-fetching or storing reviews and showing place content beside a non-Google map, so review tagging is not built.
-
+- **Followed is a filter, not a second list.** The Followed tab is the buildings list under the current filters and order, narrowed to buildings that are followed or hold a followed unit (`logic.followedGroups`). A followed unit adds its building and shows first in it, even when the filters would hide it or it is no longer listed; a followed building stays when nothing matches; no-go ZIPs do not apply. Follow criteria are gone.

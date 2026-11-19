@@ -255,3 +255,55 @@ test("finding a building in the list: which page of the list it is on", async ()
   assert.equal(pageFor(groups, "e", 2), 6);
   assert.equal(pageFor(groups, "zzz", 2), null);                         // filtered out: not in the list at all
 });
+
+// ---------- the Followed tab ----------
+
+test("followed: the buildings list narrowed to followed buildings, with the same filters and order", async () => {
+  const { followedGroups } = await import("../../site/js/logic.js");
+  const index = [building(), building({ id: "b2", name: "Second" }), building({ id: "b3", name: "Third" })];
+  const units = {
+    b1: [unit({ true: 2500 }), unit({ id: "b1:102", unit: "102", beds: 2, true: 3100 })],
+    b2: [unit({ id: "b2:1", building: "b2", true: 2000 })],
+    b3: [unit({ id: "b3:1", building: "b3", true: 1500 })],
+  };
+  const groups = followedGroups(index, units, f({ sort: "cost" }), 5, [{ id: "b1", name: "The Example" }, { id: "b2", name: "Second" }], []);
+  assert.deepEqual(groups.map((g) => g.building.id), ["b2", "b1"]);                    // cheapest first, b3 is not followed
+  assert.deepEqual(groups[1].units.map((u) => u.id), ["b1:101", "b1:102"]);
+  const oneBed = followedGroups(index, units, f({ sort: "cost", beds: [2] }), 5, [{ id: "b1" }, { id: "b2" }], []);
+  assert.deepEqual(oneBed.map((g) => [g.building.id, g.units.map((u) => u.id)]), [["b1", ["b1:102"]], ["b2", []]]);   // followed, nothing matching: kept, last
+});
+
+test("followed: a followed unit adds its building, and shows first even when the filters would hide it", async () => {
+  const { followedGroups } = await import("../../site/js/logic.js");
+  const index = [building()];
+  const live = [unit({ true: 2500 }), unit({ id: "b1:102", unit: "102", true: 2300 }), unit({ id: "b1:103", unit: "103", beds: 2, true: 3100 })];
+  const stars = [{ unit: { ...live[2], true: 9999 }, building: { id: "b1", name: "The Example" }, listed: true }];
+  const [group, ...rest] = followedGroups(index, { b1: live }, f({ sort: "cost", beds: [1] }), 1, [], stars);
+  assert.equal(rest.length, 0);
+  assert.equal(group.building, index[0]);
+  assert.deepEqual(group.units.map((u) => u.id), ["b1:103", "b1:102", "b1:101"]);
+  assert.equal(group.units[0], live[2]);                                 // today's copy of the unit, not the one saved with the star
+  assert.deepEqual(group.best.map((u) => u.id), ["b1:103"]);
+  assert.deepEqual(group.unlisted, []);
+  const two = followedGroups(index, { b1: live }, f({ sort: "cost" }), 1, [{ id: "b1" }], [...stars, { unit: live[0], listed: true }]);
+  assert.equal(two.length, 1);                                           // followed twice over is still one building
+  assert.deepEqual(two[0].best.map((u) => u.id), ["b1:101", "b1:103"]);   // every followed unit is in the short list
+});
+
+test("followed: a unit that is gone stays as last seen, and so does a building that is no longer tracked", async () => {
+  const { followedGroups } = await import("../../site/js/logic.js");
+  const gone = unit({ id: "b1:999", unit: "999" });
+  const [group] = followedGroups([building()], { b1: [unit()] }, f(), 5, [], [{ unit: gone, building: { id: "b1" }, listed: false }]);
+  assert.deepEqual(group.units.map((u) => u.id), ["b1:999", "b1:101"]);
+  assert.deepEqual(group.unlisted, ["b1:999"]);
+  const lost = followedGroups([building()], { b1: [unit()] }, f(), 5, [{ id: "zz", name: "Old Place" }],
+    [{ unit: unit({ id: "yy:1", building: "yy" }), building: { id: "yy", name: "Other Old Place" }, listed: false }]);
+  assert.deepEqual(lost.map((g) => [g.building.name, g.tracked, g.units.length]), [["Old Place", false, 0], ["Other Old Place", false, 1]]);
+});
+
+test("followed: a no-go ZIP does not hide a building you chose to follow", async () => {
+  const { followedGroups } = await import("../../site/js/logic.js");
+  const index = [building({ zip: "20015" })];
+  const [group] = followedGroups(index, { b1: [unit()] }, f({ nogo: ["20015"] }), 5, [{ id: "b1" }], []);
+  assert.equal(group.units.length, 1);
+});

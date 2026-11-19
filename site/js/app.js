@@ -1,7 +1,7 @@
 // Loads the data files and draws the page. Every decision (what matches, what order, what words) is in logic.js.
 
 import {
-  DEFAULT_FILTERS, TAG_GROUPS, affordable, affordableNote, ago, areaFacts, countiesLabel, countyGroups, availability, cost, crimeText, criteriaFilters, criteriaFrom, criteriaLabel, driveLabel, incomeNeeded,
+  DEFAULT_FILTERS, TAG_GROUPS, affordable, affordableNote, ago, areaFacts, countiesLabel, countyGroups, availability, cost, crimeText, driveLabel, followedGroups, incomeNeeded,
   availableNote, dogText, isSteal, mapPoints, nearbyTags, standing, unitTitle, walkText, groupBuildings, money, perSqft, shortDate, sparkline, staleText, tagLabel, tagReason, tagsLabel, chosenTags, setTag, unitMatches,
   CRIME_STOPS, TRADEOFFS, crimeStopLabel, dropText, noiseTags, relateCrime, typicalOf, worksTags, worth, worthText,
   pageFor, popupFacts,
@@ -242,18 +242,18 @@ function aboutArea(building) {
 
 function followButton(building) {
   const following = store.isFollowing(building.id);
-  const criteria = criteriaFrom(state.filters);
   return h("button", {
     class: "follow", type: "button", "aria-pressed": String(following),
-    title: following ? "Stop following this building" : `Follow this building for: ${criteriaLabel(criteria)}. It stays under Followed and shows whatever matches each day.`,
-    onclick: () => { store.toggleFollow(building, criteria); draw(); },
+    title: following ? "Stop following this building" : "Follow this building. It stays under Followed, showing whatever matches your filters.",
+    onclick: () => { store.toggleFollow(building); draw(); },
   }, following ? "★ Following" : "☆ Follow building");
 }
 
-function buildingCard(group, note) {
+function buildingCard(group) {
   const { building, units, best } = group;
   const all = state.expanded.has(building.id);
   const shown = all ? units : best;
+  const unlisted = group.unlisted || [];              // followed units that are no longer listed, kept as last seen
   return h("article", { class: "building", "data-id": building.id },
     h("header", null,
       h("h2", null, h("a", { href: building.url, target: "_blank", rel: "noopener" }, building.name), " ", followButton(building),
@@ -265,18 +265,28 @@ function buildingCard(group, note) {
             building.rating_count != null && h("small", null, ` (${building.rating_count.toLocaleString("en-US")})`))
         : h("span", null),
       h("div", { class: "where" }, [building.neighborhood, address(building), building.manager].filter(Boolean).join(" · "))),
-    note && h("p", { class: "following" }, note),
     building.special && h("p", { class: "offer" }, building.special,
       h("small", null, "Building-wide offer: it may not apply to every unit.")),
     facts(building),
     nearbyTags(building.near).length ? h("p", { class: "nearby" }, h("b", null, "Nearby: "), nearbyTags(building.near).join(" · ")) : null,
     aboutArea(building),
-    h("div", { class: "units" }, shown.flatMap((unit) => unitRow(unit, building))),
-    !units.length && h("p", { class: "following" }, "Nothing here matches right now."),
+    h("div", { class: "units" }, shown.flatMap((unit) => unitRow(unit, building, !unlisted.includes(unit.id)))),
+    !units.length && h("p", { class: "following" }, "Nothing here matches your filters right now."),
     units.length > best.length && h("button", {
       class: "more", type: "button",
       onclick: () => { if (all) state.expanded.delete(building.id); else state.expanded.add(building.id); draw(); },
-    }, all ? `Show only the best ${best.length}` : `Show all ${plural(units.length, "matching unit")}`));
+    }, all ? `Show only the best ${best.length}` : `Show all ${plural(units.length, group.unlisted ? "unit" : "matching unit")}`));
+}
+
+/** A followed building that is no longer tracked: its name, and the followed units as they were last seen. */
+function lostCard({ building, units }) {
+  return h("article", { class: "building" },
+    h("header", null,
+      h("h2", null, building.url ? h("a", { href: building.url, target: "_blank", rel: "noopener" }, building.name) : building.name, " ",
+        store.isFollowing(building.id) && followButton(building)),
+      h("span", null),
+      h("div", { class: "where" }, "This building is no longer tracked.")),
+    h("div", { class: "units" }, units.flatMap((unit) => unitRow(unit, building, false))));
 }
 
 function noPrices() {
@@ -406,43 +416,23 @@ function drawMap(groups) {
   else chart.open = null;
 }
 
-function followedBuildings() {
-  return store.follows().map((follow) => {
-    const building = state.byId[follow.id];
-    if (!building) {
-      return h("article", { class: "building" }, h("header", null, h("h2", null, follow.name), h("span", null),
-        h("div", { class: "where" }, "This building is no longer tracked.")));
-    }
-    const [group] = groupBuildings([building], state.units, { ...criteriaFilters(follow.criteria), nogo: [] }, BEST);
-    return buildingCard(group || { building, units: [], best: [] }, `Following for: ${criteriaLabel(follow.criteria)}`);
-  });
-}
-
+/** The Followed tab: the buildings list, narrowed to buildings you follow or hold a followed unit in. */
 function drawFollowed() {
-  const stars = store.stars();
-  const follows = store.follows();
-  $("n-followed").textContent = stars.length + follows.length ? String(stars.length + follows.length) : "";
+  const groups = followedGroups(state.index, state.units, active(), BEST, store.follows(), store.stars());
+  $("n-followed").textContent = groups.length ? String(groups.length) : "";
   const section = $("followed");
-  if (!stars.length && !follows.length) {
-    section.replaceChildren(h("p", { class: "empty" }, "Nothing followed yet. Use the ☆ on a unit to follow that unit, or \"Follow building\" to keep a building here with whatever matches your size and price filters each day."));
-    return;
+  if (!groups.length) {
+    section.replaceChildren(h("p", { class: "empty" }, "Nothing followed yet. Use the ☆ on a unit, or \"Follow building\": either keeps that building here, showing whatever matches your filters, with the units you followed first."));
+    return groups;
   }
-  const groups = new Map();
-  for (const star of stars) {
-    const building = state.byId[star.unit.building] || star.building || { id: star.unit.building, name: star.unit.building };
-    if (!groups.has(building.id)) groups.set(building.id, { building, stars: [] });
-    groups.get(building.id).stars.push(star);
+  section.replaceChildren(...groups.map((group) => (group.tracked ? buildingCard(group) : lostCard(group))));
+  if (state.tab === "followed") {
+    const matching = groups.reduce((n, group) => n + group.units.length - group.unlisted.length, 0);
+    $("count").replaceChildren(
+      state.updated ? `Updated ${ago(state.updated)} · ` : "",
+      h("b", null, plural(groups.length, "followed building")), " · ", h("b", null, plural(matching, "unit")));
   }
-  section.replaceChildren(
-    follows.length ? h("h3", { class: "group" }, "Buildings you follow") : "",
-    ...followedBuildings(),
-    stars.length ? h("h3", { class: "group" }, "Units you follow") : "",
-    ...[...groups.values()].map(({ building, stars: mine }) => h("article", { class: "building" },
-    h("header", null,
-      h("h2", null, h("a", { href: building.url, target: "_blank", rel: "noopener" }, building.name)),
-      h("span", null),
-      h("div", { class: "where" }, [building.neighborhood, address(building), building.manager].filter(Boolean).join(" · "))),
-    h("div", { class: "units" }, mine.flatMap((star) => unitRow(star.unit, building, star.listed))))));
+  return groups;
 }
 
 function draw() {

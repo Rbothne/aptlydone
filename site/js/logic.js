@@ -180,27 +180,49 @@ export function pageFor(groups, buildingId, pageSize) {
   return at < 0 ? null : (Math.floor(at / pageSize) + 1) * pageSize;
 }
 
-/** What "follow this building" remembers: the size and price filters in force when it was followed. */
-export function criteriaFrom(filters) {
-  return { beds: [...filters.beds], minSqft: filters.minSqft, maxCost: filters.maxCost };
-}
+/**
+ * The Followed tab: the buildings list narrowed to the buildings that are followed or hold a followed unit, under the same
+ * filters and in the same order. What was followed never drops out: a followed unit shows first in its building even when
+ * the filters would hide it (as last seen once it is no longer listed), a followed building stays when nothing in it
+ * matches, and a no-go ZIP does not hide either. Returns [{building, units, best, unlisted, tracked}].
+ */
+export function followedGroups(index, unitsByBuilding, filters, bestCount, follows, stars) {
+  const compare = compareUnits(filters.sort);
+  const open = { ...filters, nogo: [] };
+  const byId = Object.fromEntries(index.map((building) => [building.id, building]));
+  const wanted = new Map();                       // building id -> {known, stars}
+  const want = (id, known) => {
+    if (!wanted.has(id)) wanted.set(id, { known: null, stars: [] });
+    const entry = wanted.get(id);
+    entry.known = entry.known || known;
+    return entry;
+  };
+  for (const follow of follows) want(follow.id, follow);
+  for (const star of stars) want(star.unit.building, star.building).stars.push(star);
 
-export function criteriaFilters(criteria) {
-  const c = criteria || {};
-  return { ...DEFAULT_FILTERS, beds: Array.isArray(c.beds) ? c.beds : [], minSqft: c.minSqft ?? null, maxCost: c.maxCost ?? null };
-}
-
-export function criteriaLabel(criteria) {
-  const c = criteria || {};
-  const parts = [];
-  const beds = (Array.isArray(c.beds) ? [...c.beds] : []).sort();
-  if (beds.length) {
-    const names = beds.map((n) => (n === 0 ? "Studio" : n === 3 ? "3+" : String(n)));
-    parts.push(names.join(" or ") + (beds.length === 1 && beds[0] === 0 ? "" : " bed"));
+  const groups = [];
+  for (const [id, { known, stars: mine }] of wanted) {
+    const building = byId[id];
+    const live = building ? unitsByBuilding[id] || [] : [];
+    const starred = new Set(mine.map((star) => star.unit.id));
+    const listed = live.filter((unit) => starred.has(unit.id)).sort(compare);
+    const here = new Set(listed.map((unit) => unit.id));
+    const gone = mine.filter((star) => !here.has(star.unit.id)).map((star) => star.unit);
+    const matching = live.filter((unit) => !starred.has(unit.id) && unitMatches(unit, building, open)).sort(compare);
+    const pinned = [...listed, ...gone];
+    const units = [...pinned, ...matching];
+    groups.push({
+      building: building || { ...known, id, name: (known && known.name) || id },
+      units, best: units.slice(0, Math.max(bestCount, pinned.length)),
+      unlisted: gone.map((unit) => unit.id), tracked: Boolean(building),
+      top: [...listed, ...matching].sort(compare)[0] || null,
+    });
   }
-  if (c.minSqft != null) parts.push(`${c.minSqft}+ sqft`);
-  if (c.maxCost != null) parts.push(`up to ${money(c.maxCost)}`);
-  return parts.join(" · ") || "any unit";
+  return groups.sort((a, b) => {
+    if (a.top && b.top) return compare(a.top, b.top);
+    if (a.top || b.top) return a.top ? -1 : 1;
+    return String(a.building.name).localeCompare(String(b.building.name));
+  });
 }
 
 /** Where a building's one-bedroom cost per sqft sits among buildings within two miles, in plain words. */
