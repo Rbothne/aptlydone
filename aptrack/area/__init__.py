@@ -4,6 +4,7 @@ It changes slowly, so it is collected weekly into data/area.json, apart from the
 Every part is optional: a source that fails leaves what was collected before in place.
 """
 
+import concurrent.futures
 import re
 import time
 
@@ -37,14 +38,16 @@ def collect(buildings, previous, get, today, now, parts=PARTS, post=None, sleep=
 
     if "crime" in parts:
         counts, covered = dict(area.get("crime") or {}), set(area.get("crime_counties") or [])
-        for county, reader in crime.SOURCES.items():
+        geocache = area.setdefault("geocache", {})
+
+        def one(county):
+            """{building id: counts} for one county, or None when its source could not be read."""
+            reader = crime.SOURCES[county]
             mine = [b for b in buildings if b.get("county") == county]
-            if not mine:
-                continue
             start, end = crime.FROZEN.get(county, (crime.year_ago(today), today))
             try:
                 if county in crime.NEEDS_PLACING:
-                    incidents = reader(get, start, end, post=post, cache=area.setdefault("geocache", {}))
+                    incidents = reader(get, start, end, post=post, cache=geocache)
                 elif county in crime.NEEDS_POST:
                     incidents = reader(get, start, end, post=post)
                 else:
@@ -52,13 +55,20 @@ def collect(buildings, previous, get, today, now, parts=PARTS, post=None, sleep=
                 found = crime.near(mine, incidents)
             except Exception as error:
                 print(f"  no crime data for county {county} this time: {error!r}")
-                continue
+                return None
             if county in crime.FROZEN:                  # say which year these counts are from
                 for tally in found.values():
                     tally["period"] = [start, end]
-            counts.update(found)
-            covered.add(county)
             print(f"  county {county}: {len(incidents)} incidents in 12 months, {len(mine)} buildings")
+            return found
+
+        # every county has its own source, so they are all asked at once, each at its own pace
+        wanted = [county for county in crime.SOURCES if any(b.get("county") == county for b in buildings)]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(wanted))) as pool:
+            for county, found in zip(wanted, pool.map(one, wanted)):
+                if found is not None:
+                    counts.update(found)
+                    covered.add(county)
         area["crime"], area["crime_counties"] = counts, sorted(covered)
 
     if "rents" in parts:

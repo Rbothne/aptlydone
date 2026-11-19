@@ -105,15 +105,19 @@ def read_host(group, get, facts_trouble=None):
     return outcomes, []
 
 
-def run(buildings, state, get, day, *, workers=4, sleep=time.sleep):
-    """Read every readable building and record what was found. Returns this run's successful reads by building id."""
+def run(buildings, state, get, day, *, workers=None, sleep=time.sleep):
+    """Read every readable building and record what was found. Returns this run's successful reads by building id.
+
+    Every site has a lane of its own, all running side by side, each at that site's own spacing: while one site
+    is made to wait its five seconds, the others are being asked. `workers` caps the lanes; by default there is
+    one per site, so nothing ever waits for a free lane."""
     groups = {}
     for building in buildings:
         if readable(building):
             groups.setdefault(host(building), []).append(building)
 
     outcomes, deferred, facts_trouble = [], [], {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(workers or len(groups), len(groups)))) as pool:
         for done, left in pool.map(lambda group: read_host(group, get, facts_trouble), groups.values()):
             outcomes += done
             deferred += left
@@ -210,7 +214,7 @@ def main():
     before = copy.deepcopy(state)
     day = files.today()
 
-    results = run(chosen, state, get, day, workers=settings["workers"])
+    results = run(chosen, state, get, day, workers=settings.get("workers"))
     history.retire(state, {b["id"] for b in buildings}, day)
     history.prune(state, day)
     if not history.safe_to_save(before, state):

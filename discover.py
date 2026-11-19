@@ -32,7 +32,7 @@ def main():
         parser.error(f"no company named {args.only!r} in managers.json")
     get = fetch.polite(settings["delay_seconds"], settings.get("site_delays"))
 
-    found = discovery.run_all(managers, DISCOVERERS, get, limit=args.limit, workers=settings["workers"])
+    found = discovery.run_all(managers, DISCOVERERS, get, limit=args.limit, workers=settings.get("workers"))
 
     buildings = discovery.merge(files.load(BUILDINGS, []), found, files.today(), partial=bool(args.limit))
     discovery.locate_all(buildings, get, settings["counties"], osm_get=lambda url: get(url, headers=OSM_AGENT))

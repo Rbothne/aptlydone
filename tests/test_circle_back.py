@@ -1,4 +1,5 @@
 """Discovery when a company's site stops answering: stop asking, keep what was known, come back once."""
+import os
 import unittest
 
 from aptrack import discovery, fetch
@@ -107,3 +108,77 @@ class ShrinkGuardTests(QuietTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EverySiteAtOnceTests(QuietTestCase):
+    """One lane per site: a slow site (one that asks for five seconds between requests, say) never leaves the
+    others waiting for a free lane. Each fake below only answers once every site is asking at the same moment."""
+
+    SITES = 9
+
+    def test_units_are_read_from_every_site_side_by_side(self):
+        import threading
+
+        import build
+        from aptrack import history
+        together = threading.Barrier(self.SITES, timeout=5)
+        page = open(os.path.join(os.path.dirname(__file__), "fixtures", "camden_available.html"), encoding="utf-8").read()
+        waited = set()
+        lock = threading.Lock()
+
+        def get(url, **options):
+            site = url.split("/")[2]
+            with lock:
+                first = site not in waited
+                waited.add(site)
+            if first:
+                together.wait()
+            return page.encode()
+        buildings = [{"id": f"b{n}", "manager": "M", "name": f"B{n}", "platform": "camden", "url": f"https://site{n}.test/b",
+                      "feed": f"https://site{n}.test/b/available-apartments", "in_region": True, "county": "11001"} for n in range(self.SITES)]
+        results = build.run(buildings, history.new_state(), get, "2026-11-19", sleep=lambda s: None)
+        self.assertEqual(len(results), self.SITES)
+
+    def test_companies_are_discovered_side_by_side(self):
+        import threading
+        together = threading.Barrier(self.SITES, timeout=5)
+
+        def discoverer(get, limit=None):
+            together.wait()
+            return []
+        managers = [{"name": f"M{n}", "discover": "x"} for n in range(self.SITES)]
+        found = discovery.run_all(managers, {"x": discoverer}, None, sleep=lambda s: None)
+        self.assertEqual(found, {f"M{n}": [] for n in range(self.SITES)})
+
+    def test_a_limit_on_lanes_is_still_honoured_when_given(self):
+        import threading
+        running, most, lock = [0], [0], threading.Lock()
+
+        def discoverer(get, limit=None):
+            with lock:
+                running[0] += 1
+                most[0] = max(most[0], running[0])
+            threading.Event().wait(0.02)
+            with lock:
+                running[0] -= 1
+            return []
+        discovery.run_all([{"name": f"M{n}", "discover": "x"} for n in range(6)], {"x": discoverer}, None, workers=2, sleep=lambda s: None)
+        self.assertLessEqual(most[0], 2)
+
+    def test_counties_crime_is_collected_side_by_side(self):
+        import threading
+        from unittest import mock
+
+        from aptrack import area
+        from aptrack.area import crime
+        together = threading.Barrier(3, timeout=5)
+
+        def reader(get, start, today):
+            together.wait()
+            return [(38.9, -77.0, "violent", "2026-06-01")]
+        buildings = [{"id": f"b{n}", "county": county, "lat": 38.9, "lon": -77.0, "tract": "1", "in_region": True}
+                     for n, county in enumerate(("11001", "24031", "24033"))]
+        with mock.patch.dict(crime.SOURCES, {"11001": reader, "24031": reader, "24033": reader}):
+            got = area.collect(buildings, {}, None, "2026-11-19", "now", parts=("crime",), sleep=lambda s: None)
+        self.assertEqual(got["crime_counties"], ["11001", "24031", "24033"])
+        self.assertEqual([got["crime"][f"b{n}"]["violent"] for n in range(3)], [1, 1, 1])

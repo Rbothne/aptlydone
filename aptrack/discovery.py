@@ -52,9 +52,10 @@ def merge(previous, found, day, partial=False):
     return sorted(merged.values(), key=lambda b: b["id"])
 
 
-def run_all(managers, discoverers, get, limit=None, workers=4, sleep=time.sleep):
-    """{manager name: buildings found, or None when its discovery failed}. Companies are read side by side; one
-    whose site fails or stops answering is left alone, and come back to once after the others are done."""
+def run_all(managers, discoverers, get, limit=None, workers=None, sleep=time.sleep):
+    """{manager name: buildings found, or None when its discovery failed}. Every company is read at once, each
+    at its own site's spacing (`workers` caps how many, for tests); one whose site fails or stops answering is
+    left alone, and come back to once after the others are done."""
     def attempt(manager):
         try:
             find = discoverers[manager["discover"]]
@@ -65,7 +66,7 @@ def run_all(managers, discoverers, get, limit=None, workers=4, sleep=time.sleep)
             print(f"{manager['name']}: discovery failed: {error!r}")
             return None
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(workers or len(managers), len(managers)))) as pool:
         found = dict(zip((m["name"] for m in managers), pool.map(attempt, managers)))
     failed = [m for m in managers if found[m["name"]] is None]
     if failed:
