@@ -1,10 +1,10 @@
 // Loads the data files and draws the page. Every decision (what matches, what order, what words) is in logic.js.
 
 import {
-  DEFAULT_FILTERS, affordable, affordableNote, ago, areaFacts, availability, cost, crimeText, criteriaFilters, criteriaFrom, criteriaLabel, driveLabel, incomeNeeded,
+  DEFAULT_FILTERS, affordable, affordableNote, ago, areaFacts, countiesLabel, countyGroups, availability, cost, crimeText, criteriaFilters, criteriaFrom, criteriaLabel, driveLabel, incomeNeeded,
   availableNote, isSteal, mapPoints, standing, unitTitle, groupBuildings, money, perSqft, shortDate, sparkline, tagLabel, tagReason, unitMatches,
 } from "./logic.js";
-import { driveTimes, geocode } from "./commute.js";
+import { driveTimes, geocode, trafficTimes } from "./commute.js";
 import { createStore } from "./store.js";
 
 const COUNTY = {
@@ -188,13 +188,12 @@ function facts(building) {
   const items = [];
   if (building.laundry === "in_unit") items.push(["In-unit laundry"]);
   else if (building.laundry === "shared") items.push(["Shared laundry"]);
-  else items.push(["Laundry not stated", "unknown"]);
   if (building.parking_from != null) items.push([`Parking from ${money(building.parking_from)}/mo`]);
   else if (building.parking) items.push(["Parking available, price not stated"]);
   else items.push(["Parking not stated", "unknown"]);
   if (building.pets) items.push(["Pets allowed"]);
   if (building.one_time) items.push([`One-time fees ${money(building.one_time)}`]);
-  if (building.drive != null) items.push([driveLabel(building.drive)]);
+  if (building.drive != null) items.push([building.driveTraffic ? driveLabel(building.drive, building.drivePm) : driveLabel(building.drive)]);
   const crime = crimeText(building, state.crimeCounties);
   items.push([crime.text, crime.known ? null : "unknown"]);
   if (building.rank) items.push([`${standing(building.rank)} (pricier than ${building.rank.pct}% of ${building.rank.n} buildings within 2 miles)`]);
@@ -253,7 +252,7 @@ function noPrices() {
   const { filters } = state;
   const q = filters.q.trim().toLowerCase();
   const silent = state.index.filter((b) => !(state.units[b.id] || []).length
-    && (!filters.county || b.county === filters.county)
+    && (!filters.counties.length || filters.counties.includes(b.county))
     && (!q || [b.name, b.neighborhood].filter(Boolean).join(" ").toLowerCase().includes(q)));
   if (!silent.length) return null;
   return h("details", { class: "noprices" },
@@ -395,20 +394,30 @@ function draw() {
 /** Put known drive times on the buildings and their units (units carry it so they can be sorted by it). */
 function applyDrive(times) {
   for (const building of state.index) {
-    const minutes = times && building.id in times ? times[building.id] : null;
-    building.drive = minutes;
-    for (const unit of state.units[building.id] || []) unit.drive = minutes;
+    const time = times && building.id in times ? times[building.id] : null;
+    const traffic = time != null && typeof time === "object";             // {am, pm} from Google; a plain number without traffic
+    building.drive = traffic ? time.am : time;
+    building.drivePm = traffic ? time.pm : null;
+    building.driveTraffic = traffic;
+    for (const unit of state.units[building.id] || []) unit.drive = building.drive;
   }
+}
+
+function driveKey() {
+  const key = store.getSetting("googleKey", null);
+  const hours = { leave: store.getSetting("leave", "08:00"), back: store.getSetting("back", "17:30") };
+  return { key, hours, cache: `${state.work.lat},${state.work.lon}|${key ? `traffic ${hours.leave} ${hours.back}` : "free"}` };
 }
 
 function showWork() {
   $("work").value = state.work ? state.work.address : "";
   const cached = store.getSetting("drive", null);
-  const known = state.work && cached && cached.key === `${state.work.lat},${state.work.lon}` ? cached.times : null;
+  const known = state.work && cached && cached.key === driveKey().cache ? cached.times : null;
   applyDrive(known);
+  const traffic = known && Object.values(known).some((time) => typeof time === "object");
   $("workstatus").textContent = !state.work ? "" : known
-    ? `${Object.keys(known).length} buildings timed from ${state.work.label.split(",").slice(0, 2).join(",")}`
-    : "Not timed yet";
+    ? `${Object.keys(known).length} buildings timed from ${state.work.label.split(",").slice(0, 2).join(",")}${traffic ? ", with typical traffic" : ", without traffic"}`
+    : "Not timed yet: press Time my drive";
   return known;
 }
 
@@ -429,11 +438,27 @@ async function timeDrives() {
     if (!found) { $("workstatus").textContent = "Could not find that address. Try adding the city and state."; return; }
     state.work = { address: typed, ...found };
     store.setSetting("work", state.work);
-    $("workstatus").textContent = "Timing drives…";
-    const times = await driveTimes(state.work, state.index);
-    store.setSetting("drive", { key: `${found.lat},${found.lon}`, times });
+    const { key, hours, cache } = driveKey();
+    let times = null, problem = "";
+    if (key) {
+      $("workstatus").textContent = "Timing drives in typical traffic…";
+      try {
+        times = await trafficTimes(state.work, state.index, key, hours);
+      } catch (error) {
+        problem = `Google did not accept the request (${error.message}), so these are no-traffic times. `;
+      }
+    }
+    if (!times || !Object.keys(times).length) {
+      $("workstatus").textContent = "Timing drives…";
+      times = await driveTimes(state.work, state.index);
+      store.setSetting("drive", { key: `${found.lat},${found.lon}|free`, times });
+      if (key) store.setSetting("drive", { key: cache, times });          // do not ask Google again on every page load
+    } else {
+      store.setSetting("drive", { key: cache, times });
+    }
     showWork();
     if (!Object.keys(times).length) $("workstatus").textContent = "The routing service did not answer. Try again in a minute.";
+    else if (problem) $("workstatus").textContent = problem + $("workstatus").textContent;
     draw();
   } catch (error) {
     $("workstatus").textContent = `Could not time drives (${error.message}). Try again in a minute.`;
@@ -449,7 +474,13 @@ function showFilters() {
   $("q").value = f.q;
   for (const id of NUMBERS) $(id).value = f[id] ?? "";
   $("moveBy").value = f.moveBy || "";
-  $("county").value = f.county;
+  $("areaslabel").textContent = countiesLabel(f.counties, COUNTY);
+  for (const box of document.querySelectorAll("#areaspanel input[data-county]")) box.checked = f.counties.includes(box.dataset.county);
+  for (const box of document.querySelectorAll("#areaspanel input[data-state]")) {
+    const mine = [...document.querySelectorAll(`#areaspanel input[data-county][data-in="${box.dataset.state}"]`)];
+    box.checked = mine.length > 0 && mine.every((county) => county.checked);
+    box.indeterminate = !box.checked && mine.some((county) => county.checked);
+  }
   $("manager").value = f.manager;
   $("minRating").value = f.minRating == null ? "" : String(f.minRating);
   $("sort").value = f.sort;
@@ -479,7 +510,7 @@ function wire() {
     $(id).addEventListener("change", () => { const v = $(id).value; state.filters[id] = v === "" ? null : Number(v); changed(); });
   }
   $("moveBy").addEventListener("change", () => { state.filters.moveBy = $("moveBy").value || null; changed(); });
-  $("county").addEventListener("change", () => { state.filters.county = $("county").value; changed(); });
+  document.addEventListener("click", (event) => { if (!$("areas").contains(event.target)) $("areas").open = false; });
   $("manager").addEventListener("change", () => { state.filters.manager = $("manager").value; changed(); });
   $("minRating").addEventListener("change", () => { const v = $("minRating").value; state.filters.minRating = v === "" ? null : Number(v); changed(); });
   $("sort").addEventListener("change", () => { state.filters.sort = $("sort").value; changed(); });
@@ -526,6 +557,28 @@ function wire() {
   }
 }
 
+// ---------- area picker: states with their counties, any number chosen ----------
+
+function buildAreas(counts) {
+  const panel = $("areaspanel");
+  const choose = (fipsList, on) => {
+    const chosen = new Set(state.filters.counties);
+    for (const fips of fipsList) { if (on) chosen.add(fips); else chosen.delete(fips); }
+    state.filters.counties = [...chosen];
+    changed();
+  };
+  panel.replaceChildren(...countyGroups(Object.keys(counts), COUNTY).flatMap((group) => {
+    const all = group.counties.map((county) => county.fips);
+    const rows = group.counties.map((county) => h("label", { class: "county" },
+      h("input", { type: "checkbox", "data-county": county.fips, "data-in": group.state, onchange: (event) => choose([county.fips], event.target.checked) }),
+      county.name.replace(/, (VA|MD)$/, ""), h("small", null, String(counts[county.fips].units))));
+    if (group.counties.length === 1) { rows[0].className = "state"; return rows; }
+    return [h("label", { class: "state" },
+      h("input", { type: "checkbox", "data-state": group.state, onchange: (event) => choose(all, event.target.checked) }),
+      `${group.state} (all)`, h("small", null, String(all.reduce((n, fips) => n + counts[fips].units, 0)))), ...rows];
+  }));
+}
+
 // ---------- first-visit setup ----------
 
 function openSetup() {
@@ -537,6 +590,10 @@ function openSetup() {
   $("s-work").value = state.work ? state.work.address : "";
   $("s-maxDrive").value = f.maxDrive ?? "";
   $("s-income").value = state.income ?? "";
+  $("s-key").value = store.getSetting("googleKey", "") || "";
+  $("s-leave").value = store.getSetting("leave", "08:00");
+  $("s-back").value = store.getSetting("back", "17:30");
+  $("x-status").textContent = "";
   if (typeof $("setup").showModal === "function") $("setup").showModal();
 }
 
@@ -555,11 +612,16 @@ function wireSetup() {
     state.filters.moveBy = $("s-moveBy").value || null;
     state.income = number("s-income");
     store.setSetting("income", state.income);
+    const before = state.work ? driveKey().cache : null;
+    store.setSetting("googleKey", $("s-key").value.trim() || null);
+    store.setSetting("leave", $("s-leave").value || "08:00");
+    store.setSetting("back", $("s-back").value || "17:30");
     const maxDrive = number("s-maxDrive");
     const address = $("s-work").value.trim();
     done();
     changed();
-    if (address && (!state.work || state.work.address !== address)) {
+    const retime = state.work && driveKey().cache !== before;             // the key or the hours changed
+    if (address && (retime || !state.work || state.work.address !== address)) {
       $("work").value = address;
       timeDrives().then(() => { if (maxDrive != null && state.work) { state.filters.maxDrive = maxDrive; changed(); } });
     } else if (maxDrive != null && state.work) {
@@ -568,6 +630,41 @@ function wireSetup() {
     }
   });
   $("setupbtn").addEventListener("click", openSetup);
+
+  // settings as text, to carry to another browser
+  $("x-copy").addEventListener("click", async () => {
+    const text = store.exportText(new Date().toISOString());
+    try {
+      await navigator.clipboard.writeText(text);
+      $("x-status").textContent = "Copied. Paste it into the box below on the other browser.";
+    } catch {
+      $("x-text").value = text;
+      $("x-text").select();
+      $("x-status").textContent = "Could not reach the clipboard; the text is in the box below to copy by hand.";
+    }
+  });
+  $("x-file").addEventListener("click", () => {
+    const link = h("a", { href: URL.createObjectURL(new Blob([store.exportText(new Date().toISOString())], { type: "text/plain" })),
+      download: "apartment-tracker-settings.txt" });
+    document.body.append(link);
+    link.click();
+    link.remove();
+    $("x-status").textContent = "Saved apartment-tracker-settings.txt.";
+  });
+  $("x-import").addEventListener("click", () => {
+    const result = store.importText($("x-text").value);
+    if (!result.ok) { $("x-status").textContent = "That is not an export from this page. Nothing was changed."; return; }
+    store.setSetting("welcomed", true);
+    state.filters = store.getFilters();
+    state.nogo = store.getSetting("nogo", []);
+    state.income = store.getSetting("income", null);
+    state.work = store.getSetting("work", null);
+    state.demographics = store.getSetting("demographics", true);
+    $("setup").close();
+    showWork();
+    changed();
+    $("workstatus").textContent = `Settings loaded: ${result.stars} followed units, ${result.follows} followed buildings.` + (state.work ? " Press Time my drive to time drives here." : "");
+  });
 }
 
 // ---------- loading ----------
@@ -598,7 +695,7 @@ async function load() {
   state.crimeCounties = index.crime_counties || [];
   if (state.crimeCounties.length) $("crime-counties").textContent = state.crimeCounties.map((fips) => COUNTY[fips] || fips).join("; ");
   const counties = Object.keys(index.counties).sort((a, b) => index.counties[b].units - index.counties[a].units);
-  for (const fips of counties) $("county").append(h("option", { value: fips }, COUNTY[fips] || fips));
+  buildAreas(index.counties);
   const managers = [...new Set(index.buildings.map((b) => b.manager).filter(Boolean))].sort();
   for (const name of managers) $("manager").append(h("option", { value: name }, name));
   showFilters();

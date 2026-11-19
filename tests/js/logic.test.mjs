@@ -59,10 +59,8 @@ test("floor range and ground floor", () => {
   assert.equal(unitMatches(unit({ floor: null }), building(), f({ ground: true })), false);
 });
 
-test("building facts: laundry, parking, pets need a known yes", () => {
-  assert.equal(unitMatches(unit(), building({ laundry: null }), f({ laundry: true })), false);
-  assert.equal(unitMatches(unit(), building({ laundry: "shared" }), f({ laundry: true })), false);
-  assert.equal(unitMatches(unit(), building({ laundry: "in_unit" }), f({ laundry: true })), true);
+test("building facts: parking and pets need a known yes; there is no laundry filter", () => {
+  assert.equal("laundry" in DEFAULT_FILTERS, false);
   assert.equal(unitMatches(unit(), building({ parking_from: null }), f({ parking: true })), false);
   assert.equal(unitMatches(unit(), building({ parking_from: 225 }), f({ parking: true })), true);
   assert.equal(unitMatches(unit(), building({ pets: null }), f({ pets: true })), false);
@@ -82,9 +80,25 @@ test("income-restricted units and senior housing are hidden unless switched on",
   assert.equal(unitMatches(unit(), building({ senior: true }), f({ showRestricted: true })), true);
 });
 
-test("county filter", () => {
-  assert.equal(unitMatches(unit(), building({ county: "51013" }), f({ county: "11001" })), false);
-  assert.equal(unitMatches(unit(), building({ county: "11001" }), f({ county: "11001" })), true);
+test("county filter takes several counties; none chosen means all", () => {
+  assert.deepEqual(DEFAULT_FILTERS.counties, []);
+  assert.equal(unitMatches(unit(), building({ county: "51013" }), f({ counties: ["11001"] })), false);
+  assert.equal(unitMatches(unit(), building({ county: "11001" }), f({ counties: ["11001", "51013"] })), true);
+  assert.equal(unitMatches(unit(), building({ county: "51013" }), f({ counties: ["11001", "51013"] })), true);
+  assert.equal(unitMatches(unit(), building({ county: "24031" }), f()), true);
+});
+
+test("counties are grouped by state, with a label for what is chosen", async () => {
+  const { countyGroups, countiesLabel } = await import("../../site/js/logic.js");
+  const names = { "11001": "Washington, DC", "51013": "Arlington", "51510": "Alexandria", "24031": "Montgomery" };
+  assert.deepEqual(countyGroups(["24031", "51510", "11001", "51013"], names), [
+    { state: "DC", counties: [{ fips: "11001", name: "Washington, DC" }] },
+    { state: "Virginia", counties: [{ fips: "51510", name: "Alexandria" }, { fips: "51013", name: "Arlington" }] },
+    { state: "Maryland", counties: [{ fips: "24031", name: "Montgomery" }] },
+  ]);
+  assert.equal(countiesLabel([], names), "All areas");
+  assert.equal(countiesLabel(["51013"], names), "Arlington");
+  assert.equal(countiesLabel(["51013", "51510"], names), "Arlington + 1 more");
 });
 
 test("search matches name, neighborhood, manager, city and ZIP", () => {
@@ -288,7 +302,7 @@ test("crime counts from an older year say which year", async () => {
 
 test("follow criteria: taken from the filters, put into words, and turned back into filters", async () => {
   const { criteriaFrom, criteriaLabel, criteriaFilters } = await import("../../site/js/logic.js");
-  const criteria = criteriaFrom(f({ beds: [1, 2], minSqft: 700, maxCost: 2600, q: "chevy", tagged: true, county: "11001" }));
+  const criteria = criteriaFrom(f({ beds: [1, 2], minSqft: 700, maxCost: 2600, q: "chevy", tagged: true, counties: ["11001"] }));
   assert.deepEqual(criteria, { beds: [1, 2], minSqft: 700, maxCost: 2600 });
   assert.equal(criteriaLabel(criteria), "1 or 2 bed · 700+ sqft · up to $2,600");
   assert.equal(criteriaLabel({ beds: [0], minSqft: null, maxCost: null }), "Studio");
@@ -296,7 +310,7 @@ test("follow criteria: taken from the filters, put into words, and turned back i
   assert.equal(criteriaLabel({ beds: [], minSqft: null, maxCost: null }), "any unit");
   assert.equal(criteriaLabel(undefined), "any unit");
   const back = criteriaFilters(criteria);
-  assert.deepEqual([back.beds, back.minSqft, back.maxCost, back.q, back.tagged, back.county], [[1, 2], 700, 2600, "", false, ""]);
+  assert.deepEqual([back.beds, back.minSqft, back.maxCost, back.q, back.tagged, back.counties], [[1, 2], 700, 2600, "", false, []]);
   assert.equal(unitMatches(unit({ beds: 1, sqft: 800, true: 2500 }), building(), back), true);
   assert.equal(unitMatches(unit({ beds: 1, sqft: 650, true: 2500 }), building(), back), false);
 });

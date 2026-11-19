@@ -40,7 +40,6 @@
 
     <span class="chips" role="group" aria-label="Must have">
       <button type="button" data-toggle="ground" aria-pressed="false">Ground floor</button>
-      <button type="button" data-toggle="laundry" aria-pressed="false">In-unit laundry</button>
       <button type="button" data-toggle="parking" aria-pressed="false">Parking</button>
       <button type="button" data-toggle="pets" aria-pressed="false">Pets</button>
       <button type="button" data-toggle="tagged" aria-pressed="false">Tagged only</button>
@@ -58,7 +57,10 @@
       <select id="minRating"><option value="">Any</option><option value="3.5">3.5+</option><option value="4">4.0+</option>
         <option value="4.3">4.3+</option><option value="4.5">4.5+</option><option value="4.7">4.7+</option></select></label>
     <label>Managed by <select id="manager"><option value="">Anyone</option></select></label>
-    <label>County <select id="county"><option value="">All</option></select></label>
+    <details class="picker" id="areas">
+      <summary>Areas: <span id="areaslabel">All areas</span></summary>
+      <div class="panel" id="areaspanel"></div>
+    </details>
     <label>Sort <select id="sort">
       <option value="picks">Top picks</option>
       <option value="cost">Lowest monthly cost</option>
@@ -103,6 +105,27 @@
     <label>Household income per year <input type="number" id="s-income" min="0" step="1000" placeholder="$ (optional)" inputmode="numeric"></label>
     <p class="muted">Income is used only to flag units whose rent is more than a third of it, the usual rule buildings apply.
       The work address is sent to OpenStreetMap and a public routing service to time drives without traffic.</p>
+
+    <h3>Rush-hour drive times (optional)</h3>
+    <p class="muted">With a Google Maps key the drive times use typical traffic at the hours you drive, to work and back.
+      Create a key in Google Cloud with the <b>Routes API</b> turned on; timing every building both ways uses about 800 of the
+      5,000 free lookups a month. The key is kept in this browser only and is sent only to Google.</p>
+    <label>Google Maps key <input type="password" id="s-key" placeholder="paste the key" autocomplete="off" spellcheck="false"></label>
+    <label class="pair">Leave for work at <input type="time" id="s-leave" value="08:00"> Leave work at <input type="time" id="s-back" value="17:30"></label>
+
+    <details class="backup">
+      <summary>Move your settings to another browser or device</summary>
+      <p class="muted">This copies your filters, followed units and buildings, no-go ZIP codes, work address and income as text.
+        It leaves out the Google key.</p>
+      <div class="actions left">
+        <button type="button" class="pill" id="x-copy">Copy as text</button>
+        <button type="button" class="pill" id="x-file">Save as a file</button>
+        <span id="x-status" class="muted" aria-live="polite"></span>
+      </div>
+      <label>Paste exported settings here to load them
+        <textarea id="x-text" rows="4" spellcheck="false" placeholder='{"app": "apartment-tracker", ...}'></textarea></label>
+      <div class="actions left"><button type="button" class="pill" id="x-import">Load these settings</button></div>
+    </details>
     <div class="actions">
       <button type="button" class="pill" id="s-skip">Skip</button>
       <button type="submit" class="pill primary" id="s-go">Show apartments</button>

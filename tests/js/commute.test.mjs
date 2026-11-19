@@ -79,3 +79,56 @@ test("shortest drive sort puts unknown times last", async () => {
   const units = [{ id: "x" }, { id: "far", drive: 55 }, { id: "near", drive: 20 }];
   assert.deepEqual(units.sort(compareUnits("drive")).map((u) => u.id), ["near", "far", "x"]);
 });
+
+test("departure is the next Tuesday, Wednesday or Thursday at the chosen time", async () => {
+  const { nextWeekday } = await import("../../site/js/commute.js");
+  const at = (text) => new Date(text);
+  const day = (date) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][date.getDay()];
+  const friday = at("2026-11-20T10:00:00");
+  const got = nextWeekday(friday, "08:00");
+  assert.equal(day(got), "Tue");
+  assert.deepEqual([got.getHours(), got.getMinutes()], [8, 0]);
+  assert.ok(got > friday);
+  assert.equal(day(nextWeekday(at("2026-11-17T06:00:00"), "08:00")), "Tue");      // Tuesday morning, before 8: today
+  assert.equal(day(nextWeekday(at("2026-11-17T09:00:00"), "08:00")), "Wed");      // Tuesday after 8: tomorrow
+  assert.equal(day(nextWeekday(at("2026-11-19T18:00:00"), "17:30")), "Tue");      // Thursday evening, past 5:30: next week
+});
+
+test("traffic times: one request each way, minutes for the morning and evening trips", async () => {
+  const { trafficTimes } = await import("../../site/js/commute.js");
+  const calls = [];
+  const post = async (url, body, headers) => {
+    calls.push({ url, body, headers });
+    const outbound = body.origins.length > 1;                    // buildings -> work
+    return (outbound ? body.origins : body.destinations).map((_, i) => ({
+      originIndex: outbound ? i : 0, destinationIndex: outbound ? 0 : i, condition: "ROUTE_EXISTS", duration: `${(outbound ? 40 : 50) * 60 + i}s`,
+    }));
+  };
+  const times = await trafficTimes(work, buildings, "KEY", { leave: "08:00", back: "17:30" }, post, new Date("2026-11-17T06:00:00"));
+  assert.deepEqual(times, { a: { am: 40, pm: 50 }, b: { am: 40, pm: 50 } });
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].url, "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix");
+  assert.equal(calls[0].headers["X-Goog-Api-Key"], "KEY");
+  assert.ok(calls[0].headers["X-Goog-FieldMask"].includes("duration"));
+  assert.equal(calls[0].body.routingPreference, "TRAFFIC_AWARE");
+  assert.equal(calls[0].body.travelMode, "DRIVE");
+  assert.deepEqual(calls[0].body.destinations[0].waypoint.location.latLng, { latitude: 39.1, longitude: -76.8 });
+  assert.equal(calls[1].body.origins.length, 1);
+  assert.ok(Date.parse(calls[0].body.departureTime) < Date.parse(calls[1].body.departureTime));
+});
+
+test("traffic times: routes that do not exist are left out, and a refused key is an error", async () => {
+  const { trafficTimes } = await import("../../site/js/commute.js");
+  const post = async (url, body) => (body.origins.length > 1
+    ? [{ originIndex: 0, destinationIndex: 0, condition: "ROUTE_EXISTS", duration: "600s" }, { originIndex: 1, destinationIndex: 0, condition: "ROUTE_NOT_FOUND" }]
+    : [{ originIndex: 0, destinationIndex: 0, condition: "ROUTE_EXISTS", duration: "660s" }]);
+  const times = await trafficTimes(work, buildings, "KEY", { leave: "08:00", back: "17:30" }, post, new Date("2026-11-17T06:00:00"));
+  assert.deepEqual(times, { a: { am: 10, pm: 11 } });
+  await assert.rejects(trafficTimes(work, buildings, "BAD", { leave: "08:00", back: "17:30" }, async () => { throw new Error("403 API key not valid"); }),
+    /API key/);
+});
+
+test("drive wording with traffic", () => {
+  assert.equal(driveLabel(38, 52), "38 min to work, 52 min home (typical traffic)");
+  assert.equal(driveLabel(75, null), "1 h 15 min to work (typical traffic)");
+});

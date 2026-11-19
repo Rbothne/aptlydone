@@ -35,6 +35,7 @@ export function createStore(storage) {
       }
     }
     if (!Array.isArray(filters.beds)) filters.beds = [];
+    if (!Array.isArray(filters.counties)) filters.counties = [];
     return filters;
   }
 
@@ -59,6 +60,33 @@ export function createStore(storage) {
     },
     setFilters(filters) { write(FILTERS, filters); },
     stars,
+
+    /** Everything except the Google key, as text that importText() accepts in another browser. */
+    exportText(when) {
+      const settings = { ...(read(SETTINGS, {}) || {}) };
+      delete settings.googleKey;
+      delete settings.drive;                                   // a cache; it is rebuilt
+      return JSON.stringify({
+        app: "apartment-tracker", version: 1, exported: when,
+        filters: getFilters(), stars: stars(), follows: this.follows(), settings,
+      }, null, 1);
+    },
+
+    /** Replace this browser's filters, followed things and settings with an export. The Google key here is kept. */
+    importText(text) {
+      let data;
+      try { data = JSON.parse(text); } catch { return { ok: false }; }
+      if (!data || typeof data !== "object" || data.app !== "apartment-tracker") return { ok: false };
+      const key = (read(SETTINGS, {}) || {}).googleKey;
+      const settings = data.settings && typeof data.settings === "object" ? { ...data.settings } : {};
+      delete settings.googleKey;
+      if (key) settings.googleKey = key;
+      write(SETTINGS, settings);
+      write(FILTERS, data.filters && typeof data.filters === "object" ? data.filters : {});
+      write(STARS, Array.isArray(data.stars) ? data.stars : []);
+      write(FOLLOWS, Array.isArray(data.follows) ? data.follows : []);
+      return { ok: true, stars: stars().length, follows: this.follows().length };
+    },
 
     /** Buildings being followed: [{id, name, criteria}]. */
     follows() {

@@ -2,7 +2,7 @@
 
 export const DEFAULT_FILTERS = Object.freeze({
   q: "", beds: [], minSqft: null, maxCost: null, moveBy: null, floorMin: null, floorMax: null, ground: false,
-  laundry: false, parking: false, pets: false, tagged: false, highEnd: false, maxViolent: null, maxDrive: null, minRating: null, manager: "", county: "", showRestricted: false, sort: "picks",
+  parking: false, pets: false, tagged: false, highEnd: false, maxViolent: null, maxDrive: null, minRating: null, manager: "", counties: [], showRestricted: false, sort: "picks",
 });
 
 export const HIGH_END = 67;                 // a building pricier than this share of its neighbours is "high-end for its area"
@@ -38,7 +38,6 @@ export function unitMatches(unit, building, filters) {
   if (filters.floorMin != null && !(unit.floor != null && unit.floor >= filters.floorMin)) return false;
   if (filters.floorMax != null && !(unit.floor != null && unit.floor <= filters.floorMax)) return false;
   if (filters.ground && !GROUND_FLOORS.includes(unit.floor)) return false;
-  if (filters.laundry && building.laundry !== "in_unit") return false;
   if (filters.parking && building.parking_from == null && building.parking !== true) return false;
   if (filters.pets && building.pets !== true) return false;
   if (filters.tagged && !isSteal(unit.tag)) return false;
@@ -48,7 +47,7 @@ export function unitMatches(unit, building, filters) {
   if (filters.minRating != null && !(building.rating != null && building.rating >= filters.minRating)) return false;
   if (filters.manager && building.manager !== filters.manager) return false;
   if (filters.nogo && building.zip && filters.nogo.includes(building.zip)) return false;
-  if (filters.county && building.county !== filters.county) return false;
+  if (filters.counties && filters.counties.length && !filters.counties.includes(building.county)) return false;
   const q = filters.q.trim().toLowerCase();
   if (q && !searchable(building).includes(q)) return false;
   return true;
@@ -176,6 +175,24 @@ export function affordableNote(project) {
     : `City records: ${project.affordable} income-restricted units here`;
 }
 
+const STATES = [["11", "DC"], ["51", "Virginia"], ["24", "Maryland"]];
+
+/** Counties (FIPS codes) grouped by state, each list in name order: for the area picker. */
+export function countyGroups(fipsCodes, names) {
+  return STATES.map(([prefix, state]) => ({
+    state,
+    counties: fipsCodes.filter((fips) => fips.startsWith(prefix))
+      .map((fips) => ({ fips, name: names[fips] || fips }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  })).filter((group) => group.counties.length);
+}
+
+export function countiesLabel(selected, names) {
+  if (!selected || !selected.length) return "All areas";
+  const first = names[selected[0]] || selected[0];
+  return selected.length === 1 ? first : `${first} + ${selected.length - 1} more`;
+}
+
 export function tagLabel(tag) {
   return TAG_LABELS[tag] || "";
 }
@@ -231,10 +248,11 @@ export function areaFacts(tract, trend, zip, showRace) {
 }
 
 /** "38 min drive to work (no traffic)"; empty when the time is not known. */
-export function driveLabel(minutes) {
+export function driveLabel(minutes, evening) {
   if (minutes == null) return "";
-  const time = minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
-  return `${time} drive to work (no traffic)`;
+  const time = (m) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`);
+  if (evening === undefined) return `${time(minutes)} drive to work (no traffic)`;
+  return `${time(minutes)} to work${evening == null ? "" : `, ${time(evening)} home`} (typical traffic)`;
 }
 
 export function money(n) {

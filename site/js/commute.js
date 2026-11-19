@@ -47,3 +47,62 @@ export async function driveTimes(work, buildings, getJson = fetchJson) {
   }
   return times;
 }
+
+// ---------- with a Google key: typical traffic at the hours you actually drive ----------
+
+const ROUTES = "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix";
+const ROUTES_BATCH = 600;      // Google allows 625 origin-destination pairs per request
+
+async function postJson(url, body, headers) {
+  const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) });
+  if (!response.ok) {
+    let detail = "";
+    try { detail = (await response.json())[0]?.error?.message || ""; } catch { /* no detail */ }
+    throw new Error(`${response.status} ${detail}`.trim());
+  }
+  return response.json();
+}
+
+/** The next Tuesday, Wednesday or Thursday at "HH:MM" local time: an ordinary commuting day, in the future. */
+export function nextWeekday(now, hhmm) {
+  const [hours, minutes] = hhmm.split(":").map(Number);
+  const when = new Date(now);
+  when.setHours(hours, minutes, 0, 0);
+  while (when <= now || ![2, 3, 4].includes(when.getDay())) {
+    when.setDate(when.getDate() + 1);
+    when.setHours(hours, minutes, 0, 0);
+  }
+  return when;
+}
+
+const waypoint = (place) => ({ waypoint: { location: { latLng: { latitude: place.lat, longitude: place.lon } } } });
+
+/** {building id: {am, pm}}: minutes to work at the morning hour and home at the evening hour, in typical traffic. */
+export async function trafficTimes(work, buildings, key, hours, post = postJson, now = new Date()) {
+  const located = buildings.filter((b) => b.lat != null && b.lon != null);
+  const headers = { "X-Goog-Api-Key": key, "X-Goog-FieldMask": "originIndex,destinationIndex,duration,condition,status" };
+  const times = {};
+  const ask = async (batch, toWork, departure) => {
+    const body = {
+      origins: toWork ? batch.map(waypoint) : [waypoint(work)],
+      destinations: toWork ? [waypoint(work)] : batch.map(waypoint),
+      travelMode: "DRIVE", routingPreference: "TRAFFIC_AWARE", departureTime: departure.toISOString(),
+    };
+    for (const element of await post(ROUTES, body, headers)) {
+      const building = batch[toWork ? element.originIndex ?? 0 : element.destinationIndex ?? 0];
+      if (!building || element.condition !== "ROUTE_EXISTS" || !element.duration) continue;
+      (times[building.id] ||= {})[toWork ? "am" : "pm"] = Math.round(parseInt(element.duration, 10) / 60);
+    }
+  };
+  const morning = nextWeekday(now, hours.leave), evening = nextWeekday(now, hours.back);
+  for (let start = 0; start < located.length; start += ROUTES_BATCH) {
+    const batch = located.slice(start, start + ROUTES_BATCH);
+    await ask(batch, true, morning);
+    await ask(batch, false, evening);
+  }
+  for (const id of Object.keys(times)) {
+    if (times[id].am == null) delete times[id];          // without a morning time there is nothing to sort or filter by
+    else if (times[id].pm == null) times[id].pm = null;
+  }
+  return times;
+}

@@ -112,3 +112,40 @@ test("following a building remembers the criteria it was followed with", () => {
   assert.deepEqual(store.follows(), []);
   assert.equal(createStore(brokenStorage).toggleFollow(building, {}), true);
 });
+
+test("everything can be exported as text and imported in another browser", () => {
+  const here = createStore(fakeStorage());
+  here.setFilters({ ...DEFAULT_FILTERS, beds: [1], minSqft: 700 });
+  here.toggleStar(unit(), building);
+  here.toggleFollow(building, { beds: [1], minSqft: 700, maxCost: null });
+  here.setSetting("nogo", ["20002"]);
+  here.setSetting("income", 90000);
+  here.setSetting("work", { address: "1 Main St", lat: 39.1, lon: -76.8, label: "1 Main St" });
+  here.setSetting("googleKey", "SECRET-KEY");
+  const text = here.exportText("2026-11-18T20:00Z");
+  assert.equal(typeof text, "string");
+  assert.equal(text.includes("SECRET-KEY"), false);                // the key never leaves this browser
+  const parsed = JSON.parse(text);
+  assert.equal(parsed.app, "apartment-tracker");
+  assert.equal(parsed.exported, "2026-11-18T20:00Z");
+
+  const there = createStore(fakeStorage());
+  there.setSetting("googleKey", "OTHER-KEY");
+  assert.deepEqual(there.importText(text), { ok: true, stars: 1, follows: 1 });
+  assert.equal(there.getFilters().minSqft, 700);
+  assert.equal(there.stars()[0].unit.id, "b1:101");
+  assert.equal(there.follows()[0].id, "b1");
+  assert.deepEqual(there.getSetting("nogo", []), ["20002"]);
+  assert.equal(there.getSetting("income", null), 90000);
+  assert.equal(there.getSetting("work", null).address, "1 Main St");
+  assert.equal(there.getSetting("googleKey", null), "OTHER-KEY");   // importing does not touch this browser's key
+});
+
+test("importing text that is not an export changes nothing", () => {
+  const store = createStore(fakeStorage());
+  store.setFilters({ ...DEFAULT_FILTERS, minSqft: 900 });
+  for (const text of ["", "hello", "{}", '{"app":"something-else"}', "[1,2,3]"]) {
+    assert.equal(store.importText(text).ok, false, text);
+  }
+  assert.equal(store.getFilters().minSqft, 900);
+});
