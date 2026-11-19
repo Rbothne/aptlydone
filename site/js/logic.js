@@ -2,7 +2,8 @@
 
 export const DEFAULT_FILTERS = Object.freeze({
   q: "", beds: [], minSqft: null, maxCost: null, moveBy: null, floorMin: null, floorMax: null, ground: false,
-  parking: false, pets: false, nearMetro: false, nearGrocery: false, nearPark: false, dogFriendly: false, minWalk: null, deals: [], highEnd: false, maxViolent: null, maxDrive: null, minRating: null, manager: "", counties: [], showRestricted: false, sort: "picks",
+  ownDoor: false, balcony: false, quietAir: false, noSites: false,
+  parking: false, pets: false, nearMetro: false, nearGrocery: false, nearPark: false, dogFriendly: false, minWalk: null, deals: [], highEnd: false, maxViolentX: null, maxDrive: null, minRating: null, manager: "", counties: [], showRestricted: false, sort: "picks",
 });
 
 export const HIGH_END = 67;                 // a building pricier than this share of its neighbours is "high-end for its area"
@@ -10,6 +11,11 @@ export const GROUND_FLOORS = [0, 1];
 export const NEAR_MILES = 0.5;                // "near" a Metro station or a grocery store
 export const PARK_MILES = 0.25;               // a park has to be closer than that to count as next to home
 export const DOG_FRIENDLY = 3;                // dog score, out of 5, that the Dog-friendly filter asks for
+export const AIR_MENTION = 50, AIR_LOUD = 55; // decibels of aircraft noise (24-hour average) worth a note, and worth a warning
+export const GROUND_LOUD = 60;                // road or rail noise worth a warning
+export const CRIME_STOPS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3];   // the violent-crime limit, as multiples of the typical building's count
+export const WALK_BAND = 4.75;                // points between the EPA index's bands (20 points, four bands)
+export const MOST_DISCOUNT = 25;              // Top picks counts a unit as at most this many percent under similar units
 
 function within(building, kind, miles) {
   const nearest = building.near && building.near[kind] ? building.near[kind][1] : null;
@@ -46,6 +52,10 @@ export function unitMatches(unit, building, filters) {
   if (filters.floorMin != null && !(unit.floor != null && unit.floor >= filters.floorMin)) return false;
   if (filters.floorMax != null && !(unit.floor != null && unit.floor <= filters.floorMax)) return false;
   if (filters.ground && !GROUND_FLOORS.includes(unit.floor)) return false;
+  if (filters.ownDoor && !unit.own_door) return false;
+  if (filters.balcony && !unit.outdoor) return false;
+  if (filters.quietAir && building.noise && building.noise.air >= AIR_MENTION) return false;
+  if (filters.noSites && building.works && (building.works.next.length || building.works.here.length)) return false;
   if (filters.parking && building.parking_from == null && building.parking !== true) return false;
   if (filters.pets && building.pets !== true) return false;
   if (filters.nearMetro && !within(building, "metro", NEAR_MILES)) return false;
@@ -54,9 +64,9 @@ export function unitMatches(unit, building, filters) {
   if (filters.dogFriendly && !(building.dog && building.dog.score >= DOG_FRIENDLY)) return false;
   if (filters.minWalk != null && !(building.walk && building.walk.score >= filters.minWalk)) return false;
   const deals = chosenDeals(filters);
-  if (deals.length && !deals.includes(unit.tag)) return false;
+  if (deals.length && !(deals.includes(unit.tag) || (deals.includes("drop") && unit.drop))) return false;
   if (filters.highEnd && !(building.rank && building.rank.pct >= HIGH_END)) return false;
-  if (filters.maxViolent != null && !(building.crime && building.crime.violent <= filters.maxViolent)) return false;
+  if (filters.maxViolentX != null && !(building.crime && building.crime.x != null && building.crime.x <= filters.maxViolentX)) return false;
   if (filters.maxDrive != null && !(building.drive != null && building.drive <= filters.maxDrive)) return false;
   if (filters.minRating != null && !(building.rating != null && building.rating >= filters.minRating)) return false;
   if (filters.manager && building.manager !== filters.manager) return false;
@@ -92,8 +102,12 @@ function chain(...comparisons) {
 
 const costPerSqft = (u) => (cost(u) != null && u.sqft ? cost(u) / u.sqft : null);
 
+// Top picks: what each unit has in its favour for this user, as a share of its cost (see worth()), most first;
+// a price too low to believe goes last. Units nobody has valued yet fall back to: steal tag, then furthest under its building, then cost per sqft.
 const SORTS = {
-  picks: chain(by((u) => (u.tag === "check" ? 4 : TAG_ORDER[u.tag] ?? 3)), by((u) => u.own?.pct), by(costPerSqft)),
+  picks: chain(by((u) => (u.tag === "check" ? 1 : 0)), by((u) => u.worth, true),
+    by((u) => TAG_ORDER[u.tag] ?? 3), by((u) => u.own?.pct), by(costPerSqft)),
+  drop: by((u) => u.drop?.pct),
   cost: by(cost),
   ppsf: by(costPerSqft),
   own: by((u) => u.own?.pct),
@@ -207,24 +221,32 @@ export const TAG_GROUPS = [
   { name: "Deals", note: "any of these", tags: [
     { key: "absolute", label: "Absolute steal", title: "10% or more below its building and 15% or more below its neighbors" },
     { key: "building", label: "Building steal", title: "15% or more below similar units in the same building" },
-    { key: "local", label: "Local value", title: "20% or more below similar units in buildings within one to two miles" }] },
+    { key: "local", label: "Local value", title: "20% or more below similar units in buildings within one to two miles" },
+    { key: "drop", label: "Price drop", title: "At least 2% below the highest price it stood at in the last 30 days, and still falling or holding" }] },
+  { name: "Unit", note: "all of these", tags: [
+    { key: "ground", label: "Ground floor", title: "Units on the ground floor only" },
+    { key: "ownDoor", label: "Own front door", title: "The unit's own listing says it has a private entrance to the outside, or is a townhome. Most listings do not say, so this hides most units" },
+    { key: "balcony", label: "Balcony or terrace", title: "The unit's own listing names a balcony, terrace, patio, deck or yard. A building that only says \"balconies in select homes\" does not count" }] },
   { name: "Nearby", note: "all of these", tags: [
     { key: "nearMetro", label: "Near Metro", title: "A Metro station within half a mile" },
     { key: "nearGrocery", label: "Grocery nearby", title: "A supermarket within half a mile" },
     { key: "nearPark", label: "Park nearby", title: "A park within a quarter mile" },
     { key: "dogFriendly", label: "Dog-friendly", title: "Pets allowed, plus at least two of: a dog park within half a mile, a park within a quarter mile, a dog run or pet spa on site" }] },
+  { name: "Quiet", note: "all of these", tags: [
+    { key: "quietAir", label: "No aircraft noise", title: "Under 50 decibels of aircraft noise, averaged over the day, on the US Department of Transportation's noise map" },
+    { key: "noSites", label: "No building site next door", title: "No new-building or demolition permit within a block in the last two years, and no big renovation permit on the building itself in the last year. Permits are checked in DC only; buildings elsewhere are not hidden" }] },
   { name: "Building", note: "all of these", tags: [
-    { key: "ground", label: "Ground floor", title: "Units on the ground floor only" },
     { key: "parking", label: "Parking", title: "The building lists parking" },
     { key: "pets", label: "Pets", title: "The building says pets are allowed" },
     { key: "highEnd", label: "High-end", title: "Buildings whose one-bedroom cost per sqft is in the top third of buildings within two miles" }] },
 ];
 const DEAL_KEYS = TAG_GROUPS[0].tags.map((tag) => tag.key);
+const STEAL_KEYS = DEAL_KEYS.filter((key) => key in TAG_ORDER);
 
 /** The deal tags a unit must carry one of. Filters saved before the drop-down said only "tagged". */
 function chosenDeals(filters) {
   if (Array.isArray(filters.deals)) return filters.deals.filter((key) => DEAL_KEYS.includes(key));
-  return filters.tagged ? DEAL_KEYS : [];
+  return filters.tagged ? STEAL_KEYS : [];
 }
 
 /** Keys of every chosen tag, in the drop-down's order. */
@@ -304,13 +326,51 @@ export function tagReason(unit) {
   return parts.join(" · ");
 }
 
-/** The crime line for a building: counts when known, and why not when unknown. */
-export function crimeText(building, crimeCounties) {
+const median = (numbers) => {
+  const sorted = [...numbers].sort((a, b) => a - b);
+  if (!sorted.length) return null;
+  const middle = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+};
+
+/**
+ * The typical building's crime counts (the median over buildings that have counts), or null when there is nothing
+ * to measure against. Also writes each building's `crime.x`: its violent count as a multiple of the typical one.
+ */
+export function relateCrime(buildings) {
+  const counted = buildings.filter((b) => b.crime);
+  const violent = median(counted.map((b) => b.crime.violent));
+  for (const b of counted) b.crime.x = violent ? Math.round((b.crime.violent / violent) * 100) / 100 : null;
+  if (!violent) return null;
+  return { violent, property: median(counted.map((b) => b.crime.property)), buildings: counted.length };
+}
+
+/** A multiple of the typical in words: "half", "a quarter of", "60% of", "2.5×"; null when it is about the same. */
+function times(x) {
+  if (Math.abs(x - 1) <= 0.1) return null;
+  if (Math.abs(x - 0.5) <= 0.05) return "half";
+  if (Math.abs(x - 0.25) <= 0.05) return "a quarter of";
+  if (Math.abs(x - 0.75) <= 0.03) return "three quarters of";
+  return x < 1 ? `${Math.round(x * 100)}% of` : `${Math.round(x * 10) / 10}×`;
+}
+
+/** One stop of the violent-crime limit: "half the typical or less (10 or fewer)". */
+export function crimeStopLabel(x, typical) {
+  if (x == null) return "any";
+  const count = typical ? ` (${Math.floor(x * typical.violent)} or fewer)` : "";
+  if (x > 1) return `up to ${x}× the typical${count}`;
+  return `${x === 1 ? "the typical" : `${times(x)} the typical`} or less${count}`;
+}
+
+/** The crime line for a building: counts when known (and how they compare, given the typical), and why not when unknown. */
+export function crimeText(building, crimeCounties, typical) {
   const crime = building.crime;
   if (crime) {
     const month = (day) => `${MONTHS[Number(day.slice(5, 7)) - 1]} ${day.slice(0, 4)}`;
     const when = crime.period ? `${month(crime.period[0])} to ${month(crime.period[1])} (the last year published here)` : "past 12 months";
-    return { text: `Within ½ mile, ${when}: ${crime.violent} violent · ${crime.property} property crimes`, known: true };
+    const against = typical && crime.x != null
+      ? ` (${times(crime.x) ? `${times(crime.x)} the typical building's ${typical.violent}` : "about typical"})` : "";
+    return { text: `Within ½ mile, ${when}: ${crime.violent} violent${against} · ${crime.property} property crimes`, known: true };
   }
   const covered = (crimeCounties || []).includes(building.county);
   return { text: covered ? "Crime nearby not counted yet" : "No crime data for this county", known: false };
@@ -336,6 +396,139 @@ export function areaFacts(tract, trend, zip, showRace) {
     }
   }
   return lines;
+}
+
+/** "Down $100 (4%) since Nov 15, from $2,500"; empty when the price has not dropped lately. */
+export function dropText(unit) {
+  const drop = unit.drop;
+  return drop ? `Down ${money(drop.by)} (${Math.round(Math.abs(drop.pct))}%) since ${shortDate(drop.day)}, from ${money(drop.was)}` : "";
+}
+
+const BAND_TOP = { 45: 50, 50: 55, 55: 60, 60: 70, 70: 80, 80: 90 };
+const band = (decibels) => (BAND_TOP[decibels] ? `${decibels}–${BAND_TOP[decibels]} dB` : `${decibels}+ dB`);
+
+/** Notes about transport noise loud enough to mention: [{text, loud}]. Levels are day-long averages from the US DOT's map. */
+export function noiseTags(noise) {
+  if (!noise) return [];
+  const tags = [];
+  if (noise.air >= AIR_MENTION) tags.push({ text: `Aircraft noise ${band(noise.air)}`, loud: noise.air >= AIR_LOUD });
+  if (noise.road >= GROUND_LOUD) tags.push({ text: `Road noise ${band(noise.road)}`, loud: true });
+  if (noise.rail >= GROUND_LOUD) tags.push({ text: `Rail noise ${band(noise.rail)}`, loud: true });
+  return tags;
+}
+
+const monthYear = (day) => `${MONTHS[Number(day.slice(5, 7)) - 1]} ${day.slice(0, 4)}`;
+
+/** Notes about construction from building permits: a site next door, big work in the building. [{text, title}] */
+export function worksTags(works) {
+  if (!works) return [];
+  const line = (w) => `${w.kind}, ${w.address}, ${w.miles} mi, permit ${monthYear(w.day)}: ${w.what}`;
+  const tags = [];
+  if (works.next.length) {
+    const [first, ...rest] = works.next;
+    tags.push({
+      text: `Building site next door: ${first.kind.toLowerCase()} at ${first.address} (permit ${monthYear(first.day)})${rest.length ? ` + ${rest.length} more` : ""}`,
+      title: works.next.map(line).join("\n"),
+    });
+  }
+  if (works.here.length) {
+    const [first] = works.here;
+    tags.push({
+      text: `${first.kind === "Demolition" ? "Demolition work" : first.kind} in this building (permit ${monthYear(first.day)})`,
+      title: works.here.map(line).join("\n"),
+    });
+  }
+  return tags;
+}
+
+/**
+ * The setup's trade-off questions. Each asks for dollars a month against one concrete difference, so that an
+ * answer means the same thing to everyone; Top picks adds those dollars up for every home (see worth()).
+ */
+export const TRADEOFFS = [
+  { key: "commute", title: "Your commute",
+    ask: "How much more rent per month would you pay to cut your drive to work by 10 minutes each way?",
+    means: "Every 10 minutes shorter than the typical building's drive from your work address counts for this much; every 10 minutes longer counts against. Needs a work address.",
+    options: [0, 25, 50, 100, 200, 300] },
+  { key: "crime", title: "Violent crime nearby",
+    ask: "How much more per month would you pay to live where violent crime within half a mile is half the typical building's, instead of typical?",
+    means: "Typical is the middle building of those tracked. Half the typical counts for this much; twice the typical counts against by twice this much.",
+    options: [0, 50, 100, 200, 300, 500] },
+  { key: "walk", title: "Walkability",
+    ask: "How much more per month would you pay for a block one step more walkable: say from \"some errands on foot\" to \"most errands on foot\"?",
+    means: "One step is one band on the EPA's walkability index (it has four). Each band above the typical building's block counts for this much; each band below counts against.",
+    options: [0, 25, 50, 100, 200] },
+  { key: "quiet", title: "Quiet",
+    ask: "How much more per month would you pay to be rid of one source of noise: aircraft overhead, or a building site next door?",
+    means: "Each of these counts against a home by this much: aircraft noise of 55 decibels or more (half for 50 to 55), a building site within a block, big renovation in the building. Heavy road or rail noise counts half.",
+    options: [0, 50, 100, 200, 300] },
+];
+
+const clamp = (value, limit) => Math.max(-limit, Math.min(limit, value));
+
+/** The typical building's drive and walkability (medians over buildings that have them): what worth() measures against. */
+export function typicalOf(buildings) {
+  return {
+    drive: median(buildings.filter((b) => b.drive != null).map((b) => b.drive)),
+    walk: median(buildings.filter((b) => b.walk && b.walk.score != null).map((b) => b.walk.score)),
+  };
+}
+
+/**
+ * What a unit is worth to this user, in dollars a month, against an ordinary match: how far under similar units
+ * it is priced, plus the user's own dollar value for its drive, its crime, its walkability and its quiet
+ * (`prefs`, from the setup questions; a missing one counts for nothing). {total, share, parts: [{label, dollars}]};
+ * `share` is the total as a share of the unit's own monthly cost, which is what Top picks sorts on: sorted on
+ * dollars alone, the dearest homes would always come first.
+ * Each of the user's values is capped at twice the amount they named, so one extreme cannot drown the rest.
+ */
+export function worth(unit, building, prefs, typical) {
+  const p = prefs || {}, t = typical || {};
+  const parts = [];
+  const add = (label, dollars) => { if (Math.round(dollars)) parts.push({ label, dollars: Math.round(dollars) }); };
+
+  const price = cost(unit);
+  // what it would take to reach the others' price; a discount past MOST_DISCOUNT is more likely a mismatch than a bargain
+  const shares = [unit.own, unit.local].filter(Boolean).map((vs) => Math.max(vs.pct, -MOST_DISCOUNT)).map((pct) => -pct / (100 + pct));
+  if (price != null && shares.length && unit.tag !== "check") {
+    const saving = (price * shares.reduce((sum, share) => sum + share, 0)) / shares.length;
+    add(saving >= 0 ? "under similar units" : "over similar units", saving);
+  }
+  if (p.commute && building.drive != null && t.drive != null) {
+    const minutes = Math.round(t.drive - building.drive);
+    add(`${Math.abs(minutes)} min ${minutes >= 0 ? "shorter" : "longer"} drive than typical`, clamp((minutes / 10) * p.commute, 2 * p.commute));
+  }
+  if (p.crime && building.crime && building.crime.x != null) {
+    const x = building.crime.x;
+    add(`${times(x) || "about"} the typical violent crime`, clamp(((1 - x) / 0.5) * p.crime, 2 * p.crime));
+  }
+  if (p.walk && building.walk && building.walk.score != null && t.walk != null) {
+    const bands = (building.walk.score - t.walk) / WALK_BAND;
+    add(`${bands >= 0 ? "more" : "less"} walkable than typical`, clamp(bands * p.walk, 2 * p.walk));
+  }
+  if (p.quiet) {
+    const noise = building.noise || {};
+    if (noise.air >= AIR_LOUD) add("aircraft noise", -p.quiet);
+    else if (noise.air >= AIR_MENTION) add("some aircraft noise", -p.quiet / 2);
+    if (noise.road >= GROUND_LOUD || noise.rail >= GROUND_LOUD) add("road or rail noise", -p.quiet / 2);
+    const works = building.works || { next: [], here: [] };
+    if (works.next.length) add("building site next door", -p.quiet);
+    if (works.here.length) add("big work in the building", -p.quiet);
+  }
+  const total = parts.reduce((sum, part) => sum + part.dollars, 0);
+  return { total, share: price ? Math.round((total / price) * 10000) / 10000 : 0, parts };
+}
+
+/** "About $461 a month in its favour: $361 under similar units · +$100 for 10 min shorter drive than typical". */
+export function worthText(value) {
+  if (!value || !value.parts.length) return "";
+  const said = value.parts.map((part) => (/^(under|over) /.test(part.label)
+    ? `${money(Math.abs(part.dollars))} ${part.label}`
+    : `${part.dollars > 0 ? "+" : "−"}${money(Math.abs(part.dollars))} for ${part.label}`));
+  const head = value.total > 0 ? `About ${money(value.total)} a month in its favour`
+    : value.total < 0 ? `About ${money(-value.total)} a month against it` : "Evens out";
+  const share = value.share ? ` (${Math.round(Math.abs(value.share) * 100)}% of its cost)` : "";
+  return `${head}${share}: ${said.join(" · ")}`;
 }
 
 /** "38 min drive to work (no traffic)"; empty when the time is not known. */

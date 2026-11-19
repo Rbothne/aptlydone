@@ -3,6 +3,7 @@
 import {
   DEFAULT_FILTERS, TAG_GROUPS, affordable, affordableNote, ago, areaFacts, countiesLabel, countyGroups, availability, cost, crimeText, criteriaFilters, criteriaFrom, criteriaLabel, driveLabel, incomeNeeded,
   availableNote, dogText, isSteal, mapPoints, nearbyTags, standing, unitTitle, walkText, groupBuildings, money, perSqft, shortDate, sparkline, staleText, tagLabel, tagReason, tagsLabel, chosenTags, setTag, unitMatches,
+  CRIME_STOPS, TRADEOFFS, crimeStopLabel, dropText, noiseTags, relateCrime, typicalOf, worksTags, worth, worthText,
 } from "./logic.js";
 import { driveTimes, geocode, trafficTimes } from "./commute.js";
 import { createStore } from "./store.js";
@@ -22,7 +23,10 @@ try { storage = window.localStorage; } catch { /* blocked: the store works in me
 const store = createStore(storage);
 
 const state = {
-  updated: null, index: [], byId: {}, units: {}, unitsById: {}, tracts: {}, zips: {}, crimeCounties: [],
+  updated: null, index: [], byId: {}, units: {}, unitsById: {}, tracts: {}, zips: {}, crimeCounties: [], counties: {},
+  crimeTypical: null,                              // the typical building's crime counts: what each building is measured against
+  typical: { drive: null, walk: null },            // the typical building's drive and walkability
+  values: store.getSetting("values", {}),          // dollars a month the user put on a shorter drive, less crime, walkability, quiet
   demographics: store.getSetting("demographics", true),
   income: store.getSetting("income", null),        // yearly household income, used only for the three-times-rent flag
   nogo: store.getSetting("nogo", []),              // ZIP codes the user never wants to see
@@ -94,6 +98,7 @@ function unitRow(unit, building, listed = true) {
         class: `tag ${unit.tag}`,
         title: unit.tag === "check" ? "30% or more under similar units in its own building, or 40% or more under similar units nearby. That is usually income-restricted housing the building did not label, or a mistake. Ask before counting on it." : null,
       }, tagLabel(unit.tag)),
+      unit.drop && h("span", { class: "tag drop", title: dropText(unit) }, "Price drop"),
       h("b", null, unitTitle(unit)), " · ",
       [bedsLabel(unit.beds), unit.baths != null && `${unit.baths} bath`, unit.sqft && `${unit.sqft.toLocaleString("en-US")} sqft`,
         unit.floor != null && `floor ${unit.floor}`].filter(Boolean).join(" · "),
@@ -101,6 +106,8 @@ function unitRow(unit, building, listed = true) {
         class: "note", title: "This building publishes prices per floor plan, not per unit. The price is the lowest for this floor plan.",
       }, availableNote(unit)),
       unit.sqft && unit.sqft < ROOM_SQFT && h("span", { class: "note" }, "room"),
+      unit.outdoor && h("span", { class: "note", title: "This unit's own listing names it" }, unit.outdoor.toLowerCase()),
+      unit.own_door && h("span", { class: "note", title: "This unit's own listing says it has its own door to the outside, or is a townhome" }, "own front door"),
       unit.restricted === true && h("span", { class: "note" }, "income-restricted"),
       affordable(unit, state.income) === false && h("span", {
         class: "note", title: "Most managed buildings ask for yearly income of at least 36 times the monthly rent.",
@@ -129,6 +136,15 @@ function unitRow(unit, building, listed = true) {
   return state.open.has(unit.id) ? [row, detail(unit, building)] : [row];
 }
 
+/** Why a unit sits where it does under Top picks: its worth to this user in dollars a month, part by part. */
+function ranking(unit, building) {
+  const text = worthText(worth(unit, building, state.values, state.typical));
+  if (!text) return null;
+  const asked = TRADEOFFS.some((trade) => state.values[trade.key]);
+  return h("section", null, h("h3", null, "Where it ranks in Top picks"), h("p", { style: "margin:0" }, text + "."),
+    !asked && h("small", null, "Answer the questions in Setup to count your commute, crime, walkability and quiet too."));
+}
+
 function detail(unit, building) {
   const fees = unit.fees || 0;
   const lease = unit.lease || 12;
@@ -155,10 +171,13 @@ function detail(unit, building) {
         building.parking_from != null && h("small", null, `Parking is extra, from ${money(building.parking_from)}/mo. `),
         h("small", null, "Optional fees and usage-based utilities are not included.")),
       tagReason(unit) && h("section", null, h("h3", null, "How it compares"), h("p", { style: "margin:0" }, tagReason(unit) + ".")),
+      ranking(unit, building),
+      unit.notes && h("section", null, h("h3", null, "What the listing says about this unit"), h("p", { style: "margin:0" }, unit.notes)),
       h("section", null,
         h("h3", null, "Price history"),
         h("ul", null, history.map((point) => h("li", null,
           `${shortDate(point[0])}: ${money(point[1])}`, point[3] ? ` on ${point[3]} months` : "", point[2] ? ` · ${point[2]}` : ""))),
+        unit.drop && h("p", { style: "margin:4px 0" }, h("b", null, dropText(unit) + ".")),
         h("small", null, unit.first ? `Tracked since ${shortDate(unit.first)}. ` : "",
           building.read ? `Last read ${shortDate(building.read)}.` : "")),
       h("section", null, h("a", { href: unit.url || building.url, target: "_blank", rel: "noopener" }, "Open the building's site ↗"))));
@@ -196,8 +215,12 @@ function facts(building) {
   if (building.drive != null) items.push([building.driveTraffic ? driveLabel(building.drive, building.drivePm) : driveLabel(building.drive)]);
   if (walkText(building.walk)) items.push([walkText(building.walk)]);
   if (dogText(building.dog)) items.push([dogText(building.dog), null, building.dog.reasons.join(" · ")]);
-  const crime = crimeText(building, state.crimeCounties);
+  const crime = crimeText(building, state.crimeCounties, state.crimeTypical);
   items.push([crime.text, crime.known ? null : "unknown"]);
+  for (const note of noiseTags(building.noise)) {
+    items.push([note.text, note.loud ? "stale" : null, "Modeled average over 24 hours, from the US Department of Transportation's noise map (2020). A guide, not a measurement at this address."]);
+  }
+  for (const note of worksTags(building.works)) items.push([note.text, "stale", note.title]);
   if (building.rank) items.push([`${standing(building.rank)} (pricier than ${building.rank.pct}% of ${building.rank.n} buildings within 2 miles)`]);
   if (affordableNote(building.affordable)) items.push([affordableNote(building.affordable), "stale"]);
   if (building.coming_soon) items.push(["Coming soon"]);
@@ -404,6 +427,15 @@ function applyDrive(times) {
     building.driveTraffic = traffic;
     for (const unit of state.units[building.id] || []) unit.drive = building.drive;
   }
+  revalue();
+}
+
+/** Work out what every unit is worth to this user (see worth() in logic.js); Top picks sorts on it. */
+function revalue() {
+  state.typical = typicalOf(state.index);
+  for (const building of state.index) {
+    for (const unit of state.units[building.id] || []) unit.worth = worth(unit, building, state.values, state.typical).share;
+  }
 }
 
 function driveKey() {
@@ -470,7 +502,7 @@ async function timeDrives() {
 
 const NUMBERS = ["minSqft", "maxCost", "floorMin", "floorMax"];
 const ANY_DRIVE = 95;      // the slider's last stop means "any"
-const ANY_CRIME = 61;      // the slider's last stop means "any"
+const ANY_CRIME = CRIME_STOPS.length;      // the slider's last stop means "any"; the others are CRIME_STOPS in order
 
 function showFilters() {
   const f = state.filters;
@@ -497,8 +529,9 @@ function showFilters() {
   $("sort").value = f.sort;
   for (const button of document.querySelectorAll("[data-beds]")) button.setAttribute("aria-pressed", String(f.beds.includes(Number(button.dataset.beds))));
   for (const button of document.querySelectorAll("[data-toggle]")) button.setAttribute("aria-pressed", String(Boolean(f[button.dataset.toggle])));
-  $("maxViolent").value = f.maxViolent == null ? ANY_CRIME : Math.min(f.maxViolent, ANY_CRIME - 1);
-  $("maxViolentOut").textContent = f.maxViolent == null ? "any" : `${f.maxViolent} or fewer`;
+  const stop = CRIME_STOPS.indexOf(f.maxViolentX);
+  $("maxViolentX").value = stop < 0 ? ANY_CRIME : stop;
+  $("maxViolentXOut").textContent = crimeStopLabel(stop < 0 ? null : f.maxViolentX, state.crimeTypical);
   $("demographics").checked = state.demographics;
   $("minWalk").value = f.minWalk == null ? 0 : f.minWalk;
   $("minWalkOut").textContent = f.minWalk == null ? "any" : `${f.minWalk}+`;
@@ -541,9 +574,9 @@ function wire() {
   for (const button of document.querySelectorAll("[data-toggle]")) {
     button.addEventListener("click", () => { state.filters[button.dataset.toggle] = !state.filters[button.dataset.toggle]; changed(); });
   }
-  $("maxViolent").addEventListener("input", () => {
-    const value = Number($("maxViolent").value);
-    state.filters.maxViolent = value >= ANY_CRIME ? null : value;
+  $("maxViolentX").addEventListener("input", () => {
+    const value = Number($("maxViolentX").value);
+    state.filters.maxViolentX = value >= ANY_CRIME ? null : CRIME_STOPS[value];
     changed();
   });
   $("maxDrive").addEventListener("input", () => {
@@ -615,7 +648,43 @@ function buildAreas(counts) {
   }));
 }
 
-// ---------- first-visit setup ----------
+// ---------- setup, one step at a time ----------
+
+const setup = { at: 0, answered: new Set() };      // which step is showing, and which steps the user went through (not skipped)
+const steps = () => [...document.querySelectorAll("#setup fieldset.step")];
+
+function showStep() {
+  const all = steps();
+  all.forEach((step, i) => { step.hidden = i !== setup.at; });
+  const last = setup.at === all.length - 1;
+  $("s-where").textContent = `Step ${setup.at + 1} of ${all.length} · ${all[setup.at].dataset.title}`;
+  $("s-prev").hidden = setup.at === 0;
+  $("s-next").hidden = last;
+  $("s-go").hidden = !last;
+  $("s-skip").textContent = last ? "Skip this step and finish" : "Skip this step";
+}
+
+/** The chosen answer to one trade-off question, or undefined when none is chosen. */
+function tradeAnswer(key) {
+  const chosen = document.querySelector(`#setup .trade[data-trade="${key}"] button[aria-pressed="true"]`);
+  return chosen ? Number(chosen.dataset.value) : undefined;
+}
+
+function buildSetupAreas() {
+  const counts = state.counties;
+  const chosen = state.filters.counties;
+  $("s-areas").replaceChildren(...countyGroups(Object.keys(counts), COUNTY).flatMap((group) => {
+    const rows = group.counties.map((county) => h("label", null,
+      h("input", { type: "checkbox", "data-scounty": county.fips, "data-in": group.state, checked: chosen.includes(county.fips) }),
+      county.name.replace(/, (VA|MD)$/, ""), h("small", null, `${counts[county.fips].units.toLocaleString("en-US")} units`)));
+    if (group.counties.length === 1) return rows;
+    const all = h("input", { type: "checkbox", onchange: (event) => {
+      for (const box of document.querySelectorAll(`#s-areas input[data-in="${group.state}"]`)) box.checked = event.target.checked;
+    } });
+    all.checked = group.counties.every((county) => chosen.includes(county.fips));
+    return [h("label", { class: "state" }, all, `${group.state} (all)`), ...rows];
+  }));
+}
 
 function openSetup() {
   const f = state.filters;
@@ -630,40 +699,111 @@ function openSetup() {
   $("s-leave").value = store.getSetting("leave", "08:00");
   $("s-back").value = store.getSetting("back", "17:30");
   $("x-status").textContent = "";
+  buildSetupAreas();
+  $("s-maxViolentX").replaceChildren(h("option", { value: "" }, "any amount (hide nothing)"),
+    ...CRIME_STOPS.map((x) => h("option", { value: String(x) }, crimeStopLabel(x, state.crimeTypical))));
+  $("s-maxViolentX").value = f.maxViolentX == null ? "" : String(f.maxViolentX);
+  const typical = state.crimeTypical;
+  $("s-crime-typical").textContent = typical
+    ? `Typical is the middle building of the ${typical.buildings} tracked buildings that have counts: ${typical.violent} violent crimes (homicide, sex offences, robbery, aggravated assault) reported within half a mile in a year. Homes in places that publish no counts are hidden while a limit is set.`
+    : "No crime counts are loaded yet, so a limit here hides everything.";
+  for (const box of document.querySelectorAll("#setup [data-stag]")) box.checked = chosenTags(f).includes(box.dataset.stag);
+  for (const trade of TRADEOFFS) {
+    for (const button of document.querySelectorAll(`#setup .trade[data-trade="${trade.key}"] button`)) {
+      button.setAttribute("aria-pressed", String(state.values[trade.key] != null && Number(button.dataset.value) === state.values[trade.key]));
+    }
+  }
+  setup.at = 0;
+  setup.answered = new Set();
+  showStep();
   if (typeof $("setup").showModal === "function") $("setup").showModal();
+}
+
+/** Put the answers of every step the user went through into the filters and settings; skipped steps change nothing. */
+function finishSetup() {
+  const number = (id) => ($(id).value === "" ? null : Number($(id).value));
+  const did = (name) => setup.answered.has(name);
+  const tags = (names) => {
+    for (const name of names) state.filters = setTag(state.filters, name, document.querySelector(`#setup [data-stag="${name}"]`).checked);
+  };
+  const value = (key) => { const answer = tradeAnswer(key); if (answer !== undefined) state.values = { ...state.values, [key]: answer }; };
+
+  if (did("home")) {
+    state.filters.beds = [...document.querySelectorAll('[data-sbeds][aria-pressed="true"]')].map((b) => Number(b.dataset.sbeds));
+    state.filters.minSqft = number("s-minSqft");
+    state.filters.moveBy = $("s-moveBy").value || null;
+  }
+  if (did("budget")) {
+    state.filters.maxCost = number("s-maxCost");
+    state.income = number("s-income");
+    store.setSetting("income", state.income);
+  }
+  if (did("where")) state.filters.counties = [...document.querySelectorAll("#s-areas input[data-scounty]:checked")].map((box) => box.dataset.scounty);
+  if (did("crime")) {
+    state.filters.maxViolentX = number("s-maxViolentX");
+    value("crime");
+  }
+  if (did("walk")) { tags(["nearMetro", "nearGrocery"]); value("walk"); }
+  if (did("quiet")) { tags(["quietAir", "noSites", "ground", "ownDoor", "balcony"]); value("quiet"); }
+
+  let address = null, maxDrive = null, retime = false;
+  if (did("commute")) {
+    const before = state.work ? driveKey().cache : null;
+    store.setSetting("googleKey", $("s-key").value.trim() || null);
+    store.setSetting("leave", $("s-leave").value || "08:00");
+    store.setSetting("back", $("s-back").value || "17:30");
+    retime = Boolean(state.work) && driveKey().cache !== before;          // the key or the hours changed
+    maxDrive = number("s-maxDrive");
+    address = $("s-work").value.trim();
+    value("commute");
+  }
+  store.setSetting("values", state.values);
+  store.setSetting("welcomed", true);
+  $("setup").close();
+  revalue();
+  changed();
+  if (address && (retime || !state.work || state.work.address !== address)) {
+    $("work").value = address;
+    timeDrives().then(() => { if (maxDrive != null && state.work) { state.filters.maxDrive = maxDrive; changed(); } });
+  } else if (did("commute") && state.work) {
+    state.filters.maxDrive = maxDrive;
+    changed();
+  }
 }
 
 function wireSetup() {
   for (const button of document.querySelectorAll("[data-sbeds]")) {
     button.addEventListener("click", () => button.setAttribute("aria-pressed", String(button.getAttribute("aria-pressed") !== "true")));
   }
-  const number = (id) => ($(id).value === "" ? null : Number($(id).value));
-  const done = () => { store.setSetting("welcomed", true); $("setup").close(); };
-  $("s-skip").addEventListener("click", done);
+  for (const trade of TRADEOFFS) {
+    const box = document.querySelector(`#setup .trade[data-trade="${trade.key}"]`);
+    const choose = (button) => {
+      const on = button.getAttribute("aria-pressed") === "true";
+      for (const other of box.querySelectorAll("button")) other.setAttribute("aria-pressed", "false");
+      button.setAttribute("aria-pressed", String(!on));                   // pressing the chosen one again un-answers it
+    };
+    box.replaceChildren(
+      h("p", { class: "ask" }, trade.ask),
+      h("span", { class: "chips", role: "group", "aria-label": trade.title }, trade.options.map((dollars) => h("button", {
+        type: "button", "data-value": String(dollars), "aria-pressed": "false", onclick: (event) => choose(event.currentTarget),
+      }, dollars ? `$${dollars}` : "$0: it does not matter to me"))),
+      h("p", { class: "muted means" }, trade.means, " Used only to order Top picks; it hides nothing."));
+  }
+  const name = () => steps()[setup.at].dataset.step;
+  const move = (by) => { setup.at = Math.max(0, Math.min(steps().length - 1, setup.at + by)); showStep(); };
+  $("s-prev").addEventListener("click", () => move(-1));
+  $("s-next").addEventListener("click", () => { setup.answered.add(name()); move(1); });
+  $("s-skip").addEventListener("click", () => {
+    setup.answered.delete(name());
+    if (setup.at === steps().length - 1) finishSetup(); else move(1);
+  });
+  $("s-finish").addEventListener("click", () => { setup.answered.add(name()); finishSetup(); });
+  $("s-close").addEventListener("click", () => { store.setSetting("welcomed", true); $("setup").close(); });
   $("setupform").addEventListener("submit", (event) => {
     event.preventDefault();
-    state.filters.beds = [...document.querySelectorAll('[data-sbeds][aria-pressed="true"]')].map((b) => Number(b.dataset.sbeds));
-    state.filters.minSqft = number("s-minSqft");
-    state.filters.maxCost = number("s-maxCost");
-    state.filters.moveBy = $("s-moveBy").value || null;
-    state.income = number("s-income");
-    store.setSetting("income", state.income);
-    const before = state.work ? driveKey().cache : null;
-    store.setSetting("googleKey", $("s-key").value.trim() || null);
-    store.setSetting("leave", $("s-leave").value || "08:00");
-    store.setSetting("back", $("s-back").value || "17:30");
-    const maxDrive = number("s-maxDrive");
-    const address = $("s-work").value.trim();
-    done();
-    changed();
-    const retime = state.work && driveKey().cache !== before;             // the key or the hours changed
-    if (address && (retime || !state.work || state.work.address !== address)) {
-      $("work").value = address;
-      timeDrives().then(() => { if (maxDrive != null && state.work) { state.filters.maxDrive = maxDrive; changed(); } });
-    } else if (maxDrive != null && state.work) {
-      state.filters.maxDrive = maxDrive;
-      changed();
-    }
+    if (setup.at < steps().length - 1) { setup.answered.add(name()); move(1); return; }      // Enter in a field goes on a step
+    setup.answered.add(name());
+    finishSetup();
   });
   $("setupbtn").addEventListener("click", openSetup);
 
@@ -696,6 +836,7 @@ function wireSetup() {
     state.income = store.getSetting("income", null);
     state.work = store.getSetting("work", null);
     state.demographics = store.getSetting("demographics", true);
+    state.values = store.getSetting("values", {});
     $("setup").close();
     showWork();
     changed();
@@ -729,6 +870,11 @@ async function load() {
   state.tracts = index.tracts || {};
   state.zips = index.zips || {};
   state.crimeCounties = index.crime_counties || [];
+  state.counties = index.counties;
+  state.crimeTypical = relateCrime(state.index);
+  if (state.crimeTypical) {
+    $("crime-typical").textContent = ` (today ${state.crimeTypical.violent} violent crimes within half a mile in a year, across ${state.crimeTypical.buildings} buildings)`;
+  }
   if (state.crimeCounties.length) $("crime-counties").textContent = state.crimeCounties.map((fips) => COUNTY[fips] || fips).join("; ");
   const counties = Object.keys(index.counties).sort((a, b) => index.counties[b].units - index.counties[a].units);
   buildAreas(index.counties);
@@ -757,3 +903,5 @@ load();
 
 // Kept for the console: which units match right now.
 window.aptMatches = () => state.index.flatMap((b) => (state.units[b.id] || []).filter((u) => unitMatches(u, b, active())));
+window.aptBuilding = (id) => state.byId[id];
+window.aptFacts = () => state.index.flatMap((b) => [...noiseTags(b.noise), ...worksTags(b.works)].map((note) => note.text));

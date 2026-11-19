@@ -38,7 +38,7 @@ Status: tracking for thirteen companies (a fourteenth, Equity Residential, is pa
 Python 3.12 or later, standard library only.
 
     py discover.py                  # about ten minutes the first time
-    py area.py                      # census, crime, rent trends (optional; a couple of minutes)
+    py area.py                      # census, crime, rent trends, places, noise, permits (optional; several minutes)
     py build.py
     py -m http.server 8000 -d site  # then open http://localhost:8000
 
@@ -48,6 +48,14 @@ Python 3.12 or later, standard library only.
     node --test "tests/js/*.test.mjs"
 
 To exercise the page in a real browser, copy `tests/js/smoke.html` to `site/_smoke.html`, serve `site/`, and open `/_smoke.html`: it clicks through details, stars and every filter and prints what it saw.
+
+## Noise, construction, and what a listing says about a unit
+
+- `aptrack/area/noise.py` reads the US DOT National Transportation Noise Map (2020) for aircraft, road and rail noise at each building. The map is published only as coloured tiles, so it fetches the tile a building falls on (`aptrack/area/png.py` decodes it with the standard library) and looks the pixel's colour up in the map's own legend. A building is looked up once (`py area.py --only noise`).
+- `aptrack/area/works.py` reads DC's building permits (one map layer per year): new buildings and demolition within a block in two years, and alteration work on the building's own lot that paid $5,000 or more in fees in the last year (`py area.py --only works`). DC only.
+- `aptrack/traits.py` marks a unit `outdoor` ("Balcony", "Terrace"...) and `own_door` from the floor plan's name and the unit's own feature list, never from building amenities. The SightMap reader now passes a unit map's per-unit feature list through as the unit's notes.
+- `history.drop` marks a price drop: at least 2% below the highest rent that stood in the last 30 days, the latest move down, same lease length.
+- On the page (`site/js/logic.js`): `relateCrime` measures each building's violent count against the median building; `worth` adds up, in dollars a month, how far a unit is priced under similar units (capped at 25%) and the user's own values from Setup for drive, crime, walkability and quiet. Top picks sorts on that sum as a share of the unit's cost.
 
 ## Pausing a company, and bringing it back
 

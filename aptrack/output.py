@@ -3,7 +3,7 @@
 import datetime
 import os
 
-from . import costs, deals, files
+from . import costs, deals, files, history, traits
 from .area import zip_code
 from .area.affordable import mostly
 from .area.places import dog_score, walk_label
@@ -56,6 +56,9 @@ def assemble(buildings, results, state, out_dir, today=None):
                        and days_since(status["ok"], today) > KEEP_UNREAD_DAYS)
         if expired:
             units = []
+        for unit in units:
+            traits.apply(unit)
+            unit["drop"] = history.drop(unit.get("history"), today) if today else None
 
         entry = {key: building.get(key) for key in BUILDING_FIELDS}
         entry.update(units=len(units), fees=fees, amenities=amenities,
@@ -111,10 +114,13 @@ def write_site(buildings, results, state, out_dir, now, area=None):
     price(entries, units_of)
     crime = area.get("crime") or {}
     nearby, walk = area.get("places") or {}, area.get("walk") or {}
+    loud, building_sites = area.get("noise") or {}, area.get("works") or {}
     for entry in entries:
         entry["crime"] = crime.get(entry["id"])
         entry["zip"] = zip_code(entry)
         entry["near"] = nearby.get(entry["id"])
+        entry["noise"] = loud.get(entry["id"])
+        entry["works"] = building_sites.get(entry["id"])
         score = walk.get(entry["id"])
         entry["walk"] = {"score": score, "label": walk_label(score)} if score is not None else None
         entry["dog"] = dog_score(entry.get("pets"), (entry.get("features") or []) + (entry.get("amenities") or []), entry["near"])
@@ -131,5 +137,6 @@ def write_site(buildings, results, state, out_dir, now, area=None):
         files.save(os.path.join(out_dir, f"units-{county}.json"), {"units": units})
     files.save(os.path.join(out_dir, "index.json"), {
         "updated": now, "counties": counties, "buildings": entries,
-        "tracts": tracts, "zips": zips, "crime_counties": area.get("crime_counties") or [], "area_updated": area.get("updated"),
+        "tracts": tracts, "zips": zips, "crime_counties": area.get("crime_counties") or [], "works_counties": area.get("works_counties") or [],
+        "area_updated": area.get("updated"),
     })

@@ -46,8 +46,8 @@
       <button type="button" data-toggle="showRestricted" aria-pressed="false" title="Income-restricted units and senior housing are hidden unless this is on">Income-restricted &amp; senior</button>
     </span>
 
-    <label title="Reported homicides, sex offences, robberies and aggravated assaults within half a mile in the past 12 months. Buildings in counties that publish no incident data are hidden while this is set.">Violent crime nearby
-      <input type="range" id="maxViolent" min="0" max="61" step="1" value="61"> <output id="maxViolentOut" for="maxViolent">any</output></label>
+    <label title="Reported homicides, sex offences, robberies and aggravated assaults within half a mile in the past 12 months, against the typical tracked building (the middle one of those with counts). Buildings in counties that publish no incident data are hidden while this is set.">Violent crime nearby
+      <input type="range" id="maxViolentX" min="0" max="7" step="1" value="7"> <output id="maxViolentXOut" for="maxViolentX">any</output></label>
 
     <label title="The EPA's walkability index for the block: 1 is least walkable, 20 is most. Above 15 is the top band.">Walkability
       <input type="range" id="minWalk" min="0" max="19" step="1" value="0"> <output id="minWalkOut" for="minWalk">any</output></label>
@@ -69,6 +69,7 @@
       <option value="ppsf">Lowest cost per sqft</option>
       <option value="own">Furthest below its building</option>
       <option value="local">Furthest below nearby buildings</option>
+      <option value="drop">Biggest price drop</option>
       <option value="newest">Newest listings</option>
       <option value="size">Largest</option>
       <option value="drive">Shortest drive to work</option>
@@ -91,34 +92,90 @@
 <dialog id="setup">
   <form method="dialog" id="setupform">
     <h2>Set up your search</h2>
-    <p class="muted">A few answers so the list starts where you would. Skip anything; all of it can be changed later in the bar at the top.
-      Everything stays in this browser.</p>
-    <label>Bedrooms
-      <span class="chips" id="s-beds" role="group">
-        <button type="button" data-sbeds="0" aria-pressed="false">Studio</button>
-        <button type="button" data-sbeds="1" aria-pressed="false">1 bed</button>
-        <button type="button" data-sbeds="2" aria-pressed="false">2 bed</button>
-        <button type="button" data-sbeds="3" aria-pressed="false">3+</button>
-      </span></label>
-    <label>Smallest size <input type="number" id="s-minSqft" min="0" step="50" placeholder="sqft" inputmode="numeric"></label>
-    <label>Most you would pay per month <input type="number" id="s-maxCost" min="0" step="100" placeholder="$" inputmode="numeric"></label>
-    <label>Move in by <input type="date" id="s-moveBy"></label>
-    <label>Work address <input type="text" id="s-work" placeholder="Street, city, state" autocomplete="off"></label>
-    <label>Longest drive to work <input type="number" id="s-maxDrive" min="10" max="90" step="5" placeholder="minutes" inputmode="numeric"></label>
-    <label>Household income per year <input type="number" id="s-income" min="0" step="1000" placeholder="$ (optional)" inputmode="numeric"></label>
-    <p class="muted">Income is used only to flag units whose rent is more than a third of it, the usual rule buildings apply.
-      The work address is sent to OpenStreetMap and a public routing service to time drives without traffic.</p>
+    <p class="muted" id="s-where">Step 1</p>
 
-    <h3>Rush-hour drive times (optional)</h3>
-    <p class="muted">With a Google Maps key the drive times use typical traffic at the hours you drive, to work and back.
-      Create a key in Google Cloud with the <b>Routes API</b> turned on; timing every building both ways uses about 800 of the
-      5,000 free lookups a month. The key is kept in this browser only and is sent only to Google.</p>
-    <label>Google Maps key <input type="password" id="s-key" placeholder="paste the key" autocomplete="off" spellcheck="false"></label>
-    <label class="pair">Leave for work at <input type="time" id="s-leave" value="08:00"> Leave work at <input type="time" id="s-back" value="17:30"></label>
+    <fieldset class="step" data-step="home" data-title="The home">
+      <p class="muted">A few short steps so the list starts where you would. Skip any of them; everything can be changed later
+        in the bar at the top, and all of it stays in this browser.</p>
+      <label>Bedrooms
+        <span class="chips" id="s-beds" role="group">
+          <button type="button" data-sbeds="0" aria-pressed="false">Studio</button>
+          <button type="button" data-sbeds="1" aria-pressed="false">1 bed</button>
+          <button type="button" data-sbeds="2" aria-pressed="false">2 bed</button>
+          <button type="button" data-sbeds="3" aria-pressed="false">3+</button>
+        </span></label>
+      <label>Smallest size <input type="number" id="s-minSqft" min="0" step="50" placeholder="sqft" inputmode="numeric"></label>
+      <label>Move in by <input type="date" id="s-moveBy"></label>
+    </fieldset>
+
+    <fieldset class="step" data-step="budget" data-title="Budget" hidden>
+      <label>Most you would pay per month <input type="number" id="s-maxCost" min="0" step="100" placeholder="$" inputmode="numeric"></label>
+      <p class="muted">This is checked against the true monthly cost: rent after any free months, plus required fees.</p>
+      <label>Household income per year <input type="number" id="s-income" min="0" step="1000" placeholder="$ (optional)" inputmode="numeric"></label>
+      <p class="muted">Income is used only to flag units whose rent is more than a third of it, the usual rule buildings apply.</p>
+    </fieldset>
+
+    <fieldset class="step" data-step="where" data-title="Where" hidden>
+      <p class="muted">Tick the areas to search. Leave everything unticked to search the whole region.</p>
+      <div class="boxes" id="s-areas"></div>
+    </fieldset>
+
+    <fieldset class="step" data-step="commute" data-title="Commute" hidden>
+      <label>Work address <input type="text" id="s-work" placeholder="Street, city, state" autocomplete="off"></label>
+      <label>Hide homes with a longer drive than <input type="number" id="s-maxDrive" min="10" max="90" step="5" placeholder="minutes (optional)" inputmode="numeric"></label>
+      <div class="trade" data-trade="commute"></div>
+      <p class="muted">The work address is sent to OpenStreetMap and a public routing service to time drives without traffic.</p>
+      <details class="backup">
+        <summary>Rush-hour drive times (optional)</summary>
+        <p class="muted">With a Google Maps key the drive times use typical traffic at the hours you drive, to work and back.
+          Create a key in Google Cloud with the <b>Routes API</b> turned on; timing every building both ways uses about 800 of the
+          5,000 free lookups a month. The key is kept in this browser only and is sent only to Google.</p>
+        <label>Google Maps key <input type="password" id="s-key" placeholder="paste the key" autocomplete="off" spellcheck="false"></label>
+        <label class="pair">Leave for work at <input type="time" id="s-leave" value="08:00"> Leave work at <input type="time" id="s-back" value="17:30"></label>
+      </details>
+    </fieldset>
+
+    <fieldset class="step" data-step="crime" data-title="Safety" hidden>
+      <label>Hide homes with more violent crime nearby than
+        <select id="s-maxViolentX"></select></label>
+      <p class="muted" id="s-crime-typical"></p>
+      <div class="trade" data-trade="crime"></div>
+    </fieldset>
+
+    <fieldset class="step" data-step="walk" data-title="Getting around" hidden>
+      <div class="boxes">
+        <label><input type="checkbox" data-stag="nearMetro"> Only homes within half a mile of a Metro station</label>
+        <label><input type="checkbox" data-stag="nearGrocery"> Only homes with a supermarket within half a mile</label>
+      </div>
+      <div class="trade" data-trade="walk"></div>
+    </fieldset>
+
+    <fieldset class="step" data-step="quiet" data-title="Quiet, and the unit itself" hidden>
+      <div class="boxes">
+        <label><input type="checkbox" data-stag="quietAir"> Hide homes under aircraft noise</label>
+        <label><input type="checkbox" data-stag="noSites"> Hide homes with a building site next door or big renovation inside (known for DC only)</label>
+      </div>
+      <div class="trade" data-trade="quiet"></div>
+      <div class="boxes">
+        <label><input type="checkbox" data-stag="ground"> Only ground-floor units</label>
+        <label><input type="checkbox" data-stag="ownDoor"> Only units whose listing says they have their own door to the outside</label>
+        <label><input type="checkbox" data-stag="balcony"> Only units whose listing names a balcony, terrace or patio</label>
+      </div>
+      <p class="muted">Most listings say nothing about entrances or balconies, so the last two hide most units. They can be switched off under Tags.</p>
+    </fieldset>
+
+    <div class="actions">
+      <button type="button" class="pill" id="s-prev">Back</button>
+      <button type="button" class="pill" id="s-skip">Skip this step</button>
+      <button type="button" class="pill primary" id="s-next">Next</button>
+      <button type="submit" class="pill primary" id="s-go">Show apartments</button>
+    </div>
+    <p class="muted finish"><button type="button" class="link" id="s-finish">Finish now with what I have answered</button> ·
+      <button type="button" class="link" id="s-close">Close without changing anything</button></p>
 
     <details class="backup">
       <summary>Move your settings to another browser or device</summary>
-      <p class="muted">This copies your filters, followed units and buildings, no-go ZIP codes, work address and income as text.
+      <p class="muted">This copies your filters, your answers here, followed units and buildings, no-go ZIP codes, work address and income as text.
         It leaves out the Google key.</p>
       <div class="actions left">
         <button type="button" class="pill" id="x-copy">Copy as text</button>
@@ -129,10 +186,6 @@
         <textarea id="x-text" rows="4" spellcheck="false" placeholder='{"app": "apartment-tracker", ...}'></textarea></label>
       <div class="actions left"><button type="button" class="pill" id="x-import">Load these settings</button></div>
     </details>
-    <div class="actions">
-      <button type="button" class="pill" id="s-skip">Skip</button>
-      <button type="submit" class="pill primary" id="s-go">Show apartments</button>
-    </div>
   </form>
 </dialog>
 
@@ -153,16 +206,25 @@
   <b>Building steal</b>: 15% or more below similar units in the same building. <b>Local value</b>: 20% or more below similar units
   in other buildings within one to two miles. <b>Absolute steal</b>: 10% or more below its building and 15% or more below its neighbors.
   <b>Check price</b>: 30% or more below its own building, or 40% or more below its neighbors. That is usually income-restricted housing the building did not label, or a mistake; it is not counted as a steal.
+  <b>Price drop</b>: the rent is at least 2% below the highest it stood at in the last 30 days and its latest move was down; a unit can carry it alongside a steal tag.
+  <b>Top picks</b> puts first the homes with the most in their favour for their price: how far each is priced under similar units (counted up to 25%), plus the dollar amounts you gave in Setup for a shorter drive, less violent crime, a more walkable block and quiet, all taken as a share of the home's monthly cost. Open a unit to see the sum.
   In DC, a building standing on a project in the city's affordable-housing list where at least half the units are income-restricted is treated as income-restricted and hidden with the rest.
   Prices come from each building's own site and are only as good as what it publishes; check with the building before relying on one.</p>
   <p><b>Crime</b> counts are incidents reported to police within half a mile in the past 12 months, from each county's open data
   (so far: <span id="crime-counties">none</span>). Counties count offences differently, so compare across a border with care, and county figures can miss incidents handled by a
   city's own police. Arlington's counts are from the last year it published locations, June 2021 to June 2022.
+  A building's violent count is also given against the <b>typical</b> building: the middle one of all tracked buildings that have counts<span id="crime-typical"></span>.
   <b>About the area</b> figures are for the census tract (American Community Survey, 5-year) and the ZIP code (Zillow's rent index).</p>
   <p><b>Nearby</b> places are from OpenStreetMap (Metro stations from the transit authority's list), measured in a straight line from the building; parks are measured to their edge.
   <b>Walkability</b> is the EPA's National Walkability Index for the block (1 to 20). <b>Dog-friendly</b> is out of 5: one point for
   allowing pets, two for a dog park within half a mile (one if within a mile), one for a park within a quarter mile, one for a dog run
   or pet spa on site; a building that does not say it allows pets gets no score.</p>
+  <p><b>Noise</b> is from the US Department of Transportation's National Transportation Noise Map (2020): modeled sound from aircraft, roads and
+  railways averaged over 24 hours, in bands. The Department says it is for seeing patterns, not exact enough to judge one address, so treat a note as "look into this".
+  Aircraft noise is noted from 50 decibels and flagged from 55; road and rail from 60.
+  <b>Construction</b> is from DC's building permits, so it is known for DC buildings only: a new-building or demolition permit within a block in the last two years,
+  or alteration work on the building's own lot that paid $5,000 or more in permit fees in the last year. A permit is permission, not proof that work has started or is still going.
+  <b>Balcony or terrace</b> and <b>Own front door</b> are marked only when a unit's own listing says so; most listings say nothing, and those units are simply unmarked.</p>
   <p><b>Drive times</b> are free-flow times with no traffic, so they compare buildings fairly but understate a rush-hour commute.
   Your work address is kept in this browser only. To time drives it is sent to the OpenStreetMap Nominatim service to find its
   coordinates, and those coordinates are sent to the public OSRM routing server along with the buildings' locations.

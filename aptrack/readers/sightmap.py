@@ -49,8 +49,15 @@ def parse_fees(data):
     return fees
 
 
+def said(description):
+    """The lines of a unit's feature list (a heading, then "* 2nd Floor", "* North View"...), without the headings."""
+    lines = [line.strip().lstrip("*-• ").strip() for line in (description or "").splitlines()]
+    return [line for line in lines if line and not line.startswith("#")]
+
+
 def parse(feed, building):
     data = feed.get("data", feed)
+    described = {d.get("id"): said(d.get("description")) for d in data.get("unit_descriptions") or []}
     plans = {p["id"]: p for p in data.get("floor_plans") or []}
     floors = {f["id"]: num(f.get("filter_short_label")) for f in data.get("floors") or []}
     flat_term = data.get("flat_pricing_lease_term_months")
@@ -80,6 +87,7 @@ def parse(feed, building):
             lease=u.get("display_lease_term") or flat_term,
             available=u.get("available_on"),
             special=u.get("specials_description"),
+            notes=", ".join(line for d in u.get("descriptions") or [] for line in described.get(d, [])) or None,
             url=building.get("url"),
         )
         if unit:

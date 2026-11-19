@@ -184,3 +184,23 @@ h3.group { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; co
 footer { max-width: 1180px; margin: 0 auto; padding: 0 16px 40px; color: var(--muted); font-size: 12.5px; }
 footer b { color: var(--ink); font-weight: 600; }
 footer label { cursor: pointer; }
+
+/* price drops, unit notes, the step-by-step setup */
+.tag.drop { border: 1px solid var(--accent); color: var(--accent); }
+
+#setup fieldset.step { border: 0; padding: 0; margin: 0; min-width: 0; }
+#setup fieldset.step > label { display: grid; grid-template-columns: 1fr; gap: 4px; margin: 12px 0 0; color: var(--muted); }
+#setup fieldset.step > label.pair, #setup .backup label.pair { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+#setup select { background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; }
+#setup .boxes { display: grid; gap: 6px; margin-top: 12px; }
+#setup .boxes label { display: flex; gap: 8px; align-items: flex-start; color: var(--ink); }
+#setup .boxes label.state { font-weight: 600; margin-top: 6px; }
+#setup .boxes input[type=checkbox] { margin-top: 3px; padding: 0; }
+#setup .boxes small { color: var(--muted); margin-left: auto; }
+#setup .trade { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; }
+#setup .trade .ask { margin: 0 0 8px; font-weight: 600; }
+#setup .trade .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+#setup .trade .means { margin: 8px 0 0; }
+#setup .finish { margin: 10px 0 0; text-align: right; }
+#setup button.link { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }
+#setup #s-where { margin: 0 0 6px; font-weight: 600; }

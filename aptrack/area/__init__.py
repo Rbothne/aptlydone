@@ -8,9 +8,9 @@ import concurrent.futures
 import re
 import time
 
-from . import affordable, census, crime, places, rents
+from . import affordable, census, crime, noise, places, rents, works
 
-PARTS = ("census", "crime", "rents", "affordable", "places")
+PARTS = ("census", "crime", "rents", "affordable", "places", "noise", "works")
 
 
 def zip_code(building):
@@ -105,6 +105,25 @@ def collect(buildings, previous, get, today, now, parts=PARTS, post=None, sleep=
                 except Exception as error:
                     print(f"  no walkability for {building['id']}: {error!r}")
             area["walk"] = walk
+
+    if "noise" in parts:                      # the noise map is a 2020 model: a building is looked up once
+        known = dict(area.get("noise") or {})
+        fresh = [b for b in buildings if len(known.get(b["id"]) or {}) < len(noise.LAYERS)]
+        if fresh:
+            for building_id, levels in noise.read(get, fresh).items():
+                known[building_id] = {**(known.get(building_id) or {}), **levels}
+        area["noise"] = known
+
+    if "works" in parts:
+        mine = [b for b in buildings if b.get("county") in works.COUNTIES]
+        if mine:
+            try:
+                area["works"] = works.near(mine, works.permits(get, today), today)
+                area["works_counties"] = list(works.COUNTIES)
+                print(f"  construction: {sum(1 for w in area['works'].values() if w['next'])} buildings with a site next door, "
+                      f"{sum(1 for w in area['works'].values() if w['here'])} with big work on their own lot")
+            except Exception as error:
+                print(f"  no building permits this time: {error!r}")
 
     area["updated"] = now
     return area

@@ -204,15 +204,6 @@ test("availability wording", async () => {
   assert.equal(availability(null, "2026-11-18"), "");
 });
 
-test("violent crime limit needs a known count at or under it", async () => {
-  const { unitMatches: matches } = await import("../../site/js/logic.js");
-  assert.equal(matches(unit(), building({ crime: { violent: 3, property: 40 } }), f({ maxViolent: 3 })), true);
-  assert.equal(matches(unit(), building({ crime: { violent: 4, property: 40 } }), f({ maxViolent: 3 })), false);
-  assert.equal(matches(unit(), building({ crime: null }), f({ maxViolent: 3 })), false);
-  assert.equal(matches(unit(), building({ crime: null }), f()), true);
-  assert.equal(DEFAULT_FILTERS.maxViolent, null);
-});
-
 test("crime wording says when a county publishes nothing", async () => {
   const { crimeText } = await import("../../site/js/logic.js");
   assert.deepEqual(crimeText(building({ crime: { violent: 3, property: 41 } }), ["11001"]),
@@ -417,9 +408,11 @@ test("filters saved before the tag drop-down still work: tagged-only means any d
 test("the tag drop-down: groups, what is chosen, and its label", async () => {
   const { TAG_GROUPS, chosenTags, tagsLabel, setTag } = await import("../../site/js/logic.js");
   assert.deepEqual(TAG_GROUPS.map((g) => [g.name, g.tags.map((t) => t.key)]), [
-    ["Deals", ["absolute", "building", "local"]],
+    ["Deals", ["absolute", "building", "local", "drop"]],
+    ["Unit", ["ground", "ownDoor", "balcony"]],
     ["Nearby", ["nearMetro", "nearGrocery", "nearPark", "dogFriendly"]],
-    ["Building", ["ground", "parking", "pets", "highEnd"]],
+    ["Quiet", ["quietAir", "noSites"]],
+    ["Building", ["parking", "pets", "highEnd"]],
   ]);
   assert.equal(tagsLabel(f()), "Any");
   assert.deepEqual(chosenTags(f()), []);

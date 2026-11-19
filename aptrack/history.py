@@ -14,6 +14,8 @@ import statistics
 
 UNIT_KEEP_DAYS = 400      # a leased unit's record is kept this long, so next year's search can see this year's prices
 SAVE_FLOOR = 0.8          # refuse to save a history with fewer than this share of the previous unit records
+DROP_DAYS = 30            # a price drop is measured against the highest price that stood in this many days...
+DROP_PCT = 2              # ...and has to be at least this many percent: pricing software moves prices a little every day
 
 
 def new_state():
@@ -75,6 +77,27 @@ def record(state, building_id, units, day):
     status = state["buildings"].setdefault(building_id, {})
     status.update(ok=day, failed=None)
     status.pop("why", None)
+
+
+def drop(points, today):
+    """{"was", "by", "pct", "day"} when a unit's rent now is at least DROP_PCT below the highest it stood at in the
+    last DROP_DAYS and its latest move was down; None otherwise. Only prices for the same lease length compare."""
+    if not points:
+        return None
+    rent, lease = points[-1][1], points[-1][3]
+    same = [p for p in points if p[3] == lease]
+    since = len(same) - 1                                   # where the current rent began
+    while since > 0 and same[since - 1][1] == rent:
+        since -= 1
+    if since == 0 or same[since - 1][1] <= rent:
+        return None
+    cutoff = (datetime.date.fromisoformat(today) - datetime.timedelta(days=DROP_DAYS)).isoformat()
+    if same[since][0] < cutoff:
+        return None
+    stood = [p[1] for i, p in enumerate(same[:since]) if same[i + 1][0] >= cutoff]      # prices still up inside the window
+    high = max(stood)
+    pct = round((rent / high - 1) * 100, 1)
+    return {"was": high, "by": high - rent, "pct": pct, "day": same[since][0]} if pct <= -DROP_PCT else None
 
 
 def record_failure(state, building_id, day, why=None):
