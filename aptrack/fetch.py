@@ -19,8 +19,9 @@ class RateLimited(Exception):
     """The site answered 429. Callers come back later instead of retrying."""
 
 
-def get(url, *, timeout=25, tries=3, headers=None, opener=urllib.request.urlopen, sleep=time.sleep):
-    """Fetch `url` and return the body as bytes, decompressed if the server gzipped it."""
+def get(url, *, timeout=25, tries=3, headers=None, opener=urllib.request.urlopen, sleep=time.sleep, raw=False):
+    """Fetch `url` and return the body as bytes, decompressed if the server gzipped it.
+    `raw` returns the bytes exactly as sent, for a piece of a binary file that might only look gzipped."""
     request = urllib.request.Request(url, headers={
         "User-Agent": USER_AGENT,
         "Accept": "*/*",
@@ -31,7 +32,7 @@ def get(url, *, timeout=25, tries=3, headers=None, opener=urllib.request.urlopen
         try:
             with opener(request, timeout=timeout) as response:
                 body = response.read()
-            return gzip.decompress(body) if body[:2] == b"\x1f\x8b" else body
+            return gzip.decompress(body) if body[:2] == b"\x1f\x8b" and not raw else body
         except urllib.error.HTTPError as error:
             error.close()
             if error.code in (404, 410):

@@ -125,6 +125,22 @@ class CrimeTests(QuietTestCase):
         self.assertEqual(sorted(crime.howard_incidents(rows)),
                          [(39.2, -76.8, "violent", "2025-11-18"), (39.275, -76.803, "property", "2025-11-19"), (39.289, -76.824, "violent", "2025-11-18")])
 
+    def test_coordinates_sent_as_text_are_read_as_numbers_and_nonsense_is_skipped(self):
+        rows = [["1", DAY, "39.2", "-76.8", "13A"], ["2", DAY, "n/a", "-76.8", "13A"], ["3", str(DAY), 39.3, -76.9, "23C"]]
+        self.assertEqual(sorted(crime.howard_incidents(rows)), [(39.2, -76.8, "violent", "2025-11-18"), (39.3, -76.9, "property", "2025-11-18")])
+
+    def test_one_countys_bad_data_does_not_stop_the_others(self):
+        def get(url, **options):
+            return (PAGE if "view?r=" in url else MODELS).encode()
+
+        def post(url, body, headers=None, **options):
+            schema = [{"N": f"G{n}", "T": 1} for n in range(5)]
+            return json.dumps(reply([{"S": schema, "C": ["250113958", DAY + 1000, 39.2, -76.8, "13A"]}])).encode()
+        buildings = [{"id": "h", "county": "24027", "lat": "not a number", "lon": -76.8, "tract": "1", "in_region": True},
+                     {"id": "l", "county": "51107", "lat": 39.2, "lon": -76.8, "tract": "1", "in_region": True}]
+        got = area.collect(buildings, {}, get, "2026-11-18", "now", parts=("crime",), post=post, sleep=lambda s: None)
+        self.assertEqual(got["crime_counties"], ["51107"])
+
     def test_loudoun_counts_each_incident_once_per_kind(self):
         rows = [["Offense v4 SO170017201 1 UNSECURED", DAY, 39.009, -77.438, "23C"], ["Offense v4 SO170017201 2 UNSECURED", DAY, 39.009, -77.438, "13B"],
                 ["Offense v4 SO180004849 0 UNSECURED", DAY, None, None, "23C"],

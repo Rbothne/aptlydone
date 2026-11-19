@@ -49,10 +49,10 @@ def collect(buildings, previous, get, today, now, parts=PARTS, post=None, sleep=
                     incidents = reader(get, start, end, post=post)
                 else:
                     incidents = reader(get, start, end)
+                found = crime.near(mine, incidents)
             except Exception as error:
                 print(f"  no crime data for county {county} this time: {error!r}")
                 continue
-            found = crime.near(mine, incidents)
             if county in crime.FROZEN:                  # say which year these counts are from
                 for tally in found.values():
                     tally["period"] = [start, end]
@@ -82,7 +82,7 @@ def collect(buildings, previous, get, today, now, parts=PARTS, post=None, sleep=
     if "places" in parts:
         placed = [b for b in buildings if b.get("lat") is not None and b.get("lon") is not None]
         if placed:
-            fresh = places.near(placed, places.fetch_all(get, places.bbox(placed), sleep=sleep))
+            fresh = places.near(placed, places.fetch_all(get, places.bbox(placed), places.states(placed), sleep=sleep))
             before = area.get("places") or {}
             # a kind of place that could not be read this week keeps last week's numbers
             area["places"] = {building_id: {**(before.get(building_id) or {}), **mine} for building_id, mine in fresh.items()}

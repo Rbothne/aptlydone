@@ -299,7 +299,11 @@ def by_incident(rows, incident_of):
     found = {}
     for name, when, lat, lon, code in rows:
         kind = classify_nibrs(code)
-        if not kind or lat is None or lon is None or when is None:
+        try:                                             # the service sends some numbers as text
+            lat, lon, when = float(lat), float(lon), float(when)
+        except (TypeError, ValueError):
+            continue
+        if not kind:
             continue
         day = datetime.datetime.fromtimestamp(when / 1000, datetime.timezone.utc).date().isoformat()
         found[(incident_of(name), kind)] = (lat, lon, kind, day)
