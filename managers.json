@@ -1,7 +1,7 @@
 {
   "settings": {
     "delay_seconds": 1.0,
-    "site_delays": {"sightmap.com": 0.25, "www.bozzuto.com": 0.25},
+    "site_delays": {"sightmap.com": 0.25, "www.bozzuto.com": 0.25, "www.gables.com": 5},
     "workers": 4,
     "counties": ["11001", "51013", "51510", "51059", "51600", "51610", "51107", "51153", "51683", "51685", "24031", "24033", "24027", "24003"]
   },
