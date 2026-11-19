@@ -38,6 +38,12 @@ class CommonTests(unittest.TestCase):
         self.assertEqual(common.sightmap_embed(FLOORPLANS), "https://sightmap.com/embed/y8px84x5v19")
         self.assertIsNone(common.sightmap_embed("<html></html>"))
 
+    def test_the_sightmap_script_is_not_a_unit_map(self):
+        script = '<script src="https://sightmap.com/embed/api.js"></script>'
+        self.assertEqual(common.sightmap_embed(script + '<iframe data-src="https://sightmap.com/embed/yjp2k7d9pxl"></iframe>'),
+                         "https://sightmap.com/embed/yjp2k7d9pxl")
+        self.assertIsNone(common.sightmap_embed(script))
+
 
 class WindsorTests(QuietTestCase):
     def test_location_pages_for_the_region_only(self):

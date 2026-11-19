@@ -81,6 +81,23 @@ class GenericTests(QuietTestCase):
         self.assertEqual([b["id"] for b in generic.discoverer(config)(get)], ["example-living-the-one", "example-living-the-two"])
         self.assertEqual(len(generic.discoverer(config)(get, limit=1)), 1)
 
+    def test_building_pages_can_come_from_the_links_on_a_list_page(self):
+        listing = ('<a href="/apartments/va/arlington/the-one">The One</a> <a href="/apartments/va/arlington/the-one">again</a> '
+                   '<a href="/apartments/va/arlington/the-one/gallery">Gallery</a> <a href="/about">About</a> '
+                   '<a href="https://elsewhere.test/apartments/va/arlington/other">Other</a>')
+        config = {k: v for k, v in CONFIG.items() if k != "sitemap"}
+        config["list"] = "https://www.example.test/metro/dc/"
+        self.assertEqual(generic.link_urls(listing, config["list"], CONFIG["pattern"]), [ONE])
+        get = self.web({config["list"]: listing, ONE: PAGE + FLOORPLANS})
+        found = generic.discoverer(config)(get)
+        self.assertEqual(([b["id"] for b in found], self.asked), (["example-living-the-one"], [config["list"], ONE]))
+
+    def test_a_company_whose_pages_carry_titles_not_names_is_named_from_the_address_of_the_page(self):
+        self.assertEqual(generic.slug_name("maa-national-landing", "MAA"), "MAA National Landing")
+        get = self.web({CONFIG["sitemap"]: SITEMAP, ONE: PAGE + FLOORPLANS})
+        found = generic.discoverer(dict(CONFIG, name_from_slug=True))(get)
+        self.assertEqual(found[0]["name"], "The One")
+
     def test_run_all_builds_a_generic_discoverer_from_the_managers_line(self):
         get = self.web({CONFIG["sitemap"]: SITEMAP, ONE: PAGE + FLOORPLANS})
         found = discovery.run_all([CONFIG], discover.DISCOVERERS, get, workers=1, sleep=lambda s: None)

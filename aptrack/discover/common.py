@@ -81,8 +81,10 @@ def place(page_html, kinds=None):
 
 def sightmap_embed(page_html):
     """The address of a SightMap unit map named in a page, or None."""
-    match = SIGHTMAP_EMBED.search(page_html or "")
-    return f"https://sightmap.com/embed/{match.group(1)}" if match else None
+    for name in SIGHTMAP_EMBED.findall(page_html or ""):
+        if name != "api":                      # sightmap.com/embed/api.js is the script, not a map
+            return f"https://sightmap.com/embed/{name}"
+    return None
 
 
 def building(manager, slug, url, described, feed):

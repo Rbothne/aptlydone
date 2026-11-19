@@ -12,6 +12,26 @@
     {"name": "Willow Bridge", "site": "www.willowbridgepc.com", "discover": "willowbridge"},
     {"name": "Greystar", "site": "www.greystar.com", "discover": "greystar"},
     {"name": "AvalonBay", "site": "www.avaloncommunities.com", "discover": "avalon"},
-    {"name": "WC Smith", "site": "wcsmith.com", "discover": "wcsmith"}
+    {"name": "WC Smith", "site": "wcsmith.com", "discover": "wcsmith"},
+    {"name": "Cortland", "site": "cortland.com", "discover": "generic",
+     "list": "https://cortland.com/apartments/northern-virginia-and-dc-metro/",
+     "pattern": "https://cortland\\.com/apartments/(?![a-z0-9-]*-metro/)[a-z0-9-]+/",
+     "map_paths": ["/available-apartments/"]},
+    {"name": "Gables", "site": "www.gables.com", "discover": "generic",
+     "sitemap": "https://www.gables.com/sitemap.xml",
+     "pattern": "https://www\\.gables\\.com/community/\\d+",
+     "map_paths": [""]},
+    {"name": "LyvWell", "site": "lyvwellapartments.com", "discover": "generic",
+     "sitemap": "https://lyvwellapartments.com/property-sitemap.xml",
+     "pattern": "https://lyvwellapartments\\.com/our-communities/[^/<\\s]+/",
+     "map_paths": [""]},
+    {"name": "MAA", "site": "www.maac.com", "discover": "generic",
+     "sitemap": "https://www.maac.com/sitemap.xml",
+     "pattern": "https://www\\.maac\\.com/(?:virginia|maryland|district-of-columbia|washington-dc)/[^/<\\s]+/maa-[^/<\\s]+/",
+     "map_paths": [""], "name_from_slug": true},
+    {"name": "Simpson", "site": "www.simpsonpropertygroup.com", "discover": "generic",
+     "sitemap": "https://www.simpsonpropertygroup.com/sitemap.xml",
+     "pattern": "https://www\\.simpsonpropertygroup\\.com/apartments/[^/<\\s]+-(?:virginia|maryland|washington-dc|dc)/[^/<\\s]+",
+     "map_paths": ["/apartment-floor-plans"]}
   ]
 }
