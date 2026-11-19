@@ -42,7 +42,7 @@ def web(montgomery_fails=False):
         if url.startswith(crime.ARLINGTON):
             return json.dumps([{"offenseDsc": "ROBBERY", "latitudeCrd": "38.89", "longitudeCrd": "-77.08",
                                 "firstReportDtm": "2022-03-01T07:45:00.000Z"}]).encode()
-        if url.startswith((crime.PRINCE_GEORGES, crime.FAIRFAX)):
+        if url.startswith((crime.PRINCE_GEORGES, crime.FAIRFAX, crime.PRINCE_WILLIAM)):
             raise OSError("not part of this test")
         raise AssertionError("unexpected request: " + url)
     return get

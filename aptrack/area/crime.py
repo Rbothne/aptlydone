@@ -24,6 +24,10 @@ PRINCE_GEORGES = "https://data.princegeorgescountymd.gov/resource/xjru-idbe.json
 FAIRFAX = "https://services9.arcgis.com/kYvfX7YK8OobHItA/arcgis/rest/services"          # Fairfax County Police open data
 FAIRFAX_LAYERS = ("CrimesAgainstPerson_CST_FCPOD_FC", "CrimesAgainstProperty_CST_FCPOD_FC")
 ARLINGTON = "https://datahub-v2.arlingtonva.us/api/Police/IncidentLog"
+PRINCE_WILLIAM = "https://services2.arcgis.com/0Q7l03Ls62VG0fy4/arcgis/rest/services/Public_Crime_Reports/FeatureServer/0"
+PWC_VIOLENT = ("MURDER", "AGGRAVATED ASSAULT", "ROBBERY", "FORCIBLE RAPE", "FORCIBLE SODOMY", "SEXUAL ASSAULT WITH AN OBJECT", "FORCIBLE FONDLING")
+PWC_PROPERTY = ("BURGLARY", "SHOPLIFTING", "MOTOR VEHICLE THEFT", "LARCENY", "THEFT FROM", "THEFT OF MOTOR VEHICLE PARTS", "POCKET-PICKING",
+                "PURSE-SNATCHING", "ARSON")
 PG_VIOLENT = {"HOMICIDE", "SEX OFFENSE", "ASSAULT, SHOOTING", "ASSAULT, WEAPON"}
 PAGE = 2000
 MAX_PAGES = 300          # far more than a year of incidents needs; beyond it something is wrong with the feed
@@ -230,6 +234,39 @@ def arlington(get, start, today):
     return [incident for incident in since(arlington_incidents(rows), start) if incident[3] <= today]
 
 
+# ---------- Prince William County, VA ----------
+
+def classify_pwc(name):
+    name = (name or "").upper()
+    if name.startswith(PWC_VIOLENT):
+        return "violent"
+    if name.startswith(PWC_PROPERTY) or "LARCENY" in name:
+        return "property"
+    return None
+
+
+def prince_william(get, start, today, max_pages=MAX_PAGES):
+    """The county police's public crime reports: points with an offence name and the day it happened."""
+    where = quote(f"OccurredOn >= TIMESTAMP '{start} 00:00:00'")
+    incidents, offset = [], 0
+    for _ in range(max_pages):
+        page = json.loads(get(f"{PRINCE_WILLIAM}/query?where={where}&outFields=IBRCode,OccurredOn&outSR=4326"
+                              f"&orderByFields=ObjectID&resultOffset={offset}&resultRecordCount={PAGE}&f=json"))
+        features = page.get("features") or []
+        if not features:
+            break
+        for feature in features:
+            a, point = feature.get("attributes") or {}, feature.get("geometry") or {}
+            kind = classify_pwc(a.get("IBRCode"))
+            if kind and point.get("x") is not None and point.get("y") is not None and a.get("OccurredOn") is not None:
+                day = datetime.datetime.fromtimestamp(a["OccurredOn"] / 1000, datetime.timezone.utc).date().isoformat()
+                incidents.append((point["y"], point["x"], kind, day))
+        offset += len(features)
+    else:
+        raise RuntimeError(f"Prince William crime reports did not end after {max_pages} pages")
+    return since(incidents, start)
+
+
 # ---------- Alexandria, VA: a search form and block addresses, in alexandria.py ----------
 
 def alexandria(get, start, today, post=None, cache=None):
@@ -240,7 +277,8 @@ def alexandria(get, start, today, post=None, cache=None):
 
 
 # county FIPS -> reader(get, start day, end day); a reader in NEEDS_PLACING also takes post= and cache= to geocode addresses
-SOURCES = {"11001": dc, "24031": montgomery, "24033": prince_georges, "51059": fairfax, "51013": arlington, "51510": alexandria}
+SOURCES = {"11001": dc, "24031": montgomery, "24033": prince_georges, "51059": fairfax, "51013": arlington, "51510": alexandria,
+           "51153": prince_william}
 NEEDS_PLACING = {"51510"}
 # Counties whose data has stopped: the fixed (start, end) their reader is asked for, shown beside their counts.
 FROZEN = {"51013": ("2021-06-28", "2022-06-28")}

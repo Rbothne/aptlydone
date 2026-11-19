@@ -236,3 +236,34 @@ class ArlingtonTests(unittest.TestCase):
         self.assertIn(start, asked[0])
         self.assertEqual((start, end), ("2021-06-28", "2022-06-28"))
         self.assertIs(crime.SOURCES["51013"], crime.arlington)
+
+
+class PrinceWilliamTests(unittest.TestCase):
+    def feature(self, code, when=1794965160000, x=-77.2455, y=38.6604):
+        return {"attributes": {"IBRCode": code, "OccurredOn": when}, "geometry": {"x": x, "y": y}}
+
+    def test_offence_names(self):
+        for name in ("MURDER & NONNEGLIGENT MANSLAUGHTER", "AGGRAVATED ASSAULT", "ROBBERY", "FORCIBLE RAPE", "FORCIBLE SODOMY",
+                     "SEXUAL ASSAULT WITH AN OBJECT", "FORCIBLE FONDLING"):
+            self.assertEqual(crime.classify_pwc(name), "violent", name)
+        for name in ("BURGLARY", "SHOPLIFTING", "MOTOR VEHICLE THEFT", "ALL OTHER LARCENY", "THEFT FROM MOTOR VEHICLE", "THEFT FROM BUILDING",
+                     "THEFT OF MOTOR VEHICLE PARTS OR ACCESSORIES", "POCKET-PICKING", "PURSE-SNATCHING", "ARSON"):
+            self.assertEqual(crime.classify_pwc(name), "property", name)
+        for name in ("SIMPLE ASSAULT", "ALL OTHER OFFENSES", "INTIMIDATION", "IDENTITY THEFT", "CREDIT CARD/ATM FRAUD",
+                     "DESTRUCTION/DAMAGE/VANDALISM OF PROPERTY", "STATUTORY RAPE", "KIDNAPPING/ABDUCTION", None, ""):
+            self.assertIsNone(crime.classify_pwc(name), name)
+
+    def test_reader_pages_and_keeps_located_incidents(self):
+        asked = []
+
+        def get(url, **options):
+            asked.append(url)
+            offset = int(url.split("resultOffset=")[1].split("&")[0])
+            pages = {0: [self.feature("ROBBERY"), self.feature("SIMPLE ASSAULT"), {"attributes": {"IBRCode": "BURGLARY", "OccurredOn": 1794965160000}}],
+                     3: [self.feature("SHOPLIFTING")]}
+            return json.dumps({"features": pages.get(offset, [])}).encode()
+        incidents = crime.prince_william(get, "2025-11-18", "2026-11-18")
+        self.assertEqual(incidents, [(38.6604, -77.2455, "violent", "2026-11-18"), (38.6604, -77.2455, "property", "2026-11-18")])
+        self.assertEqual(len(asked), 3)
+        self.assertIn("2025-11-18", asked[0])
+        self.assertIs(crime.SOURCES["51153"], crime.prince_william)
