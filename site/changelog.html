@@ -26,9 +26,43 @@
 </header>
 <main class="log">
   <p class="lead">What changed on the tracker, newest first, written while you were away. This page is temporary.
-  Times are US Eastern on 18 November 2026.</p>
+  Times are US Eastern, 18 and 19 November 2026.</p>
 
   <!-- NEW ENTRIES GO DIRECTLY BELOW THIS LINE -->
+
+  <h2>Published about midnight, 19 November <small>seven more companies, tags drop-down, two more counties of crime, settings export</small></h2>
+  <ul>
+    <li><b>Seven more companies are tracked:</b> Equity Residential (42 buildings), UDR (25), Cortland (20), Gables (13), LyvWell (10),
+      MAA (5) and Simpson (4). Every one of those 119 buildings has prices today. Fourteen companies in all:
+      585 buildings, 528 with prices, about 11,500 units. Tagged today: 155 Absolute steal, 80 Building steal, 725 Local value, 96 Check price.</li>
+    <li><b>Tags are now a drop-down</b>, like Areas. Three groups, each with an "(all)" box. <b>Deals</b>: Absolute steal, Building steal,
+      Local value; a unit shows if it carries any one you ticked. <b>Nearby</b>: Near Metro, Grocery nearby, Park nearby, Dog-friendly.
+      <b>Building</b>: Ground floor, Parking, Pets, High-end. In those two groups every box you tick must hold. This any-of / all-of
+      split is my call. "Income-restricted &amp; senior" stays a button of its own because it adds units instead of removing them.</li>
+    <li><b>Areas is a drop-down with several choices at once</b>, grouped by state, with "Virginia (all)" and "Maryland (all)".</li>
+    <li><b>Crime for Howard and Loudoun</b>, from the two dashboard links you sent. Each dashboard hands over a year of incidents with a
+      map point and an offence code. Loudoun's covers the Sheriff's Office only, not Leesburg's own police. These are not a documented
+      service, so they could stop working without notice; if so those counties keep their last counts. <b>Alexandria and Prince William</b>
+      were added earlier tonight. Nine counties now. <i>The Howard and Loudoun counts reach the page with the next data update, within the hour.</i></li>
+    <li><b>Nearby places, walkability and a dog-friendly score.</b> Each building lists what is close (Metro, supermarket, parks, dog park,
+      community center, library, gym, pharmacy, places to eat), the EPA walkability score for its block (1 to 20), and a dog score out of 5.
+      There is a Walkability slider and a "Most walkable" sort. <i>These also arrive with the next data update, within the hour</i>:
+      the public OpenStreetMap query servers were all overloaded tonight, so I switched to OpenStreetMap's daily state files, which took an extra hour.</li>
+    <li><b>Google Maps key in Setup</b>, with the times you leave for and from work. With a key, drive times become rush-hour times for
+      the next weekday, morning and evening. The key stays in your browser. <b>I could not test this against Google</b> because that needs a key;
+      it is written to Google's documentation. Tell me what you see the first time.</li>
+    <li><b>Settings export and import</b> in Setup: Copy or Save file gives you everything this browser remembers as text; paste it into
+      another browser and press Load. The Google key is left out on purpose.</li>
+    <li><b>Laundry filter removed.</b> The laundry note still shows on buildings that state it.</li>
+    <li><b>Adding a company is usually one line now.</b> A company whose building pages describe themselves in the standard way and embed
+      the SightMap unit map needs only a line in <code>managers.json</code>; Cortland, Gables, LyvWell, MAA and Simpson were added that way.</li>
+    <li><b>Looked at and left out.</b> Dittmar, Mill Creek, Paradigm, Bernstein, ROSS, Daro, Van Metre and The Blairs answer automated
+      visits with a challenge page, and I do not work around those. Kettler was not checked. JBG Smith, Keener, Polinger, Dweck and AIR
+      are readable but each needs its own reader; they are next.</li>
+    <li><b>Known rough edges.</b> MAA's Virginia buildings show the city as "DC Metro" (that is what MAA's pages say). UDR's building-wide
+      specials are not read yet (none was on offer tonight, so I could not see their format). Equity's estimated utilities are not
+      counted in monthly cost; its required monthly charges are.</li>
+  </ul>
 
   <h2>Published about 3:50 pm <small>WC Smith, and keeping income-restricted housing out of the deals</small></h2>
   <ul>
@@ -136,9 +170,9 @@
 
   <h2>Not done yet</h2>
   <ul class="open">
-    <li>Crime for Alexandria, Howard, Loudoun, Anne Arundel, Prince William, Falls Church and Manassas Park (no open data found).</li>
-    <li>Rush-hour drive times (needs a Google key).</li>
-    <li>Buildings whose prices I cannot read yet (about 60 are plain links), and more companies: JBG Smith, Kettler, B.F. Saul, Equity, UDR, Gables.</li>
+    <li>Crime for Anne Arundel, Falls Church, Fairfax City, Manassas and Manassas Park (none publishes incidents with locations; Anne Arundel's dashboard covers hate-bias incidents only).</li>
+    <li>Rush-hour drive times are built but untested against Google (needs your key).</li>
+    <li>Buildings whose prices I cannot read yet (57 are plain links), and more companies: JBG Smith, Keener, Polinger, Dweck, AIR, B.F. Saul.</li>
     <li>The page has only been checked in a headless desktop browser, at desktop and narrow widths, not on a real phone.</li>
     <li>The 30-days-of-history condition on Absolute steal (needs 30 days of history).</li>
   </ul>
