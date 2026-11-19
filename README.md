@@ -2,7 +2,7 @@
 
 Follows available units at professionally managed apartment buildings across the DC, Maryland and Virginia region and records every price change, so unusually low prices can be spotted against a unit's own history and its neighbors.
 
-Status: tracking for fourteen companies, true monthly cost, deal tags, the page (with a first-visit setup, a map, followed units and buildings, no-go ZIP codes), area data (census, crime for nine counties, ZIP rent trend, nearby places, walkability, a dog-friendly score), settings export and import, and drive times (no traffic by default, rush hour with your own Google key) are built. Crime for Anne Arundel, Falls Church, Fairfax City, Manassas and Manassas Park is not: none of them publishes incidents with locations. The Google drive times follow Google's documentation but have not been run against the live service, because that needs a key. `site/changelog.html` is a temporary, plain-language log of changes. The design is in `docs/superpowers/specs/`.
+Status: tracking for thirteen companies (a fourteenth, Equity Residential, is paused), true monthly cost, deal tags, the page (with a first-visit setup, a map, followed units and buildings, no-go ZIP codes), area data (census, crime for nine counties, ZIP rent trend, nearby places, walkability, a dog-friendly score), settings export and import, and drive times (no traffic by default, rush hour with your own Google key) are built. Crime for Anne Arundel, Falls Church, Fairfax City, Manassas and Manassas Park is not: none of them publishes incidents with locations. The Google drive times follow Google's documentation but have not been run against the live service, because that needs a key. `site/changelog.html` is a temporary, plain-language log of changes. The design is in `docs/superpowers/specs/`.
 
 ## Files
 
@@ -48,6 +48,12 @@ Python 3.12 or later, standard library only.
     node --test "tests/js/*.test.mjs"
 
 To exercise the page in a real browser, copy `tests/js/smoke.html` to `site/_smoke.html`, serve `site/`, and open `/_smoke.html`: it clicks through details, stars and every filter and prints what it saw.
+
+## Pausing a company, and bringing it back
+
+Add `"paused": "<why>"` to the company's line in `managers.json`. A paused company is not searched for buildings, not read, not given area data and not on the page. Nothing about it is deleted: its discoverer and reader stay in the code (a test keeps them registered), its buildings stay in `data/buildings.json` with their locations, and its price history stays in `data/state.json` with every unit marked as no longer listed. Delete the `"paused"` entry and the next run searches and reads it again, picking each unit's history back up.
+
+Equity Residential is paused: its terms of use forbid automated reading without written consent, and its site refuses GitHub's servers (HTTP 403) while answering a home connection. The git tag `with-equity` marks the last commit that tracked it.
 
 ## Adding a company
 

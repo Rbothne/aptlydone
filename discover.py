@@ -5,16 +5,18 @@
     py discover.py --limit 5       the first 5 buildings per company (for testing)
 
 Writes data/buildings.json. Buildings found before keep their details; one that stops being listed is dropped
-after three discoveries in a row without it.
+after three discoveries in a row without it. A company marked "paused" in managers.json is not searched, and
+its buildings are kept as they are.
 """
 
 import argparse
 import os
 
-from aptrack import discovery, fetch, files
+from aptrack import companies, discovery, fetch, files
 from aptrack.discover import DISCOVERERS
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
+MANAGERS = os.path.join(ROOT, "managers.json")
 BUILDINGS = os.path.join(ROOT, "data", "buildings.json")
 OSM_AGENT = {"User-Agent": "aptrack/0.1 (personal apartment price tracker)"}    # OpenStreetMap asks apps to name themselves
 
@@ -25,11 +27,16 @@ def main():
     parser.add_argument("--limit", type=int, help="first N buildings per company")
     args = parser.parse_args()
 
-    config = files.load(os.path.join(ROOT, "managers.json"), None)
+    config = files.load(MANAGERS, None)
     settings = config["settings"]
     managers = [m for m in config["managers"] if not args.only or m["name"].lower() == args.only.lower()]
     if not managers:
         parser.error(f"no company named {args.only!r} in managers.json")
+    for name, why in companies.paused(managers).items():
+        if args.only:
+            parser.error(f"{name} is paused in managers.json ({why}); delete its \"paused\" entry to bring it back")
+        print(f"{name}: paused ({why}); keeping what is known about it")
+    managers = companies.active(managers)
     get = fetch.polite(settings["delay_seconds"], settings.get("site_delays"))
 
     found = discovery.run_all(managers, DISCOVERERS, get, limit=args.limit, workers=settings.get("workers"))

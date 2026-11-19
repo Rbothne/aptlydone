@@ -16,11 +16,12 @@ import sys
 import time
 from urllib.parse import urlparse
 
-from aptrack import fetch, files, history, output
+from aptrack import companies, fetch, files, history, output
 from aptrack.facts import FACTS
 from aptrack.readers import READERS, NotAnswering, ReadError
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
+MANAGERS = os.path.join(ROOT, "managers.json")
 BUILDINGS = os.path.join(ROOT, "data", "buildings.json")
 STATE = os.path.join(ROOT, "data", "state.json")
 AREA = os.path.join(ROOT, "data", "area.json")      # written by area.py; optional
@@ -199,10 +200,12 @@ def main():
     parser.add_argument("--probe", action="store_true", help="read one building per listing system; write nothing")
     args = parser.parse_args()
 
-    settings = files.load(os.path.join(ROOT, "managers.json"), None)["settings"]
-    buildings = files.load(BUILDINGS, None)
-    if buildings is None:
+    config = files.load(MANAGERS, None)
+    settings = config["settings"]
+    known = files.load(BUILDINGS, None)
+    if known is None:
         sys.exit("data/buildings.json is missing: run discover.py first")
+    buildings = companies.tracked(known, config["managers"])     # a paused company's buildings stay known, and are left alone
     get = fetch.polite(settings["delay_seconds"], settings.get("site_delays"))
     if args.probe:
         sys.exit(0 if probe(buildings, get) else 1)
@@ -221,7 +224,7 @@ def main():
         sys.exit(f"The new history has {len(state['units'])} unit records, under 80% of the {len(before['units'])} before. "
                  "Not saving it.")
     files.save(STATE, state)
-    files.save(BUILDINGS, buildings, indent=1)
+    files.save(BUILDINGS, known, indent=1)
     output.write_site(buildings, results, state, SITE_DATA, files.now(), area=files.load(AREA, None))
 
     count = totals(state, day)

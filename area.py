@@ -10,7 +10,7 @@ import argparse
 import os
 import sys
 
-from aptrack import area, fetch, files
+from aptrack import area, companies, fetch, files
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 BUILDINGS = os.path.join(ROOT, "data", "buildings.json")
@@ -25,8 +25,9 @@ def main():
     buildings = files.load(BUILDINGS, None)
     if buildings is None:
         sys.exit("data/buildings.json is missing: run discover.py first")
-    buildings = [b for b in buildings if b.get("in_region")]
-    settings = files.load(os.path.join(ROOT, "managers.json"), None)["settings"]
+    config = files.load(os.path.join(ROOT, "managers.json"), None)
+    settings = config["settings"]
+    buildings = [b for b in companies.tracked(buildings, config["managers"]) if b.get("in_region")]
     get = fetch.polite(settings["delay_seconds"], settings.get("site_delays"))
 
     collected = area.collect(buildings, files.load(AREA, {}), get, files.today(), files.now(),
