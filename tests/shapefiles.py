@@ -6,13 +6,23 @@ import zipfile
 
 
 def shp(shapes):
-    """shapes: ("point", lon, lat), ("polygon", west, south, east, north) or None for a record without a shape."""
+    """shapes: ("point", lon, lat), ("polygon", west, south, east, north), ("rings", [[(lon, lat), ...], ...]) for an
+    outline given corner by corner (several rings: the later ones are holes or separate pieces), or None for a record without a shape."""
     records = b""
     for number, shape in enumerate(shapes, 1):
         if shape is None:
             content = struct.pack("<i", 0)
         elif shape[0] == "point":
             content = struct.pack("<i2d", 1, shape[1], shape[2])
+        elif shape[0] == "rings":
+            points = [point for ring in shape[1] for point in ring]
+            starts, at = [], 0
+            for ring in shape[1]:
+                starts.append(at)
+                at += len(ring)
+            content = struct.pack("<i4d2i", 5, min(x for x, _ in points), min(y for _, y in points), max(x for x, _ in points),
+                                  max(y for _, y in points), len(starts), len(points))
+            content += b"".join(struct.pack("<i", start) for start in starts) + b"".join(struct.pack("<2d", x, y) for x, y in points)
         else:
             west, south, east, north = shape[1:]
             ring = [(west, south), (west, north), (east, north), (east, south), (west, south)]

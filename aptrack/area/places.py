@@ -37,6 +37,7 @@ KINDS = {                   # OpenStreetMap's kind of place -> the category it c
     "park": "park", "dog_park": "dog_park", "community_centre": "community", "library": "library", "supermarket": "grocery",
     "restaurant": "food", "cafe": "food", "bar": "food", "pub": "food", "fitness_centre": "gym", "pharmacy": "pharmacy",
 }
+OUTLINED = {"park"}         # big, long or oddly shaped: measured to the real outline, not the rectangle around it
 PET_AMENITY = re.compile(r"dog (run|park|wash|spa)|pet (spa|wash|park|grooming|salon)|bark park|paw wash", re.I)
 
 
@@ -52,12 +53,34 @@ def bbox(buildings, margin=0.04):
             round(max(b["lat"] for b in placed) + margin, 3), round(max(b["lon"] for b in placed) + margin, 3))
 
 
-def miles_to(lat, lon, box):
-    """Miles from a point to the nearest edge of a box; 0 when the point is inside it."""
-    south, west, north, east = box
+def miles_to(lat, lon, shape):
+    """Miles from a point to a place: to the nearest edge of its box, or of its outline when the shape carries
+    one (a fifth item: rings of (lat, lon)). 0 when the point is inside."""
+    south, west, north, east = shape[:4]
     dy = max(south - lat, 0, lat - north) * 69.0
     dx = max(west - lon, 0, lon - east) * 69.0 * math.cos(math.radians(lat))
-    return math.hypot(dx, dy)
+    to_box = math.hypot(dx, dy)
+    if len(shape) < 5 or to_box > FAR_MILES:
+        return to_box
+    return outline_miles(lat, lon, shape[4])
+
+
+def outline_miles(lat, lon, rings):
+    """Miles from a point to an outline; 0 inside it. A point inside an odd number of rings is inside the place,
+    so a hole (a ring within a ring) is outside."""
+    wide = 69.0 * math.cos(math.radians(lat))
+    inside, nearest = False, None
+    for ring in rings:
+        flat = [((point_lon - lon) * wide, (point_lat - lat) * 69.0) for point_lat, point_lon in ring]
+        for (x1, y1), (x2, y2) in zip(flat, flat[1:]):
+            if (y1 > 0) != (y2 > 0) and x1 + (x2 - x1) * (0 - y1) / (y2 - y1) > 0:      # this side crosses the line due east of the point
+                inside = not inside
+            dx, dy = x2 - x1, y2 - y1
+            along = 0 if dx == dy == 0 else max(0, min(1, -(x1 * dx + y1 * dy) / (dx * dx + dy * dy)))
+            distance = math.hypot(x1 + along * dx, y1 + along * dy)
+            if nearest is None or distance < nearest:
+                nearest = distance
+    return 0 if inside or nearest is None else nearest
 
 
 def near(buildings, found):
@@ -103,7 +126,7 @@ def state_places(get, url, box, sleep=time.sleep):
     for layer in LAYERS:
         sleep(PAUSE)
         files = extract.members(get, url, [layer + ".shp", layer + ".dbf"])
-        for kind, shape in extract.layer(files[layer + ".shp"], files[layer + ".dbf"]):
+        for kind, shape in extract.layer(files[layer + ".shp"], files[layer + ".dbf"], outlined=OUTLINED):
             if kind in KINDS and overlaps(shape, box):
                 found[KINDS[kind]].append(shape)
     return found

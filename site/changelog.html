@@ -49,10 +49,10 @@
       There is a Walkability slider and a "Most walkable" sort. Today 327 buildings have a Metro station within half a mile and 506 a
       supermarket; 291 sit in the EPA's top walkability band. The places come from OpenStreetMap's daily state files (the public
       OpenStreetMap query servers were all overloaded tonight and ask automated users to stay away), Metro stations from the transit authority's own list.</li>
-    <li><b>Parks are overstated for now.</b> A park is measured to the rectangle around it, not to its real outline, so a building
-      inside the rectangle of a long or large park (Rock Creek, the Parkway) reads "Park next door" when it may be several blocks away.
-      507 of 585 buildings currently count as having a park within a quarter mile, which is too many. Treat "Park nearby" and the park
-      point in the dog score with caution until I measure to the real outline; that is the next fix.</li>
+    <li><b>Parks are measured to their real outline</b> (fixed about 12:30 am; the first version tonight measured to the rectangle
+      around each park, which put half of Northwest DC "next door" to Rock Creek Park). 475 of 585 buildings have a park within a
+      quarter mile. That is still most of them, because OpenStreetMap counts every pocket park, triangle and plaza in DC and Arlington
+      as a park; "Park nearby" narrows little in the city and more in the suburbs.</li>
     <li><b>Equity Residential could not be read from GitHub's servers.</b> All 42 buildings read fine from this computer tonight, which
       is where today's prices come from, but the first automatic run on GitHub failed on every one. I cannot see GitHub's log from here,
       so failed reads now record their reason: a building whose latest read failed says, for example, "Latest read failed (HTTP 403)".

@@ -39,6 +39,20 @@ class ShapesTests(unittest.TestCase):
         self.assertAlmostEqual(places.miles_to(38.95 - 0.5 * MILE, -77.0, box), 0.5, places=2)
         self.assertAlmostEqual(places.miles_to(38.9, -77.0, (38.9 + MILE, -77.0, 38.9 + MILE, -77.0)), 1.0, places=2)
 
+    def test_a_park_is_measured_to_its_outline_not_to_the_rectangle_around_it(self):
+        # an L-shaped park: a strip up the west side and a strip along the south; the rectangle around it is mostly not park
+        south, west, north, east = 38.90, -77.02, 38.90 + 2 * MILE, -77.02 + 2 * MILE / 0.778
+        strip = 0.1 * MILE
+        ell = [(south, west), (north, west), (north, west + strip / 0.778), (south + strip, west + strip / 0.778), (south + strip, east), (south, east), (south, west)]
+        park = (south, west, north, east, [ell])
+        self.assertEqual(places.miles_to(south + strip / 2, west + MILE, park), 0)                     # standing in the southern strip
+        middle = places.miles_to(south + MILE, west + MILE / 0.778, park)                              # the middle of the rectangle
+        self.assertAlmostEqual(middle, 0.9, places=1)
+        self.assertAlmostEqual(places.miles_to(south - 0.3 * MILE, west + MILE, park), 0.3, places=2)  # outside, due south
+        hole = [(south + 0.02 * MILE, west + 0.5 * MILE), (south + 0.08 * MILE, west + 0.5 * MILE), (south + 0.08 * MILE, west + 0.6 * MILE),
+                (south + 0.02 * MILE, west + 0.6 * MILE), (south + 0.02 * MILE, west + 0.5 * MILE)]
+        self.assertGreater(places.miles_to(south + 0.05 * MILE, west + 0.55 * MILE, (south, west, north, east, [ell, hole])), 0)   # in a hole: not in the park
+
     def test_the_kinds_of_place_counted(self):
         self.assertEqual(set(places.CATEGORIES), {"park", "dog_park", "community", "library", "grocery", "metro", "food", "gym", "pharmacy"})
         self.assertEqual(set(places.KINDS.values()) | {"metro"}, set(places.CATEGORIES))
@@ -75,7 +89,10 @@ class FetchTests(QuietTestCase):
         found = places.fetch_all(self.web(), BOX, ["11", "24"], sleep=lambda s: None)
         self.assertEqual(set(found), set(places.CATEGORIES))
         self.assertEqual(sorted(found["grocery"]), [(38.9, -77.0, 38.9, -77.0), (39.0, -77.1, 39.001, -77.099)])     # a point in DC, an outline in Maryland; not the one far away
-        self.assertEqual(found["park"], [(38.93, -77.06, 38.95, -77.04)])
+        self.assertEqual(len(found["park"]), 1)
+        self.assertEqual(found["park"][0][:4], (38.93, -77.06, 38.95, -77.04))
+        self.assertEqual(len(found["park"][0][4][0]), 5)                             # parks keep their outline; nothing else does
+        self.assertTrue(all(len(shape) == 4 for category in found if category != "park" for shape in found[category]))
         self.assertEqual((len(found["food"]), len(found["dog_park"]), len(found["library"]), len(found["community"]), len(found["gym"]), len(found["pharmacy"])),
                          (3, 1, 1, 1, 1, 1))
         self.assertEqual(found["metro"], [(38.9, -77.03, 38.9, -77.03), (38.95, -77.08, 38.95, -77.08)])

@@ -13,6 +13,7 @@ import zlib
 
 TAIL = 65536                # bytes from the end of the zip that normally hold its whole directory
 NEAR = 65536                # members closer together than this are fetched in one request
+POINTS, POLYGONS = (1, 11, 21), (5, 15, 25)        # shapefile shape types: plain, with height, with a measure
 END, ENTRY, LOCAL = b"PK\x05\x06", b"PK\x01\x02", b"PK\x03\x04"
 
 
@@ -83,24 +84,41 @@ def members(get, url, names, tail=TAIL):
     return {name: found[name] for name in names}
 
 
-def boxes(shp):
-    """One (south, west, north, east) per record, or None for a record without a shape. A point is a box of no size."""
+def records(shp):
+    """(kind of shape, where its content starts) for every record of a .shp file."""
     if len(shp) < 100 or struct.unpack(">i", shp[:4])[0] != 9994:
         raise ValueError("not a shapefile")
-    found, at = [], 100
+    at = 100
     while at + 12 <= len(shp):
         words, = struct.unpack(">i", shp[at + 4: at + 8])
-        kind, = struct.unpack("<i", shp[at + 8: at + 12])
-        if kind == 0:
-            found.append(None)
-        elif kind in (1, 11, 21):                                # a point (plain, with height, with a measure)
-            x, y = struct.unpack("<2d", shp[at + 12: at + 28])
-            found.append((y, x, y, x))
-        else:                                                    # every other kind starts with its bounding box
-            west, south, east, north = struct.unpack("<4d", shp[at + 12: at + 44])
-            found.append((south, west, north, east))
+        yield struct.unpack("<i", shp[at + 8: at + 12])[0], at + 8
         at += 8 + 2 * words
-    return found
+
+
+def box(shp, kind, at):
+    """(south, west, north, east) of the shape whose content starts at `at`; None for a record without a shape."""
+    if kind == 0:
+        return None
+    if kind in POINTS:
+        x, y = struct.unpack("<2d", shp[at + 4: at + 20])
+        return (y, x, y, x)
+    west, south, east, north = struct.unpack("<4d", shp[at + 4: at + 36])       # every other kind starts with its bounding box
+    return (south, west, north, east)
+
+
+def rings(shp, at):
+    """The outline of the polygon whose content starts at `at`: a list of rings, each a list of (lat, lon).
+    A second ring inside the first is a hole; one outside it is a separate piece of the same place."""
+    parts, points = struct.unpack("<2i", shp[at + 36: at + 44])
+    starts = list(struct.unpack(f"<{parts}i", shp[at + 44: at + 44 + 4 * parts])) + [points]
+    first = at + 44 + 4 * parts
+    flat = struct.unpack(f"<{2 * points}d", shp[first: first + 16 * points])
+    return [[(flat[2 * i + 1], flat[2 * i]) for i in range(starts[part], starts[part + 1])] for part in range(parts)]
+
+
+def boxes(shp):
+    """One (south, west, north, east) per record, or None for a record without a shape. A point is a box of no size."""
+    return [box(shp, kind, at) for kind, at in records(shp)]
 
 
 def kinds(dbf, column="fclass"):
@@ -120,9 +138,18 @@ def kinds(dbf, column="fclass"):
             for n in range(count)]
 
 
-def layer(shp, dbf):
-    """[(kind, box)] for every record that has a shape."""
-    shapes, names = boxes(shp), kinds(dbf)
-    if len(shapes) != len(names):
-        raise ValueError(f"{len(shapes)} shapes but {len(names)} rows: the layer's two files do not match")
-    return [(name, shape) for name, shape in zip(names, shapes) if shape is not None]
+def layer(shp, dbf, outlined=()):
+    """[(kind, shape)] for every record that has a shape. A shape is its box (south, west, north, east); for the
+    kinds named in `outlined` that are drawn as outlines, the box is followed by the outline's rings."""
+    listed, names = list(records(shp)), kinds(dbf)
+    if len(listed) != len(names):
+        raise ValueError(f"{len(listed)} shapes but {len(names)} rows: the layer's two files do not match")
+    found = []
+    for name, (kind, at) in zip(names, listed):
+        shape = box(shp, kind, at)
+        if shape is None:
+            continue
+        if name in outlined and kind in POLYGONS:
+            shape += (rings(shp, at),)
+        found.append((name, shape))
+    return found

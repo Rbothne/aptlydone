@@ -79,6 +79,18 @@ class ShapefileTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             extract.boxes(b"not a shapefile at all" * 10)
 
+    def test_outlines_are_asked_for_by_kind_and_come_as_rings_of_lat_lon(self):
+        ell = [(-77.02, 38.90), (-77.02, 38.92), (-77.019, 38.92), (-77.019, 38.901), (-77.00, 38.901), (-77.00, 38.90), (-77.02, 38.90)]
+        hole = [(-77.0195, 38.905), (-77.0192, 38.905), (-77.0192, 38.91), (-77.0195, 38.905)]
+        shp = shapefiles.shp([("rings", [ell, hole]), ("polygon", -77.06, 38.93, -77.04, 38.95), ("point", -77.03, 38.90)])
+        got = extract.layer(shp, shapefiles.dbf(["park", "supermarket", "park"]), outlined={"park"})
+        self.assertEqual([kind for kind, _ in got], ["park", "supermarket", "park"])
+        park = got[0][1]
+        self.assertEqual(park[:4], (38.90, -77.02, 38.92, -77.00))
+        self.assertEqual(park[4], [[(lat, lon) for lon, lat in ell], [(lat, lon) for lon, lat in hole]])
+        self.assertEqual(got[1][1], (38.93, -77.06, 38.95, -77.04))               # not asked for: the box alone
+        self.assertEqual(got[2][1], (38.90, -77.03, 38.90, -77.03))               # a point has no outline
+
     def test_kinds_are_the_fclass_column(self):
         self.assertEqual(extract.kinds(shapefiles.dbf(["supermarket", "bench", "park"])), ["supermarket", "bench", "park"])
 
