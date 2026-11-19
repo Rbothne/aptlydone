@@ -261,7 +261,7 @@ function noPrices() {
   return h("details", { class: "noprices" },
     h("summary", null, `${plural(silent.length, "building")} with no prices published right now`),
     h("ul", null, silent.map((b) => h("li", null,
-      h("a", { href: b.url, target: "_blank", rel: "noopener" }, b.name), ` · ${[b.neighborhood, b.manager].filter(Boolean).join(" · ")}`))));
+      h("a", { href: b.url, target: "_blank", rel: "noopener" }, b.name), ` · ${[b.neighborhood, b.manager, b.expired ? staleText(b) : null].filter(Boolean).join(" · ")}`))));
 }
 
 // ---------- drawing ----------

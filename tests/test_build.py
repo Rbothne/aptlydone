@@ -281,6 +281,21 @@ class WriteSiteTests(QuietTestCase):
         self.build_and_write([bozzuto(in_region=False, county="24510")], GOOD, history.new_state())
         self.assertEqual((self.load("index.json")["buildings"], self.load("index.json")["counties"]), ([], {}))
 
+    def test_prices_not_confirmed_for_several_days_are_withdrawn_until_the_building_reads_again(self):
+        state = history.new_state()
+        down = dict(GOOD, **{CAMDEN_FEED: OSError("HTTP 403")})
+        self.build_and_write([bozzuto(), camden()], GOOD, state)                                          # read on DAY, 18 November
+        self.build_and_write([bozzuto(), camden()], down, state, now="2026-11-21T12:00Z", day="2026-11-21")
+        three_days = {b["id"]: b for b in self.load("index.json")["buildings"]}["camden-noma"]
+        self.assertEqual((three_days["stale"], three_days["units"], three_days["expired"]), (True, 5, False))
+        self.build_and_write([bozzuto(), camden()], down, state, now="2026-11-22T12:00Z", day="2026-11-22")
+        four_days = {b["id"]: b for b in self.load("index.json")["buildings"]}["camden-noma"]
+        self.assertEqual((four_days["stale"], four_days["units"], four_days["expired"], four_days["read"]), (True, 0, True, DAY))
+        self.assertFalse([u for u in self.load("units-11001.json")["units"] if u["building"] == "camden-noma"])
+        self.build_and_write([bozzuto(), camden()], GOOD, state, now="2026-11-23T12:00Z", day="2026-11-23")
+        back = {b["id"]: b for b in self.load("index.json")["buildings"]}["camden-noma"]
+        self.assertEqual((back["stale"], back["units"], back["expired"]), (False, 5, False))
+
     def test_failed_building_keeps_previous_units_in_output(self):
         state = history.new_state()
         self.build_and_write([bozzuto(), camden()], GOOD, state)

@@ -53,10 +53,14 @@
       around each park, which put half of Northwest DC "next door" to Rock Creek Park). 475 of 585 buildings have a park within a
       quarter mile. That is still most of them, because OpenStreetMap counts every pocket park, triangle and plaza in DC and Arlington
       as a park; "Park nearby" narrows little in the city and more in the suburbs.</li>
-    <li><b>Equity Residential could not be read from GitHub's servers.</b> All 42 buildings read fine from this computer tonight, which
-      is where today's prices come from, but the first automatic run on GitHub failed on every one. I cannot see GitHub's log from here,
-      so failed reads now record their reason: a building whose latest read failed says, for example, "Latest read failed (HTTP 403)".
-      If Equity turns out to refuse GitHub's servers, I will not work around that; its prices would then only refresh when the tracker is run from this computer.</li>
+    <li><b>Equity Residential refuses GitHub's servers.</b> All 42 buildings read fine from this computer, which is where tonight's
+      Equity prices come from, but every automatic run on GitHub gets "HTTP 403" (refused). I do not work around a refusal. So for now
+      each Equity building says "Latest read failed (HTTP 403); showing Nov 19". <b>Your call:</b> keep Equity and refresh it by running
+      the tracker on this computer now and then, or drop it. Until you decide, see the next item.</li>
+    <li><b>Prices nobody has confirmed for more than three days are withdrawn.</b> A building whose reads keep failing keeps its last
+      prices for three days, marked as such, and after that is listed under "no prices published" with "Not read since Nov 19 (HTTP 403);
+      prices withdrawn until it reads again". Once withdrawn they no longer count when other units are compared. Three days is my call.</li>
+    <li><b>A failed read now says why</b> on the building ("HTTP 403", "timed out", "units listed, none with a price").</li>
     <li><b>Google Maps key in Setup</b>, with the times you leave for and from work. With a key, drive times become rush-hour times for
       the next weekday, morning and evening. The key stays in your browser. <b>I could not test this against Google</b> because that needs a key;
       it is written to Google's documentation. Tell me what you see the first time.</li>

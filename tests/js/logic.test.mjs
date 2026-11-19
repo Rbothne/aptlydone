@@ -445,3 +445,9 @@ test("a building whose latest read failed says so, since when, and why if known"
   assert.equal(staleText({ stale: true, read: "2026-11-19", why: null }), "Latest read failed; showing Nov 19");
   assert.equal(staleText({ stale: true, read: null }), "Latest read failed; showing earlier data");
 });
+
+test("a building not read for days says its prices were withdrawn", async () => {
+  const { staleText } = await import("../../site/js/logic.js");
+  assert.equal(staleText({ stale: true, expired: true, read: "2026-11-19", why: "HTTP 403" }), "Not read since Nov 19 (HTTP 403); prices withdrawn until it reads again");
+  assert.equal(staleText({ stale: true, expired: true, read: "2026-11-19" }), "Not read since Nov 19; prices withdrawn until it reads again");
+});

@@ -360,6 +360,9 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 /** The note on a building whose latest read failed: since when its figures date, and why if the run recorded it. */
 export function staleText(building) {
   if (!building.stale) return "";
+  if (building.expired && building.read) {
+    return `Not read since ${shortDate(building.read)}${building.why ? ` (${building.why})` : ""}; prices withdrawn until it reads again`;
+  }
   return `Latest read failed${building.why ? ` (${building.why})` : ""}; showing ${building.read ? shortDate(building.read) : "earlier data"}`;
 }
 

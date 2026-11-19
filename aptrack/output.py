@@ -1,5 +1,6 @@
 """The files the page loads: index.json (buildings and counts) and one units-<county>.json per county."""
 
+import datetime
 import os
 
 from . import costs, deals, files
@@ -10,15 +11,22 @@ from .facts import laundry
 
 BUILDING_FIELDS = ("id", "name", "manager", "url", "platform", "address", "lat", "lon", "state", "county", "tract",
                    "neighborhood", "zip", "first_seen")
+KEEP_UNREAD_DAYS = 3        # a building not read for longer than this has its prices withdrawn
 FACT_FIELDS = ("special", "rating", "rating_count", "coming_soon", "features", "laundry", "pets", "parking", "manager_area")
 
 
-def assemble(buildings, results, state, out_dir):
+def days_since(day, today):
+    return (datetime.date.fromisoformat(today) - datetime.date.fromisoformat(day)).days
+
+
+def assemble(buildings, results, state, out_dir, today=None):
     """(building entries, units by building id) for every building in the region.
 
     `results` holds this run's successful reads by building id. A building whose read failed keeps the units,
-    fees and amenities written last time, and is marked stale. A building whose facts could not be read keeps
-    the facts written last time.
+    fees and amenities written last time, and is marked stale. After more than KEEP_UNREAD_DAYS without a
+    successful read its prices are withdrawn (it is listed with no units, marked expired) until it reads again:
+    a price nobody has confirmed for days is not one to compare others against. A building whose facts could
+    not be read keeps the facts written last time.
     """
     before = {b["id"]: b for b in files.load(os.path.join(out_dir, "index.json"), {}).get("buildings", [])}
     before_units = {}
@@ -44,10 +52,14 @@ def assemble(buildings, results, state, out_dir):
             fees, amenities = result["fees"], result["amenities"]
         else:
             units, fees, amenities = previous_units(building), old.get("fees", []), old.get("amenities", [])
+        expired = bool(not result and today and status.get("failed") and status.get("ok")
+                       and days_since(status["ok"], today) > KEEP_UNREAD_DAYS)
+        if expired:
+            units = []
 
         entry = {key: building.get(key) for key in BUILDING_FIELDS}
         entry.update(units=len(units), fees=fees, amenities=amenities,
-                     stale=bool(status.get("failed")), read=status.get("ok"), why=status.get("why") if status.get("failed") else None)
+                     stale=bool(status.get("failed")), expired=expired, read=status.get("ok"), why=status.get("why") if status.get("failed") else None)
         facts = (result or {}).get("facts")
         if facts is not None:
             features = facts.get("features") or []
@@ -89,7 +101,7 @@ def price(entries, units_of):
 def write_site(buildings, results, state, out_dir, now, area=None):
     """`area` is what area.py collected (census, crime, rent trends), or None when it has not run yet."""
     area = area or {}
-    entries, units_of = assemble(buildings, results, state, out_dir)
+    entries, units_of = assemble(buildings, results, state, out_dir, today=now[:10])
     projects = area.get("affordable") or {}
     for entry in entries:                      # before pricing, so restricted units are neither tagged nor used as comparisons
         entry["affordable"] = projects.get(entry["id"])
