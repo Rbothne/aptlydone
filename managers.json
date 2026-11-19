@@ -14,6 +14,7 @@
     {"name": "AvalonBay", "site": "www.avaloncommunities.com", "discover": "avalon"},
     {"name": "WC Smith", "site": "wcsmith.com", "discover": "wcsmith"},
     {"name": "Equity Residential", "site": "www.equityapartments.com", "discover": "equity"},
+    {"name": "UDR", "site": "www.udr.com", "discover": "udr"},
     {"name": "Cortland", "site": "cortland.com", "discover": "generic",
      "list": "https://cortland.com/apartments/northern-virginia-and-dc-metro/",
      "pattern": "https://cortland\\.com/apartments/(?![a-z0-9-]*-metro/)[a-z0-9-]+/",

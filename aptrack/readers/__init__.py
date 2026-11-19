@@ -10,7 +10,7 @@ class NotAnswering(ReadError):
     Several of these in a row mean the site has stopped answering properly, not that one building changed."""
 
 
-from . import avalon, camden, equity, rentpress, sightmap  # noqa: E402  (ReadError must exist before the readers import it)
+from . import avalon, camden, equity, rentpress, sightmap, udr  # noqa: E402  (ReadError must exist before the readers import it)
 
 READERS = {
     "sightmap": sightmap.read,
@@ -18,4 +18,5 @@ READERS = {
     "avalon": avalon.read,
     "rentpress": rentpress.read,
     "equity": equity.read,
+    "udr": udr.read,
 }
