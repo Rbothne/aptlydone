@@ -45,6 +45,8 @@ def collect(buildings, previous, get, today, now, parts=PARTS, post=None, sleep=
             try:
                 if county in crime.NEEDS_PLACING:
                     incidents = reader(get, start, end, post=post, cache=area.setdefault("geocache", {}))
+                elif county in crime.NEEDS_POST:
+                    incidents = reader(get, start, end, post=post)
                 else:
                     incidents = reader(get, start, end)
             except Exception as error:

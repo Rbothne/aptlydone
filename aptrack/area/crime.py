@@ -286,10 +286,63 @@ def alexandria(get, start, today, post=None, cache=None):
     return source.incidents(get, start, today, place=place, cache=cache if cache is not None else {})
 
 
-# county FIPS -> reader(get, start day, end day); a reader in NEEDS_PLACING also takes post= and cache= to geocode addresses
+# ---------- Howard County, MD and Loudoun County, VA: public Power BI dashboards ----------
+
+HOWARD_VIEW = ("https://app.powerbigov.us/view?r=eyJrIjoiNjlkMThlZTktZGZiNi00MThkLThhMzAtYTQ0MjQ1MGJlNGI0IiwidCI6IjA1MzgxMzA4LTAzNjYtNGJi"
+               "Ny1hOTViLTk1MzA0YmQxMWE1OCJ9")
+LOUDOUN_VIEW = ("https://app.powerbigov.us/view?r=eyJrIjoiZTgyMTFiZjktMDg4MC00MmZjLTlmZGQtMjg1YjQ5ODY3NmNhIiwidCI6IjU5MGYxNzAyLThhMzYtNDkz"
+                "MS04ZjJmLWQzNWEwNmRkYzRjOCJ9")
+
+
+def by_incident(rows, incident_of):
+    """Rows of (id, time in milliseconds, lat, lon, NIBRS code) -> {(incident, kind): (lat, lon, kind, day)}."""
+    found = {}
+    for name, when, lat, lon, code in rows:
+        kind = classify_nibrs(code)
+        if not kind or lat is None or lon is None or when is None:
+            continue
+        day = datetime.datetime.fromtimestamp(when / 1000, datetime.timezone.utc).date().isoformat()
+        found[(incident_of(name), kind)] = (lat, lon, kind, day)
+    return found
+
+
+def howard_incidents(rows):
+    """One incident counts once, as violent if any of its charges is, else as property."""
+    found = by_incident(rows, lambda name: name)
+    return [incident for (name, kind), incident in found.items() if kind == "violent" or (name, "violent") not in found]
+
+
+def loudoun_incidents(rows):
+    """The Sheriff's Office lists offences ("Offense v4 SO170017201 1 ..."); one incident counts once per kind."""
+    def incident_of(name):
+        parts = str(name).split()
+        return parts[2] if len(parts) > 2 else name
+    return list(by_incident(rows, incident_of).values())
+
+
+def howard(get, start, today, post=None):
+    """Howard County Police's crime dashboard: reported incidents with a point, and their charges by NIBRS code."""
+    from . import powerbi
+    rows = powerbi.rows(get, post, HOWARD_VIEW, {"p": "LW_LOCATIONS_POINT_CA", "c": "LW_Charges"},
+                        [("p", "INCI_ID"), ("p", "DATE_REPT"), ("p", "LAT"), ("p", "LONG"), ("c", "NIBRSCode")], ("p", "DATE_REPT"), start)
+    return since(howard_incidents(rows), start)
+
+
+def loudoun(get, start, today, post=None):
+    """The Loudoun County Sheriff's crime dashboard. It leaves out the towns' own police (Leesburg, Purcellville)."""
+    from . import powerbi
+    rows = powerbi.rows(get, post, LOUDOUN_VIEW, {"o": "offenses"},
+                        [("o", "metadata__primary_key"), ("o", "date_reported_on_v2"), ("o", "latitude"), ("o", "longitude"), ("o", "ibr_code")],
+                        ("o", "date_reported_on_v2"), start)
+    return since(loudoun_incidents(rows), start)
+
+
+# county FIPS -> reader(get, start day, end day); a reader in NEEDS_PLACING also takes post= and cache= to geocode addresses,
+# and one in NEEDS_POST takes post= because its source is asked with a request body
 SOURCES = {"11001": dc, "24031": montgomery, "24033": prince_georges, "51059": fairfax, "51013": arlington, "51510": alexandria,
-           "51153": prince_william}
+           "51153": prince_william, "24027": howard, "51107": loudoun}
 NEEDS_PLACING = {"51510"}
+NEEDS_POST = {"24027", "51107"}
 # Counties whose data has stopped: the fixed (start, end) their reader is asked for, shown beside their counts.
 FROZEN = {"51013": ("2021-06-28", "2022-06-28")}
 
