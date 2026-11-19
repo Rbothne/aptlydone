@@ -107,6 +107,12 @@ class RecordTests(unittest.TestCase):
         history.record_failure(self.state, "b9", D1)
         self.assertEqual(self.state["buildings"]["b9"], {"ok": None, "failed": D1})
 
+    def test_a_failure_can_say_why_and_a_success_forgets_it(self):
+        history.record_failure(self.state, "b1", D1, why="HTTP 403")
+        self.assertEqual(self.state["buildings"]["b1"], {"ok": None, "failed": D1, "why": "HTTP 403"})
+        self.record(D2, unit("101", 2700))
+        self.assertEqual(self.state["buildings"]["b1"], {"ok": D2, "failed": None})
+
     def test_success_clears_failure(self):
         history.record_failure(self.state, "b1", D1)
         self.record(D2, unit("101", 2700))

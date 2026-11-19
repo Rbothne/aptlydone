@@ -71,14 +71,14 @@ class RunTests(QuietTestCase):
         results = self.run_it([bozzuto(), camden()], {API: fixture("sightmap_feed.json"), CAMDEN_FEED: OSError("timed out")})
         self.assertEqual(set(results), {"bozzuto-5333-connecticut"})
         self.assertEqual(len(results["bozzuto-5333-connecticut"]["units"]), 5)
-        self.assertEqual(self.state["buildings"]["camden-noma"], {"ok": None, "failed": DAY})
+        self.assertEqual(self.state["buildings"]["camden-noma"], {"ok": None, "failed": DAY, "why": "timed out"})
         self.assertEqual((self.state["buildings"]["bozzuto-5333-connecticut"]["ok"],
                           self.state["buildings"]["bozzuto-5333-connecticut"]["failed"]), (DAY, None))
         self.assertEqual(len(self.state["units"]), 5)
 
     def test_unreadable_page_counts_as_failure(self):
         self.run_it([camden()], {CAMDEN_FEED: "<html>Access denied</html>"})
-        self.assertEqual(self.state["buildings"]["camden-noma"], {"ok": None, "failed": DAY})
+        self.assertEqual(self.state["buildings"]["camden-noma"], {"ok": None, "failed": DAY, "why": "no page data"})
 
     def test_rate_limited_host_is_retried_after_others(self):
         results = self.run_it([camden(), bozzuto()],
@@ -204,6 +204,20 @@ class RunTests(QuietTestCase):
         self.assertEqual(building["feed_api"], API)
 
 
+class ReasonTests(unittest.TestCase):
+    def test_a_short_reason_for_each_kind_of_failure(self):
+        import urllib.error
+        refused = urllib.error.HTTPError("https://x.test/a", 403, "Forbidden", {}, None)
+        self.assertEqual(build.reason(refused), "HTTP 403")
+        refused.close()
+        self.assertEqual(build.reason(TimeoutError("The read operation timed out")), "timed out")
+        self.assertEqual(build.reason(fetch.Gone("https://x.test/a")), "page not found")
+        self.assertEqual(build.reason(fetch.RateLimited("https://x.test/a")), "too many requests")
+        self.assertEqual(build.reason(OSError("down")), "down")
+        self.assertEqual(build.reason(ValueError("x" * 300)), "x" * 100)
+        self.assertEqual(build.reason(KeyError()), "KeyError")
+
+
 class FailureShareTests(unittest.TestCase):
     def test_too_many_failures(self):
         chosen = [{"id": str(n)} for n in range(10)]
@@ -274,7 +288,9 @@ class WriteSiteTests(QuietTestCase):
                              now="2026-11-19T12:00Z", day="2026-11-19")
         by_id = {b["id"]: b for b in self.load("index.json")["buildings"]}
         self.assertEqual((by_id["camden-noma"]["stale"], by_id["camden-noma"]["units"], by_id["camden-noma"]["read"]), (True, 5, DAY))
+        self.assertEqual(by_id["camden-noma"]["why"], "down")                       # what went wrong, for the page to say
         self.assertFalse(by_id["bozzuto-5333-connecticut"]["stale"])
+        self.assertIsNone(by_id["bozzuto-5333-connecticut"]["why"])
         units = self.load("units-11001.json")["units"]
         self.assertEqual(len([u for u in units if u["building"] == "camden-noma"]), 5)
         self.assertEqual(len(units), 10)

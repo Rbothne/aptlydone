@@ -47,7 +47,7 @@ def assemble(buildings, results, state, out_dir):
 
         entry = {key: building.get(key) for key in BUILDING_FIELDS}
         entry.update(units=len(units), fees=fees, amenities=amenities,
-                     stale=bool(status.get("failed")), read=status.get("ok"))
+                     stale=bool(status.get("failed")), read=status.get("ok"), why=status.get("why") if status.get("failed") else None)
         facts = (result or {}).get("facts")
         if facts is not None:
             features = facts.get("features") or []

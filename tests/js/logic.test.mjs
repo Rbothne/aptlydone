@@ -437,3 +437,11 @@ test("the tag drop-down: groups, what is chosen, and its label", async () => {
   assert.deepEqual(setTag(setTag(f(), "local", true), "local", true).deals, ["local"]);       // choosing twice is choosing once
   assert.equal(tagsLabel({ ...f(), tagged: true, deals: undefined }), "Absolute steal + 2 more");
 });
+
+test("a building whose latest read failed says so, since when, and why if known", async () => {
+  const { staleText } = await import("../../site/js/logic.js");
+  assert.equal(staleText({ stale: false }), "");
+  assert.equal(staleText({ stale: true, read: "2026-11-19", why: "HTTP 403" }), "Latest read failed (HTTP 403); showing Nov 19");
+  assert.equal(staleText({ stale: true, read: "2026-11-19", why: null }), "Latest read failed; showing Nov 19");
+  assert.equal(staleText({ stale: true, read: null }), "Latest read failed; showing earlier data");
+});

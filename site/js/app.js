@@ -2,7 +2,7 @@
 
 import {
   DEFAULT_FILTERS, TAG_GROUPS, affordable, affordableNote, ago, areaFacts, countiesLabel, countyGroups, availability, cost, crimeText, criteriaFilters, criteriaFrom, criteriaLabel, driveLabel, incomeNeeded,
-  availableNote, dogText, isSteal, mapPoints, nearbyTags, standing, unitTitle, walkText, groupBuildings, money, perSqft, shortDate, sparkline, tagLabel, tagReason, tagsLabel, chosenTags, setTag, unitMatches,
+  availableNote, dogText, isSteal, mapPoints, nearbyTags, standing, unitTitle, walkText, groupBuildings, money, perSqft, shortDate, sparkline, staleText, tagLabel, tagReason, tagsLabel, chosenTags, setTag, unitMatches,
 } from "./logic.js";
 import { driveTimes, geocode, trafficTimes } from "./commute.js";
 import { createStore } from "./store.js";
@@ -202,7 +202,7 @@ function facts(building) {
   if (affordableNote(building.affordable)) items.push([affordableNote(building.affordable), "stale"]);
   if (building.coming_soon) items.push(["Coming soon"]);
   if (building.senior) items.push(["Senior housing"]);
-  if (building.stale) items.push([`Latest read failed; showing ${building.read ? shortDate(building.read) : "earlier data"}`, "stale"]);
+  if (building.stale) items.push([staleText(building), "stale"]);
   return h("ul", { class: "facts" }, items.map(([text, kind, title]) => h("li", { class: kind || null, title: title || null }, text)),
     building.zip && h("li", { class: "plain" }, h("button", {
       type: "button", title: `Hide every building in ZIP code ${building.zip}`, onclick: () => setNogo(building.zip, true),

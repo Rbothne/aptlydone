@@ -72,13 +72,19 @@ def record(state, building_id, units, day):
         if key.startswith(building_id + "|") and key not in by_plan:
             put(series["points"], [day, None, None, 0])
 
-    state["buildings"].setdefault(building_id, {}).update(ok=day, failed=None)
+    status = state["buildings"].setdefault(building_id, {})
+    status.update(ok=day, failed=None)
+    status.pop("why", None)
 
 
-def record_failure(state, building_id, day):
-    """A failed read: remember that it failed, and leave every unit as it was."""
+def record_failure(state, building_id, day, why=None):
+    """A failed read: remember that it failed (and why, in a few words), and leave every unit as it was."""
     building = state["buildings"].setdefault(building_id, {"ok": None, "failed": None})
     building["failed"] = day
+    if why:
+        building["why"] = why
+    else:
+        building.pop("why", None)
 
 
 def record_special(state, building_id, text, day):

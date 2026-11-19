@@ -66,6 +66,19 @@ def host(building):
     return urlparse(building.get("feed_api") or building["feed"]).netloc
 
 
+def reason(error):
+    """A failed read in a few words, for the page: "HTTP 403", "timed out", or the error's own message."""
+    if getattr(error, "code", None):
+        return f"HTTP {error.code}"
+    if isinstance(error, fetch.Gone):
+        return "page not found"
+    if isinstance(error, fetch.RateLimited):
+        return "too many requests"
+    if isinstance(error, TimeoutError) or "timed out" in str(error):
+        return "timed out"
+    return str(error)[:100] or type(error).__name__
+
+
 def site_trouble(error):
     """Is this failure about the site (not answering, or answering with something that is not its data),
     as opposed to one building's listing being unusable?"""
@@ -128,7 +141,7 @@ def run(buildings, state, get, day, *, workers=4, sleep=time.sleep):
     for building, result, error in outcomes:
         if error:
             print(f"  failed {building['id']}: {error!r}")
-            history.record_failure(state, building["id"], day)
+            history.record_failure(state, building["id"], day, why=reason(error))
             continue
         history.record(state, building["id"], result["units"], day)
         if result["facts"] is not None and "special" in result["facts"]:

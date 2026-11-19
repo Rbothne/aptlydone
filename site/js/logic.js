@@ -357,6 +357,12 @@ export function perSqft(unit) {
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+/** The note on a building whose latest read failed: since when its figures date, and why if the run recorded it. */
+export function staleText(building) {
+  if (!building.stale) return "";
+  return `Latest read failed${building.why ? ` (${building.why})` : ""}; showing ${building.read ? shortDate(building.read) : "earlier data"}`;
+}
+
 export function shortDate(day) {
   if (!day) return "";
   const [, month, date] = day.split("-").map(Number);
