@@ -388,3 +388,17 @@ The owner asked for these to be decided and published without check-ins; each is
 - **First-visit setup** asks for bedrooms, size, budget, move-in date, work address, longest drive and income. Income only drives a "needs income of $X" note (rent above a third of monthly income).
 - **Sturdiness:** a site that stops answering is left alone after three failures in a row and come back to once, at the default speed; the same for a manager's facts pages and for discovery; a company that suddenly lists under half its buildings is not believed.
 - **Speed:** SightMap and Bozzuto are read at four requests a second after a ramp test; everything else stays at one.
+
+## 18. Round two (2026-11-18, night)
+
+Asked for by the owner after reading the changelog.
+
+- **Nearby places.** One OpenStreetMap (Overpass) query per kind of place for the whole region each week: parks, dog parks, community centers, libraries, supermarkets, Metro stations, places to eat, gyms, pharmacies. Each building stores, per kind, how many are within half a mile and the distance to the nearest (up to two miles). Parks and other outlined places are measured to their edge. The page prints a "Nearby" line and has filters for Near Metro, Grocery nearby (both half a mile) and Park nearby (a quarter mile).
+- **Walkability** is the EPA's National Walkability Index for the building's block group, 1 to 20, with the EPA's own four bands. It is a filter (slider) and a sort. Walk Score itself needs a paid key and is not used.
+- **Dog-friendly** is a 1-to-5 score, only for buildings that say pets are allowed: one point for that, two for a dog park within half a mile (one if within a mile), one for a park within a quarter mile, one for a dog run, pet spa or similar on site. The "Dog-friendly" filter means 3 or more **(call: the points and the cut-off)**.
+- **Crime.** Two more readers. Alexandria publishes no map layer, but its police search form returns every incident for a date range with a block address; it is read a week at a time, and the blocks are placed with the Census batch geocoder and remembered. Prince William publishes a map layer. Seven counties now. Still none found for Howard, Loudoun (fire incidents only), Anne Arundel (yearly totals by district), Falls Church (a layer last updated in 2017) and Manassas Park.
+- **Rush-hour drive times.** Setup takes a Google Maps key and the hours the owner leaves for and from work. With a key, the browser asks Google's Routes service for traffic-aware times for the next weekday, morning and evening, and the card shows both. The key is kept only in that browser and is left out of the settings export. Built to Google's documentation; not yet run against the live service.
+- **Settings as text.** Setup can copy or save everything this browser remembers (filters, followed units and buildings, no-go ZIPs, work place, income) as text, and load it back in another browser.
+- **Areas** are chosen from a drop-down of counties grouped by state, any number at once, with "Virginia (all)" style group boxes. No selection means the whole region.
+- **Laundry filter removed**; the laundry chip still shows where a building says.
+- **Companies by configuration.** A `generic` discoverer reads a company from one `managers.json` line (sitemap, a pattern for building pages, sub-pages to look on for a SightMap unit map), so most new companies need no code.

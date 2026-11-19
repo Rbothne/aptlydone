@@ -143,6 +143,41 @@ async function run() {
     doc.querySelector("#nogo button").click();
     out.afterNogoRemoved = count();
   }
+  // nearby places, walkability and dogs
+  out.nearbyLine = (doc.querySelector(".nearby") || {}).textContent || null;
+  out.walkChip = [...doc.querySelectorAll(".facts li")].map((li) => li.textContent).find((t) => /walk/i.test(t)) || null;
+  out.dogChip = [...doc.querySelectorAll(".facts li")].map((li) => li.textContent).find((t) => /dog/i.test(t)) || null;
+  const all = count();
+  for (const name of ["nearMetro", "nearGrocery", "nearPark", "dogFriendly"]) {
+    doc.querySelector(`[data-toggle="${name}"]`).click();
+    out[name] = count();
+    doc.querySelector(`[data-toggle="${name}"]`).click();
+  }
+  out.togglesReleased = count() === all;
+  slide("minWalk", "16");
+  out.walk16 = count();
+  out.walk16Label = doc.getElementById("minWalkOut").textContent;
+  const walkScores = () => [...doc.querySelectorAll(".facts li")].map((li) => (li.textContent.match(/Walkability ([\d.]+)/) || [])[1]).filter(Boolean).map(Number);
+  out.walk16Lowest = Math.min(...walkScores());
+  set("sort", "walk");
+  out.mostWalkableFirst = walkScores()[0];
+  doc.getElementById("reset").click();
+  // the Google key stays in this browser and out of the export
+  doc.getElementById("setupbtn").click();
+  doc.getElementById("s-key").value = "TEST-KEY-not-real";
+  doc.getElementById("s-leave").value = "07:15";
+  doc.getElementById("s-go").click();
+  await wait(200);
+  const kept = JSON.parse(win.localStorage.getItem("apt.settings"));
+  out.keyKept = kept.googleKey === "TEST-KEY-not-real" && kept.leave === "07:15";
+  doc.getElementById("setupbtn").click();
+  doc.getElementById("x-copy").click();
+  await wait(100);
+  out.keyNotExported = !doc.getElementById("x-text").value.includes("TEST-KEY");
+  doc.getElementById("s-key").value = "";
+  doc.getElementById("s-go").click();
+  await wait(200);
+  out.keyCleared = JSON.parse(win.localStorage.getItem("apt.settings")).googleKey == null;
   doc.querySelector('[data-tab="map"]').click();
   await wait(1500);
   out.mapDots = doc.querySelectorAll("#mapbox path.leaflet-interactive").length;
