@@ -42,6 +42,10 @@
       <button type="button" data-toggle="ground" aria-pressed="false">Ground floor</button>
       <button type="button" data-toggle="parking" aria-pressed="false">Parking</button>
       <button type="button" data-toggle="pets" aria-pressed="false">Pets</button>
+      <button type="button" data-toggle="dogFriendly" aria-pressed="false" title="Pets allowed, plus at least two of: a dog park within half a mile, a park within a quarter mile, a dog run or pet spa on site">Dog-friendly</button>
+      <button type="button" data-toggle="nearMetro" aria-pressed="false" title="A Metro station within half a mile">Near Metro</button>
+      <button type="button" data-toggle="nearGrocery" aria-pressed="false" title="A supermarket within half a mile">Grocery nearby</button>
+      <button type="button" data-toggle="nearPark" aria-pressed="false" title="A park within a quarter mile">Park nearby</button>
       <button type="button" data-toggle="tagged" aria-pressed="false">Tagged only</button>
       <button type="button" data-toggle="highEnd" aria-pressed="false" title="Buildings whose one-bedroom cost per sqft is in the top third of buildings within two miles">High-end</button>
       <button type="button" data-toggle="showRestricted" aria-pressed="false" title="Income-restricted units and senior housing are hidden unless this is on">Income-restricted &amp; senior</button>
@@ -49,6 +53,9 @@
 
     <label title="Reported homicides, sex offences, robberies and aggravated assaults within half a mile in the past 12 months. Buildings in counties that publish no incident data are hidden while this is set.">Violent crime nearby
       <input type="range" id="maxViolent" min="0" max="61" step="1" value="61"> <output id="maxViolentOut" for="maxViolent">any</output></label>
+
+    <label title="The EPA's walkability index for the block: 1 is least walkable, 20 is most. Above 15 is the top band.">Walkability
+      <input type="range" id="minWalk" min="0" max="19" step="1" value="0"> <output id="minWalkOut" for="minWalk">any</output></label>
 
     <label title="Drive time from your work address, ignoring traffic. Set a work address below first.">Max drive
       <input type="range" id="maxDrive" min="10" max="95" step="5" value="95"> <output id="maxDriveOut" for="maxDrive">any</output></label>
@@ -70,6 +77,7 @@
       <option value="newest">Newest listings</option>
       <option value="size">Largest</option>
       <option value="drive">Shortest drive to work</option>
+      <option value="walk">Most walkable</option>
     </select></label>
     <button type="button" class="pill" id="reset">Reset</button>
     <button type="button" class="pill" id="setupbtn">Setup</button>
@@ -156,6 +164,10 @@
   (so far: <span id="crime-counties">none</span>). Counties count offences differently, so compare across a border with care, and county figures can miss incidents handled by a
   city's own police. Arlington's counts are from the last year it published locations, June 2021 to June 2022.
   <b>About the area</b> figures are for the census tract (American Community Survey, 5-year) and the ZIP code (Zillow's rent index).</p>
+  <p><b>Nearby</b> places are from OpenStreetMap, measured in a straight line from the building; parks are measured to their edge.
+  <b>Walkability</b> is the EPA's National Walkability Index for the block (1 to 20). <b>Dog-friendly</b> is out of 5: one point for
+  allowing pets, two for a dog park within half a mile (one if within a mile), one for a park within a quarter mile, one for a dog run
+  or pet spa on site; a building that does not say it allows pets gets no score.</p>
   <p><b>Drive times</b> are free-flow times with no traffic, so they compare buildings fairly but understate a rush-hour commute.
   Your work address is kept in this browser only. To time drives it is sent to the OpenStreetMap Nominatim service to find its
   coordinates, and those coordinates are sent to the public OSRM routing server along with the buildings' locations.</p>

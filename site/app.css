@@ -107,6 +107,8 @@ h3.group { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; co
 .facts li.unknown { background: none; border: 1px dashed var(--line); color: var(--muted); }
 .facts li.stale { background: none; border: 1px solid var(--warn); color: var(--warn); }
 
+.nearby { margin: 0 14px 10px; color: var(--muted); font-size: 12.5px; }
+.nearby b { color: var(--ink); font-weight: 600; }
 .area { margin: 0 14px 10px; color: var(--muted); font-size: 12.5px; }
 .area summary { cursor: pointer; width: fit-content; }
 .area ul { margin: 4px 0 0; padding-left: 18px; color: var(--ink); }

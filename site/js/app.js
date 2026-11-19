@@ -2,7 +2,7 @@
 
 import {
   DEFAULT_FILTERS, affordable, affordableNote, ago, areaFacts, countiesLabel, countyGroups, availability, cost, crimeText, criteriaFilters, criteriaFrom, criteriaLabel, driveLabel, incomeNeeded,
-  availableNote, isSteal, mapPoints, standing, unitTitle, groupBuildings, money, perSqft, shortDate, sparkline, tagLabel, tagReason, unitMatches,
+  availableNote, dogText, isSteal, mapPoints, nearbyTags, standing, unitTitle, walkText, groupBuildings, money, perSqft, shortDate, sparkline, tagLabel, tagReason, unitMatches,
 } from "./logic.js";
 import { driveTimes, geocode, trafficTimes } from "./commute.js";
 import { createStore } from "./store.js";
@@ -194,6 +194,8 @@ function facts(building) {
   if (building.pets) items.push(["Pets allowed"]);
   if (building.one_time) items.push([`One-time fees ${money(building.one_time)}`]);
   if (building.drive != null) items.push([building.driveTraffic ? driveLabel(building.drive, building.drivePm) : driveLabel(building.drive)]);
+  if (walkText(building.walk)) items.push([walkText(building.walk)]);
+  if (dogText(building.dog)) items.push([dogText(building.dog), null, building.dog.reasons.join(" · ")]);
   const crime = crimeText(building, state.crimeCounties);
   items.push([crime.text, crime.known ? null : "unknown"]);
   if (building.rank) items.push([`${standing(building.rank)} (pricier than ${building.rank.pct}% of ${building.rank.n} buildings within 2 miles)`]);
@@ -201,7 +203,7 @@ function facts(building) {
   if (building.coming_soon) items.push(["Coming soon"]);
   if (building.senior) items.push(["Senior housing"]);
   if (building.stale) items.push([`Latest read failed; showing ${building.read ? shortDate(building.read) : "earlier data"}`, "stale"]);
-  return h("ul", { class: "facts" }, items.map(([text, kind]) => h("li", { class: kind || null }, text)),
+  return h("ul", { class: "facts" }, items.map(([text, kind, title]) => h("li", { class: kind || null, title: title || null }, text)),
     building.zip && h("li", { class: "plain" }, h("button", {
       type: "button", title: `Hide every building in ZIP code ${building.zip}`, onclick: () => setNogo(building.zip, true),
     }, `No-go ZIP ${building.zip}`)));
@@ -239,6 +241,7 @@ function buildingCard(group, note) {
     building.special && h("p", { class: "offer" }, building.special,
       h("small", null, "Building-wide offer: it may not apply to every unit.")),
     facts(building),
+    nearbyTags(building.near).length ? h("p", { class: "nearby" }, h("b", null, "Nearby: "), nearbyTags(building.near).join(" · ")) : null,
     aboutArea(building),
     h("div", { class: "units" }, shown.flatMap((unit) => unitRow(unit, building))),
     !units.length && h("p", { class: "following" }, "Nothing here matches right now."),
@@ -489,6 +492,8 @@ function showFilters() {
   $("maxViolent").value = f.maxViolent == null ? ANY_CRIME : Math.min(f.maxViolent, ANY_CRIME - 1);
   $("maxViolentOut").textContent = f.maxViolent == null ? "any" : `${f.maxViolent} or fewer`;
   $("demographics").checked = state.demographics;
+  $("minWalk").value = f.minWalk == null ? 0 : f.minWalk;
+  $("minWalkOut").textContent = f.minWalk == null ? "any" : `${f.minWalk}+`;
   $("maxDrive").value = f.maxDrive == null ? ANY_DRIVE : f.maxDrive;
   $("maxDriveOut").textContent = f.maxDrive == null ? "any" : `${f.maxDrive} min`;
 }
@@ -533,6 +538,11 @@ function wire() {
   $("maxDrive").addEventListener("input", () => {
     const value = Number($("maxDrive").value);
     state.filters.maxDrive = value >= ANY_DRIVE ? null : value;
+    changed();
+  });
+  $("minWalk").addEventListener("input", () => {
+    const value = Number($("minWalk").value);
+    state.filters.minWalk = value <= 0 ? null : value;
     changed();
   });
   $("setwork").addEventListener("click", timeDrives);
@@ -707,6 +717,9 @@ async function load() {
       (state.units[unit.building] ||= []).push(unit);
       state.unitsById[unit.id] = unit;
     }
+  }
+  for (const building of state.index) {              // units carry the block's walkability so they can be sorted by it
+    for (const unit of state.units[building.id] || []) unit.walkScore = building.walk ? building.walk.score : null;
   }
   store.refreshStars(state.unitsById, state.byId);
   showWork();

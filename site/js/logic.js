@@ -2,11 +2,19 @@
 
 export const DEFAULT_FILTERS = Object.freeze({
   q: "", beds: [], minSqft: null, maxCost: null, moveBy: null, floorMin: null, floorMax: null, ground: false,
-  parking: false, pets: false, tagged: false, highEnd: false, maxViolent: null, maxDrive: null, minRating: null, manager: "", counties: [], showRestricted: false, sort: "picks",
+  parking: false, pets: false, nearMetro: false, nearGrocery: false, nearPark: false, dogFriendly: false, minWalk: null, tagged: false, highEnd: false, maxViolent: null, maxDrive: null, minRating: null, manager: "", counties: [], showRestricted: false, sort: "picks",
 });
 
 export const HIGH_END = 67;                 // a building pricier than this share of its neighbours is "high-end for its area"
-export const GROUND_FLOORS = [0, 1];          // buildings number the ground floor either way
+export const GROUND_FLOORS = [0, 1];
+export const NEAR_MILES = 0.5;                // "near" a Metro station or a grocery store
+export const PARK_MILES = 0.25;               // a park has to be closer than that to count as next to home
+export const DOG_FRIENDLY = 3;                // dog score, out of 5, that the Dog-friendly filter asks for
+
+function within(building, kind, miles) {
+  const nearest = building.near && building.near[kind] ? building.near[kind][1] : null;
+  return nearest != null && nearest <= miles;
+}          // buildings number the ground floor either way
 const TAG_ORDER = { absolute: 0, building: 1, local: 2 };
 const TAG_LABELS = { absolute: "Absolute steal", building: "Building steal", local: "Local value", check: "Check price" };
 
@@ -40,6 +48,11 @@ export function unitMatches(unit, building, filters) {
   if (filters.ground && !GROUND_FLOORS.includes(unit.floor)) return false;
   if (filters.parking && building.parking_from == null && building.parking !== true) return false;
   if (filters.pets && building.pets !== true) return false;
+  if (filters.nearMetro && !within(building, "metro", NEAR_MILES)) return false;
+  if (filters.nearGrocery && !within(building, "grocery", NEAR_MILES)) return false;
+  if (filters.nearPark && !within(building, "park", PARK_MILES)) return false;
+  if (filters.dogFriendly && !(building.dog && building.dog.score >= DOG_FRIENDLY)) return false;
+  if (filters.minWalk != null && !(building.walk && building.walk.score >= filters.minWalk)) return false;
   if (filters.tagged && !isSteal(unit.tag)) return false;
   if (filters.highEnd && !(building.rank && building.rank.pct >= HIGH_END)) return false;
   if (filters.maxViolent != null && !(building.crime && building.crime.violent <= filters.maxViolent)) return false;
@@ -87,6 +100,7 @@ const SORTS = {
   newest: by((u) => u.first, true),
   size: by((u) => u.sqft, true),
   drive: by((u) => u.drive),
+  walk: by((u) => u.walkScore, true),
 };
 
 export function compareUnits(sort) {
@@ -191,6 +205,34 @@ export function countiesLabel(selected, names) {
   if (!selected || !selected.length) return "All areas";
   const first = names[selected[0]] || selected[0];
   return selected.length === 1 ? first : `${first} + ${selected.length - 1} more`;
+}
+
+const NEARBY = [["metro", "Metro", 1.0], ["grocery", "Grocery", 0.5], ["park", "Park", 0.5], ["dog_park", "Dog park", 0.5],
+  ["community", "Community center", 0.5], ["library", "Library", 0.5], ["food", null, 0.5], ["gym", "Gym", 0.5], ["pharmacy", "Pharmacy", 0.5]];
+
+/** Short tags for what is within reach of a building: "Metro 0.3 mi", "Park 0.1 mi (3 within ½ mi)", "23 places to eat within ½ mi". */
+export function nearbyTags(near) {
+  if (!near) return [];
+  const tags = [];
+  for (const [kind, name, reach] of NEARBY) {
+    const [count, nearest] = near[kind] || [0, null];
+    if (kind === "food") {
+      if (count > 0) tags.push(`${count} place${count === 1 ? "" : "s"} to eat within ½ mi`);
+      continue;
+    }
+    if (nearest == null || nearest > reach) continue;
+    const where = nearest === 0 ? `${name} next door` : `${name} ${nearest} mi`;
+    tags.push(kind === "park" && count > 1 ? `${where} (${count} within ½ mi)` : where);
+  }
+  return tags;
+}
+
+export function walkText(walk) {
+  return walk && walk.score != null ? `Walkability ${walk.score} of 20${walk.label ? ` (${walk.label.toLowerCase()})` : ""}` : "";
+}
+
+export function dogText(dog) {
+  return dog && dog.score != null ? `Dog-friendly ${dog.score} of 5` : "";
 }
 
 export function tagLabel(tag) {

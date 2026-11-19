@@ -360,3 +360,39 @@ test("affordable-housing note for a building", async () => {
   assert.equal(affordableNote({ name: "P", affordable: 12, total: null }), "City records: 12 income-restricted units here");
   assert.equal(affordableNote(null), "");
 });
+
+const nearby = { park: [3, 0.1], dog_park: [1, 0.4], community: [0, 0.9], library: [1, 0.3], grocery: [2, 0.2], metro: [0, 0.8], food: [23, 0], gym: [0, null], pharmacy: [1, 0.5] };
+
+test("nearby filters need a known distance within reach", () => {
+  for (const key of ["nearMetro", "nearGrocery", "nearPark", "dogFriendly"]) assert.equal(DEFAULT_FILTERS[key], false);
+  assert.equal(DEFAULT_FILTERS.minWalk, null);
+  assert.equal(unitMatches(unit(), building({ near: nearby }), f({ nearMetro: true })), false);            // 0.8 mi is not "near"
+  assert.equal(unitMatches(unit(), building({ near: { ...nearby, metro: [1, 0.5] } }), f({ nearMetro: true })), true);
+  assert.equal(unitMatches(unit(), building({ near: nearby }), f({ nearGrocery: true })), true);
+  assert.equal(unitMatches(unit(), building({ near: nearby }), f({ nearPark: true })), true);
+  assert.equal(unitMatches(unit(), building({ near: { ...nearby, park: [1, 0.4] } }), f({ nearPark: true })), false);   // a park needs to be within a quarter mile
+  assert.equal(unitMatches(unit(), building({ near: null }), f({ nearGrocery: true })), false);
+  assert.equal(unitMatches(unit(), building({ dog: { score: 3, reasons: [] } }), f({ dogFriendly: true })), true);
+  assert.equal(unitMatches(unit(), building({ dog: { score: 2, reasons: [] } }), f({ dogFriendly: true })), false);
+  assert.equal(unitMatches(unit(), building({ dog: null }), f({ dogFriendly: true })), false);
+  assert.equal(unitMatches(unit(), building({ walk: { score: 16.8 } }), f({ minWalk: 15 })), true);
+  assert.equal(unitMatches(unit(), building({ walk: { score: 12 } }), f({ minWalk: 15 })), false);
+  assert.equal(unitMatches(unit(), building({ walk: null }), f({ minWalk: 15 })), false);
+});
+
+test("nearby tags: what is within reach, nearest first in a fixed order", async () => {
+  const { nearbyTags, walkText, dogText } = await import("../../site/js/logic.js");
+  assert.deepEqual(nearbyTags(nearby), ["Metro 0.8 mi", "Grocery 0.2 mi", "Park 0.1 mi (3 within ½ mi)", "Dog park 0.4 mi", "Library 0.3 mi",
+    "23 places to eat within ½ mi", "Pharmacy 0.5 mi"]);
+  assert.deepEqual(nearbyTags({ park: [1, 0], metro: [0, 1.4], food: [0, 1.2] }), ["Park next door"]);
+  assert.deepEqual(nearbyTags(null), []);
+  assert.equal(walkText({ score: 16.8, label: "Most walkable" }), "Walkability 16.8 of 20 (most walkable)");
+  assert.equal(walkText(null), "");
+  assert.equal(dogText({ score: 4, reasons: ["pets allowed", "dog park 0.3 mi"] }), "Dog-friendly 4 of 5");
+  assert.equal(dogText(null), "");
+});
+
+test("most walkable sort", () => {
+  const units = [unit({ id: "x" }), unit({ id: "low", walkScore: 9 }), unit({ id: "high", walkScore: 18 })];
+  assert.deepEqual(units.sort(compareUnits("walk")).map((u) => u.id), ["high", "low", "x"]);
+});

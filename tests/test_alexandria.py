@@ -69,6 +69,23 @@ class ReaderTests(QuietTestCase):
         get = lambda url, **options: page([ROBBERY]).encode()
         self.assertEqual(alexandria.incidents(get, "2026-11-01", "2026-11-07", place=lambda a, c: {}, cache={}), [])
 
+    def test_a_block_the_geocoder_cannot_place_is_tried_once_more_one_door_along(self):
+        bodies = []
+
+        def get(url, **options):
+            return page([ROBBERY]).encode()                                 # every week: a robbery in the 100 block of King St
+
+        def post(url, body, headers=None, **options):
+            bodies.append(body)
+            if b'"100 KING ST"' in body:
+                return b'"1","100 KING ST, Alexandria, VA, ","No_Match"\n'
+            return b'"1","101 KING ST, Alexandria, VA, ","Match","Exact","101 KING ST, ALEXANDRIA, VA, 22314","-77.0469,38.8048","1","L"\n'
+        cache = {}
+        incidents = crime.alexandria(get, "2026-11-01", "2026-11-07", post=post, cache=cache)
+        self.assertEqual(incidents, [(38.8048, -77.0469, "violent", "2026-11-05")])
+        self.assertEqual(len(bodies), 2)
+        self.assertIn(b'"101 KING ST"', bodies[1])
+
     def test_registered_as_alexandrias_crime_source(self):
         self.assertIn("51510", crime.SOURCES)
 

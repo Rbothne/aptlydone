@@ -272,7 +272,17 @@ def prince_william(get, start, today, max_pages=MAX_PAGES):
 def alexandria(get, start, today, post=None, cache=None):
     from .. import geo
     from . import alexandria as source
-    place = lambda addresses, known: geo.batch(addresses, "Alexandria", "VA", post, known)
+    def place(addresses, known):
+        found = geo.batch(addresses, "Alexandria", "VA", post, known)
+        # "5700 DOW AVE" names a block, and the geocoder sometimes has no house at exactly 5700: try 5701 once
+        next_door = {}
+        for address in set(addresses) - set(found):
+            number, _, street = address.partition(" ")
+            if number.isdigit():
+                next_door[f"{int(number) + 1} {street}"] = address
+        for moved, original in geo.batch(list(next_door), "Alexandria", "VA", post, known).items():
+            found[next_door[moved]] = original
+        return found
     return source.incidents(get, start, today, place=place, cache=cache if cache is not None else {})
 
 
