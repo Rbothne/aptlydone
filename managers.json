@@ -30,7 +30,7 @@
     {"name": "MAA", "site": "www.maac.com", "discover": "generic",
      "sitemap": "https://www.maac.com/sitemap.xml",
      "pattern": "https://www\\.maac\\.com/(?:virginia|maryland|district-of-columbia|washington-dc)/[^/<\\s]+/maa-[^/<\\s]+/",
-     "map_paths": [""], "name_from_slug": true},
+     "map_paths": [""], "name_from_slug": true, "city_from_address": true},
     {"name": "Simpson", "site": "www.simpsonpropertygroup.com", "discover": "generic",
      "sitemap": "https://www.simpsonpropertygroup.com/sitemap.xml",
      "pattern": "https://www\\.simpsonpropertygroup\\.com/apartments/[^/<\\s]+-(?:virginia|maryland|washington-dc|dc)/[^/<\\s]+",

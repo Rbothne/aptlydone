@@ -49,6 +49,15 @@ Python 3.12 or later, standard library only.
 
 To exercise the page in a real browser, copy `tests/js/smoke.html` to `site/_smoke.html`, serve `site/`, and open `/_smoke.html`: it clicks through details, stars and every filter and prints what it saw.
 
+## Where a building is
+
+Each week `discover.py` sends every building's street address to the Census Bureau's batch address service (`discovery.check_addresses`, one request) and keeps the answer on the building as `placed`. An address is asked about once.
+
+- **ZIP code** (`area.zip_code`): the building's own published ZIP when it could be one here; else the Census Bureau's for the address; else the one looked up from its coordinates. An audit on 2026-11-19 found the published ZIP right 444 times out of 444 and the coordinate lookup wrong for 246 of 564.
+- **Coordinates** (`discovery.correct`): the site's own, unless an exactly matched address is more than a quarter mile away; then the address's, with the published pair kept as `site_lat`/`site_lon`. A loose match never moves a building.
+- A building whose coordinates change is located again (`located_at`), and what is looked up once per place (walkability, noise) is looked up again (`area["at"]`).
+- A company line with `"city_from_address": true` (MAA) publishes a region where the city belongs; its buildings take the city of their address.
+
 ## Noise, construction, and what a listing says about a unit
 
 - `aptrack/area/noise.py` reads the US DOT National Transportation Noise Map (2020) for aircraft, road and rail noise at each building. The map is published only as coloured tiles, so it fetches the tile a building falls on (`aptrack/area/png.py` decodes it with the standard library) and looks the pixel's colour up in the map's own legend. A building is looked up once (`py area.py --only noise`).

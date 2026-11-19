@@ -278,6 +278,37 @@ async function run() {
   const dot = doc.querySelector("#mapbox path.leaflet-interactive");
   if (dot) { dot.dispatchEvent(new MouseEvent("click", { bubbles: true, view: win })); await wait(400); }
   out.popup = (doc.querySelector(".leaflet-popup-content") || {}).textContent || null;
+  out.popupLines = [...doc.querySelectorAll(".leaflet-popup-content p")].map((p) => p.textContent);
+  // from the map to the same building in the list: filters untouched, the card in view and marked
+  const before = count();
+  const named = doc.querySelector(".leaflet-popup-content b").textContent;
+  [...doc.querySelectorAll(".leaflet-popup-content button")].find((b) => /in the list/.test(b.textContent)).click();
+  await wait(200);
+  const found = doc.querySelector("#buildings article.found");
+  out.wentToList = !doc.getElementById("buildings").hidden && doc.getElementById("map").hidden;
+  out.foundCard = found ? found.querySelector("h2 a").textContent : null;
+  out.foundIsTheOne = Boolean(found) && found.querySelector("h2 a").textContent === named;
+  out.filtersUntouched = count() === before && doc.getElementById("q").value === "";
+  out.cardInView = found ? Math.round(found.getBoundingClientRect().top) : null;
+  out.barHeight = doc.getElementById("top").offsetHeight;
+  out.cardsDrawn = doc.querySelectorAll("#buildings article.building").length;
+  // tabs remember where you were
+  const listScroll = win.scrollY;
+  doc.querySelector('[data-tab="map"]').click();
+  await wait(200);
+  out.mapScroll = win.scrollY;
+  out.popupStillOpen = Boolean(doc.querySelector(".leaflet-popup-content"));
+  doc.querySelector('[data-tab="buildings"]').click();
+  await wait(100);
+  out.listScrollKept = listScroll > 0 && Math.abs(win.scrollY - listScroll) < 3;
+  // from the list to the map
+  const card = doc.querySelector("#buildings article.found") || doc.querySelector("#buildings article.building");
+  const wanted = card.querySelector("h2 a").textContent;
+  card.querySelector(".onmap").click();
+  await wait(600);
+  out.onMapTab = !doc.getElementById("map").hidden;
+  out.onMapPopup = ((doc.querySelector(".leaflet-popup-content b") || {}).textContent || null) === wanted;
+  out.onMapZoom = win.aptMapZoom();
   doc.querySelector('[data-tab="buildings"]').click();
   document.getElementById("out").textContent = JSON.stringify(out, null, 1);
 }

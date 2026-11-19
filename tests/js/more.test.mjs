@@ -225,3 +225,33 @@ test("top picks: the most worth first; prices to check last; ties fall back to t
     unit({ id: "negative", worth: -100 }), unit({ id: "unknown" })];
   assert.deepEqual(units.sort(compareUnits("picks")).map((u) => u.id), ["high", "low", "negative", "unknown", "check"]);
 });
+
+// ---------- the map's pop-up, and finding a building in the list ----------
+
+test("the best deal in a building is the unit furthest under similar units, never a price to check", async () => {
+  const { bestDeal } = await import("../../site/js/logic.js");
+  const units = [unit({ id: "plain" }), unit({ id: "own", own: { pct: -12 } }), unit({ id: "both", own: { pct: -10 }, local: { pct: -20 } }),
+    unit({ id: "check", tag: "check", own: { pct: -45 } }), unit({ id: "over", local: { pct: 8 } })];
+  assert.equal(bestDeal(units).id, "both");                              // 15% on average beats 12%
+  assert.equal(bestDeal([unit({ id: "dear", true: 3000 }), unit({ id: "cheap", true: 2000 })]).id, "cheap");     // nothing to compare: the cheapest
+  assert.equal(bestDeal([unit({ id: "check", tag: "check", own: { pct: -45 } }), unit({ id: "over", local: { pct: 8 } })]).id, "over");
+  assert.equal(bestDeal([]), null);
+});
+
+test("the pop-up's lines about the place: walkability, median age, and race only when asked for", async () => {
+  const { popupFacts } = await import("../../site/js/logic.js");
+  const tract = { age: 33.6, income: 120000, race: { white: 55, black: 20, asian: 10, hispanic: 10, other: 5 } };
+  const b = building({ walk: { score: 17.5, label: "Most walkable" } });
+  assert.deepEqual(popupFacts(b, tract, true), ["Walkability 17.5 of 20 (most walkable)", "Median age 34", "55% white · 20% Black · 10% Asian · 10% Hispanic · 5% other"]);
+  assert.deepEqual(popupFacts(b, tract, false), ["Walkability 17.5 of 20 (most walkable)", "Median age 34"]);
+  assert.deepEqual(popupFacts(building(), null, true), []);
+});
+
+test("finding a building in the list: which page of the list it is on", async () => {
+  const { pageFor } = await import("../../site/js/logic.js");
+  const groups = ["a", "b", "c", "d", "e"].map((id) => ({ building: { id } }));
+  assert.equal(pageFor(groups, "a", 2), 2);
+  assert.equal(pageFor(groups, "c", 2), 4);                              // enough shown to include it, in whole pages
+  assert.equal(pageFor(groups, "e", 2), 6);
+  assert.equal(pageFor(groups, "zzz", 2), null);                         // filtered out: not in the list at all
+});

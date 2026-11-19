@@ -57,7 +57,11 @@ class Folder(QuietTestCase):
                 self.patch(module, name, self.at("data", os.path.basename(getattr(module, name))))
             self.patch(module, "MANAGERS", self.at("managers.json"))
             self.patch(module.fetch, "polite", lambda *args, **kwargs: self.web)
+            self.patch(module.fetch, "post", self.no_post)
         self.patch(build, "SITE_DATA", self.at("site", "data"))
+
+    def no_post(self, *args, **kwargs):
+        raise OSError("nothing is sent anywhere in these tests")
 
     def patch(self, target, name, value):
         patcher = mock.patch.object(target, name, value)
@@ -118,7 +122,7 @@ class DiscoverTests(Folder):
         self.main(discover)
         self.assertEqual(self.searched, ["Bozzuto"])
         kept = {b["id"]: b for b in files.load(self.at("data", "buildings.json"), None)}
-        self.assertEqual(kept["camden-noma"], camden(zip="20002", missed=1))            # not counted as missing either
+        self.assertEqual(kept["camden-noma"], camden(zip="20002", missed=1, located_at=[38.9, -77.0]))     # not counted as missing either
 
     def test_asking_for_a_paused_company_by_name_says_why_it_is_not_run(self):
         errors = io.StringIO()

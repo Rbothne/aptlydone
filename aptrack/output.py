@@ -61,6 +61,7 @@ def assemble(buildings, results, state, out_dir, today=None):
             unit["drop"] = history.drop(unit.get("history"), today) if today else None
 
         entry = {key: building.get(key) for key in BUILDING_FIELDS}
+        entry["zip"] = zip_code(building)
         entry.update(units=len(units), fees=fees, amenities=amenities,
                      stale=bool(status.get("failed")), expired=expired, read=status.get("ok"), why=status.get("why") if status.get("failed") else None)
         facts = (result or {}).get("facts")

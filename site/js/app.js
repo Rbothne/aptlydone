@@ -4,6 +4,7 @@ import {
   DEFAULT_FILTERS, TAG_GROUPS, affordable, affordableNote, ago, areaFacts, countiesLabel, countyGroups, availability, cost, crimeText, criteriaFilters, criteriaFrom, criteriaLabel, driveLabel, incomeNeeded,
   availableNote, dogText, isSteal, mapPoints, nearbyTags, standing, unitTitle, walkText, groupBuildings, money, perSqft, shortDate, sparkline, staleText, tagLabel, tagReason, tagsLabel, chosenTags, setTag, unitMatches,
   CRIME_STOPS, TRADEOFFS, crimeStopLabel, dropText, noiseTags, relateCrime, typicalOf, worksTags, worth, worthText,
+  pageFor, popupFacts,
 } from "./logic.js";
 import { driveTimes, geocode, trafficTimes } from "./commute.js";
 import { createStore } from "./store.js";
@@ -32,6 +33,7 @@ const state = {
   nogo: store.getSetting("nogo", []),              // ZIP codes the user never wants to see
   work: store.getSetting("work", null),             // {address, lat, lon, label}: kept in this browser only
   filters: store.getFilters(), tab: "buildings", shown: PAGE, expanded: new Set(), open: new Set(),
+  scroll: {},                                      // how far down each tab was when it was left, to come back to the same spot
 };
 
 const $ = (id) => document.getElementById(id);
@@ -252,9 +254,12 @@ function buildingCard(group, note) {
   const { building, units, best } = group;
   const all = state.expanded.has(building.id);
   const shown = all ? units : best;
-  return h("article", { class: "building" },
+  return h("article", { class: "building", "data-id": building.id },
     h("header", null,
-      h("h2", null, h("a", { href: building.url, target: "_blank", rel: "noopener" }, building.name), " ", followButton(building)),
+      h("h2", null, h("a", { href: building.url, target: "_blank", rel: "noopener" }, building.name), " ", followButton(building),
+        building.lat != null && building.lon != null && h("button", {
+          class: "follow onmap", type: "button", title: "Show this building on the map", onclick: () => showOnMap(building),
+        }, "On the map")),
       building.rating != null
         ? h("span", { class: "rating", title: "Rating published on the manager's site" }, `★ ${building.rating}`,
             building.rating_count != null && h("small", null, ` (${building.rating_count.toLocaleString("en-US")})`))
@@ -314,19 +319,51 @@ function drawBuildings() {
 // ---------- map ----------
 
 const TAG_COLOUR = { absolute: "#c0392b", building: "#1f7a52", local: "#2d6fa8" };
-const chart = { map: null, layer: null, fitted: false };
+const chart = { map: null, layer: null, fitted: false, markers: {}, open: null, redrawing: false };     // open: the building whose pop-up is showing
 
 function popup(point) {
-  const { building, best } = point;
+  const { building, deal } = point;
   return h("div", null,
     h("p", null, h("b", null, building.name), building.rating != null && ` ★ ${building.rating}`),
     h("p", null, [building.neighborhood, address(building)].filter(Boolean).join(" · ")),
     h("p", null, `${plural(point.count, "unit")} match`, point.tag && ` · best tag: ${tagLabel(point.tag)}`),
-    best && h("p", null, `Best: ${unitTitle(best)} · ${[bedsLabel(best.beds), best.sqft && `${best.sqft} sqft`].filter(Boolean).join(" · ")} · ${money(cost(best))}/mo`),
-    h("button", { type: "button", onclick: () => { state.filters.q = building.name; state.tab = "buildings"; changed(); window.scrollTo(0, 0); } },
-      "Show in the list"),
+    deal && h("p", null, h("b", null, "Best deal: "),
+      `${unitTitle(deal)} · ${[bedsLabel(deal.beds), deal.sqft && `${deal.sqft.toLocaleString("en-US")} sqft`].filter(Boolean).join(" · ")} · ${money(cost(deal))}/mo`),
+    deal && h("p", { class: "vs" }, tagReason(deal) ? tagReason(deal) + "." : "No similar units to compare it with yet."),
+    popupFacts(building, state.tracts[building.tract], state.demographics).map((line) => h("p", { class: "place" }, line)),
+    h("button", { type: "button", onclick: () => showInList(building) }, "Go to it in the list"),
     building.zip && h("button", { type: "button", style: "margin-left:6px;background:none;color:#a8321f;border-color:#a8321f",
       onclick: () => setNogo(building.zip, true) }, `No-go ZIP ${building.zip}`));
+}
+
+/** Switch tabs, remembering how far down the one being left was and returning to where the other was left. */
+function showTab(tab) {
+  state.scroll[state.tab] = window.scrollY;
+  state.tab = tab;
+  try { history.replaceState(null, "", tab === "buildings" ? location.pathname + location.search : "#" + tab); } catch { /* no history */ }
+  draw();
+  window.scrollTo(0, state.scroll[tab] || 0);
+}
+
+/** From the map to the same building in the list, with the filters left as they are. */
+function showInList(building) {
+  const needed = pageFor(groupBuildings(state.index, state.units, active(), BEST), building.id, PAGE);
+  if (needed != null) state.shown = Math.max(state.shown, needed);
+  showTab("buildings");
+  const card = [...document.querySelectorAll("#buildings article.building")].find((article) => article.dataset.id === building.id);
+  if (!card) return;
+  window.scrollTo(0, card.getBoundingClientRect().top + window.scrollY - $("top").offsetHeight - 8);     // clear of the bar at the top
+  card.classList.add("found");
+  setTimeout(() => card.classList.remove("found"), 2500);
+}
+
+/** From the list to the same building on the map, with its pop-up open. */
+function showOnMap(building) {
+  showTab("map");
+  if (!chart.map) return;
+  chart.map.setView([building.lat, building.lon], Math.max(chart.map.getZoom(), 15));
+  const marker = chart.markers[building.id];
+  if (marker) marker.openPopup();
 }
 
 function drawMap(groups) {
@@ -340,7 +377,9 @@ function drawMap(groups) {
     chart.layer = L.layerGroup().addTo(chart.map);
   }
   chart.map.invalidateSize();
+  chart.redrawing = true;                           // redrawing closes the pop-up; that is not the user closing it
   chart.layer.clearLayers();
+  chart.markers = {};
   if (state.work) {
     L.marker([state.work.lat, state.work.lon], {
       icon: L.divIcon({ className: "workpin", html: "★", iconSize: [22, 22], iconAnchor: [11, 11] }), keyboard: false,
@@ -350,15 +389,21 @@ function drawMap(groups) {
   // Draw untagged buildings first so tagged ones sit on top.
   points.sort((a, b) => Number(Boolean(a.tag)) - Number(Boolean(b.tag)));
   for (const point of points) {
-    L.circleMarker([point.lat, point.lon], {
+    chart.markers[point.id] = L.circleMarker([point.lat, point.lon], {
       radius: 5 + Math.min(9, Math.sqrt(point.count)), weight: 1.5, color: "#ffffff",
       fillColor: TAG_COLOUR[point.tag] || "#8a8a85", fillOpacity: 0.9,
-    }).bindPopup(() => popup(point)).bindTooltip(point.name).addTo(chart.layer);
+    }).bindPopup(() => popup(point), { minWidth: 260 }).bindTooltip(point.name)
+      .on("popupopen", () => { chart.open = point.id; })
+      .on("popupclose", () => { if (!chart.redrawing) chart.open = null; })
+      .addTo(chart.layer);
   }
+  chart.redrawing = false;
   if (!chart.fitted && points.length) {
     chart.map.fitBounds(points.map((p) => [p.lat, p.lon]), { padding: [30, 30] });
     chart.fitted = true;
   }
+  if (chart.open && chart.markers[chart.open]) chart.markers[chart.open].openPopup();      // the pop-up that was open stays open
+  else chart.open = null;
 }
 
 function followedBuildings() {
@@ -602,12 +647,7 @@ function wire() {
     $("filtersbtn").setAttribute("aria-expanded", String(open));
   });
   for (const button of document.querySelectorAll(".tabs button")) {
-    button.addEventListener("click", () => {
-      state.tab = button.dataset.tab;
-      try { history.replaceState(null, "", state.tab === "buildings" ? location.pathname + location.search : "#" + state.tab); } catch { /* no history */ }
-      draw();
-      window.scrollTo(0, 0);
-    });
+    button.addEventListener("click", () => showTab(button.dataset.tab));
   }
 }
 
@@ -904,4 +944,5 @@ load();
 // Kept for the console: which units match right now.
 window.aptMatches = () => state.index.flatMap((b) => (state.units[b.id] || []).filter((u) => unitMatches(u, b, active())));
 window.aptBuilding = (id) => state.byId[id];
+window.aptMapZoom = () => (chart.map ? chart.map.getZoom() : null);
 window.aptFacts = () => state.index.flatMap((b) => [...noiseTags(b.noise), ...worksTags(b.works)].map((note) => note.text));

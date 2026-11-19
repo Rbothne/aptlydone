@@ -140,9 +140,44 @@ export function mapPoints(groups) {
     .filter(({ building }) => building.lat != null && building.lon != null)
     .map(({ building, units, best }) => ({
       id: building.id, name: building.name, lat: building.lat, lon: building.lon, building,
-      count: units.length, best: best[0],
+      count: units.length, best: best[0], deal: bestDeal(units),
       tag: units.reduce((top, unit) => (isSteal(unit.tag) && (TAG_ORDER[unit.tag] ?? 3) < (TAG_ORDER[top] ?? 3) ? unit.tag : top), null),
     }));
+}
+
+/** How far under similar units a unit is priced, in percent (negative is under): the average of what it has; null when unknown. */
+function discount(unit) {
+  const known = [unit.own, unit.local].filter(Boolean).map((vs) => vs.pct);
+  return known.length ? known.reduce((sum, pct) => sum + pct, 0) / known.length : null;
+}
+
+/**
+ * The unit in a building that is the best deal: furthest under similar units in its building and nearby. A price
+ * marked for checking is passed over while anything else is on offer; with nothing to compare, the cheapest.
+ */
+export function bestDeal(units) {
+  const sound = units.filter((unit) => unit.tag !== "check");
+  const pool = sound.length ? sound : units;
+  if (!pool.length) return null;
+  return [...pool].sort(chain(by(discount), by(cost), by((u) => u.id)))[0];
+}
+
+/** Lines about the place for the map's pop-up: walkability, the tract's median age, and race when asked for. */
+export function popupFacts(building, tract, showRace) {
+  const lines = [];
+  if (walkText(building.walk)) lines.push(walkText(building.walk));
+  if (tract && tract.age != null) lines.push(`Median age ${Math.round(tract.age)}`);
+  if (showRace && tract && tract.race) {
+    const r = tract.race;
+    lines.push(`${r.white}% white · ${r.black}% Black · ${r.asian}% Asian · ${r.hispanic}% Hispanic · ${r.other}% other`);
+  }
+  return lines;
+}
+
+/** How many buildings the list must show, in whole pages, for this building to be drawn; null when it is filtered out. */
+export function pageFor(groups, buildingId, pageSize) {
+  const at = groups.findIndex((group) => group.building.id === buildingId);
+  return at < 0 ? null : (Math.floor(at / pageSize) + 1) * pageSize;
 }
 
 /** What "follow this building" remembers: the size and price filters in force when it was followed. */

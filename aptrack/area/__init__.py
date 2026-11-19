@@ -14,21 +14,37 @@ PARTS = ("census", "crime", "rents", "affordable", "places", "noise", "works")
 
 
 def zip_code(building):
-    """A building's 5-digit ZIP code: the one looked up from its coordinates, else the one in its address.
+    """A building's 5-digit ZIP code: the one in its own address; failing that the one the Census Bureau gives for
+    the address; failing that the one looked up from its coordinates.
 
-    Some managers put the street number where the ZIP belongs, so an address ZIP is believed only when it
-    could be one here: every ZIP code in DC, Maryland and Virginia starts with 2.
+    An audit on 2026-11-19 found the published ZIP agreed with the Census Bureau every time both were usable
+    (444 of 444), while the ZIP looked up from coordinates was wrong for 246 of 564 buildings. Some managers put
+    the street number where the ZIP belongs, so a published ZIP is believed only when it could be one here:
+    every ZIP code in DC, Maryland and Virginia starts with 2.
     """
-    if building.get("zip"):
-        return building["zip"]
     address = building.get("address") or {}
     match = re.search(r"\b(\d{5})(?:-\d{4})?\s*$", address.get("zip") or address.get("full") or "")
-    return match.group(1) if match and match.group(1).startswith("2") else None
+    if match and match.group(1).startswith("2"):
+        return match.group(1)
+    return (building.get("placed") or {}).get("zip") or building.get("zip") or None
 
 
 def collect(buildings, previous, get, today, now, parts=PARTS, post=None, sleep=time.sleep):
     """Area data for these (in-region) buildings, starting from what was collected before."""
     area = dict(previous or {})
+
+    # what is looked up once per place (walkability, noise) is forgotten for a building that has moved
+    at = dict(area.get("at") or {})
+    for building in buildings:
+        if building.get("lat") is None or building.get("lon") is None:
+            continue
+        here = [building["lat"], building["lon"]]
+        if at[building["id"]] != here if building["id"] in at else "site_lat" in building:
+            for cache in ("walk", "noise"):
+                if building["id"] in (area.get(cache) or {}):
+                    area[cache] = {key: value for key, value in area[cache].items() if key != building["id"]}
+        at[building["id"]] = here
+    area["at"] = at
 
     if "census" in parts:
         counties = sorted({b["county"] for b in buildings if b.get("county")})

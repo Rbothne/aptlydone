@@ -47,6 +47,37 @@ def neighborhood(get, lat, lon):
     return reverse(get, lat, lon)["neighborhood"]
 
 
+def place_addresses(rows, post):
+    """Where the Census Bureau puts each street address. `rows` are (key, street, city, state, zip);
+    the answer maps each key to {"lat", "lon", "zip", "city", "exact"}, or to None when the address was not found.
+    "exact" is the service's own word for a match it did not have to guess at. A failed request raises."""
+    import csv
+    import io
+    found = {}
+    for start in range(0, len(rows), BATCH_SIZE):
+        part = rows[start:start + BATCH_SIZE]
+        lines = io.StringIO()
+        writer = csv.writer(lines, quoting=csv.QUOTE_ALL, lineterminator="\n")
+        for number, (_, street, city, state, zip_code) in enumerate(part, 1):
+            usable = len(zip_code or "") == 5 and zip_code.isdigit() and zip_code.startswith("2")       # every ZIP here starts with 2
+            writer.writerow([number, street, city or "", state or "", zip_code if usable else ""])
+        boundary = "----aptrack-geocode-batch"
+        body = (f'--{boundary}\r\nContent-Disposition: form-data; name="benchmark"\r\n\r\nPublic_AR_Current\r\n'
+                f'--{boundary}\r\nContent-Disposition: form-data; name="addressFile"; filename="addresses.csv"\r\n'
+                f'Content-Type: text/csv\r\n\r\n{lines.getvalue()}\r\n--{boundary}--\r\n').encode("utf-8")
+        answer = post(CENSUS_BATCH, body, {"Content-Type": f"multipart/form-data; boundary={boundary}"}, timeout=600)
+        placed = {}
+        for row in csv.reader(io.StringIO(answer.decode("utf-8", "replace"))):
+            if len(row) >= 6 and row[2] == "Match" and "," in row[5]:
+                lon, lat = row[5].split(",")
+                pieces = [piece.strip() for piece in row[4].split(",")]          # street, city, state, ZIP
+                placed[row[0]] = {"lat": float(lat), "lon": float(lon), "zip": pieces[-1] if pieces[-1].isdigit() else None,
+                                  "city": pieces[-3] if len(pieces) >= 4 else None, "exact": row[3] == "Exact"}
+        for number, row in enumerate(part, 1):
+            found[row[0]] = placed.get(str(number))
+    return found
+
+
 def batch(addresses, city, state, post, cache):
     """Coordinates for many street addresses in one city: {address: (lat, lon)} for those that could be placed.
 

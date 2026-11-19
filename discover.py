@@ -42,6 +42,11 @@ def main():
     found = discovery.run_all(managers, DISCOVERERS, get, limit=args.limit, workers=settings.get("workers"))
 
     buildings = discovery.merge(files.load(BUILDINGS, []), found, files.today(), partial=bool(args.limit))
+    discovery.check_addresses(buildings, fetch.post)
+    moved = [b["id"] for b in buildings if discovery.correct(b)]
+    if moved:
+        print(f"  placed by their address, more than {discovery.MOVE_MILES} mile from their published coordinates: {', '.join(moved)}")
+    discovery.adopt_cities(buildings, config["managers"])
     discovery.locate_all(buildings, get, settings["counties"], osm_get=lambda url: get(url, headers=OSM_AGENT))
     files.save(BUILDINGS, buildings, indent=1)
 

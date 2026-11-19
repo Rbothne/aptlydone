@@ -204,3 +204,9 @@ footer label { cursor: pointer; }
 #setup .finish { margin: 10px 0 0; text-align: right; }
 #setup button.link { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }
 #setup #s-where { margin: 0 0 6px; font-weight: 600; }
+
+/* moving between the map and the list */
+.building.found { outline: 2px solid var(--accent); outline-offset: 2px; }
+.follow.onmap { margin-left: 6px; }
+.leaflet-popup-content p.vs { color: #1f4d3a; }
+.leaflet-popup-content p.place { color: #555; }
