@@ -230,8 +230,18 @@ def arlington(get, start, today):
     return [incident for incident in since(arlington_incidents(rows), start) if incident[3] <= today]
 
 
-# county FIPS -> reader(get, start day, end day)
-SOURCES = {"11001": dc, "24031": montgomery, "24033": prince_georges, "51059": fairfax, "51013": arlington}
+# ---------- Alexandria, VA: a search form and block addresses, in alexandria.py ----------
+
+def alexandria(get, start, today, post=None, cache=None):
+    from .. import geo
+    from . import alexandria as source
+    place = lambda addresses, known: geo.batch(addresses, "Alexandria", "VA", post, known)
+    return source.incidents(get, start, today, place=place, cache=cache if cache is not None else {})
+
+
+# county FIPS -> reader(get, start day, end day); a reader in NEEDS_PLACING also takes post= and cache= to geocode addresses
+SOURCES = {"11001": dc, "24031": montgomery, "24033": prince_georges, "51059": fairfax, "51013": arlington, "51510": alexandria}
+NEEDS_PLACING = {"51510"}
 # Counties whose data has stopped: the fixed (start, end) their reader is asked for, shown beside their counts.
 FROZEN = {"51013": ("2021-06-28", "2022-06-28")}
 

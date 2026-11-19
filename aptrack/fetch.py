@@ -46,6 +46,13 @@ def get(url, *, timeout=25, tries=3, headers=None, opener=urllib.request.urlopen
     raise last
 
 
+def post(url, body, headers=None, *, timeout=120, opener=urllib.request.urlopen):
+    """Send `body` (bytes) to `url` and return the answer. No retries: the callers decide what a failure means."""
+    request = urllib.request.Request(url, data=body, method="POST", headers={"User-Agent": USER_AGENT, **(headers or {})})
+    with opener(request, timeout=timeout) as response:
+        return response.read()
+
+
 class Throttle:
     """Keeps requests to the same host at least `delay` seconds apart, across threads.
     `delays` gives particular hosts their own spacing: shorter for a site known to cope, longer for a touchy one."""

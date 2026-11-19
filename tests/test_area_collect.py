@@ -35,6 +35,8 @@ def web(montgomery_fails=False):
             return json.dumps([{"start_date": "2026-11-01T10:00:00.000", "nibrs_code": "120", "latitude": "39.0", "longitude": "-77.1"}]).encode()
         if url == rents.SOURCE:
             return ZORI.encode()
+        if url.startswith("https://apps.alexandriava.gov"):
+            raise OSError("not part of this test")
         if "Property_and_Land_WebMercator" in url:
             return b'{"features": []}'
         if url.startswith(crime.ARLINGTON):

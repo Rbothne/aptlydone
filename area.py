@@ -30,7 +30,7 @@ def main():
     get = fetch.polite(settings["delay_seconds"], settings.get("site_delays"))
 
     collected = area.collect(buildings, files.load(AREA, {}), get, files.today(), files.now(),
-                             parts=(args.only,) if args.only else area.PARTS)
+                             parts=(args.only,) if args.only else area.PARTS, post=fetch.post)
     files.save(AREA, collected)
     print(f"{len(collected.get('tracts', {}))} tracts, crime counts for {len(collected.get('crime', {}))} buildings in "
           f"{len(collected.get('crime_counties', []))} counties, rent trends for {len(collected.get('zips', {}))} ZIP codes, "

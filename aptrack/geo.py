@@ -6,6 +6,8 @@ from urllib.parse import quote
 CENSUS = "https://geocoding.geo.census.gov/geocoder/geographies"
 CENSUS_OPTIONS = "&benchmark=Public_AR_Current&vintage=Current_Current&format=json"
 NOMINATIM = "https://nominatim.openstreetmap.org/reverse"
+CENSUS_BATCH = "https://geocoding.geo.census.gov/geocoder/locations/addressbatch"
+BATCH_SIZE = 5000          # the service takes up to 10,000 addresses a request
 NAME_KEYS = ("neighbourhood", "suburb", "quarter", "city_district", "town", "city")
 
 
@@ -43,3 +45,38 @@ def reverse(get, lat, lon):
 def neighborhood(get, lat, lon):
     """The neighborhood (or failing that the town) OpenStreetMap gives for a point."""
     return reverse(get, lat, lon)["neighborhood"]
+
+
+def batch(addresses, city, state, post, cache):
+    """Coordinates for many street addresses in one city: {address: (lat, lon)} for those that could be placed.
+
+    `cache` maps "address, city, state" to [lat, lon] or None and is updated in place, so an address is only ever
+    sent once (including the ones that cannot be placed). A failed request caches nothing.
+    """
+    import csv
+    import io
+    key = lambda address: f"{address}, {city}, {state}"
+    new = sorted(address for address in set(addresses) if key(address) not in cache)
+    for start in range(0, len(new), BATCH_SIZE):
+        part = new[start:start + BATCH_SIZE]
+        lines = io.StringIO()
+        writer = csv.writer(lines, quoting=csv.QUOTE_ALL, lineterminator="\n")
+        for number, address in enumerate(part, 1):
+            writer.writerow([number, address, city, state, ""])
+        boundary = "----aptrack-geocode-batch"
+        body = (f'--{boundary}\r\nContent-Disposition: form-data; name="benchmark"\r\n\r\nPublic_AR_Current\r\n'
+                f'--{boundary}\r\nContent-Disposition: form-data; name="addressFile"; filename="addresses.csv"\r\n'
+                f'Content-Type: text/csv\r\n\r\n{lines.getvalue()}\r\n--{boundary}--\r\n').encode("utf-8")
+        try:
+            answer = post(CENSUS_BATCH, body, {"Content-Type": f"multipart/form-data; boundary={boundary}"}, timeout=300)
+        except Exception as error:
+            print(f"  could not place {len(part)} addresses this time: {error!r}")
+            continue
+        placed = {}
+        for row in csv.reader(io.StringIO(answer.decode("utf-8", "replace"))):
+            if len(row) >= 6 and row[2] == "Match" and "," in row[5]:
+                lon, lat = row[5].split(",")
+                placed[row[0]] = [float(lat), float(lon)]
+        for number, address in enumerate(part, 1):
+            cache[key(address)] = placed.get(str(number))
+    return {address: tuple(cache[key(address)]) for address in set(addresses) if cache.get(key(address))}

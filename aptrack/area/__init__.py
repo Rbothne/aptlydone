@@ -24,7 +24,7 @@ def zip_code(building):
     return match.group(1) if match and match.group(1).startswith("2") else None
 
 
-def collect(buildings, previous, get, today, now, parts=PARTS):
+def collect(buildings, previous, get, today, now, parts=PARTS, post=None):
     """Area data for these (in-region) buildings, starting from what was collected before."""
     area = dict(previous or {})
 
@@ -42,7 +42,10 @@ def collect(buildings, previous, get, today, now, parts=PARTS):
                 continue
             start, end = crime.FROZEN.get(county, (crime.year_ago(today), today))
             try:
-                incidents = reader(get, start, end)
+                if county in crime.NEEDS_PLACING:
+                    incidents = reader(get, start, end, post=post, cache=area.setdefault("geocache", {}))
+                else:
+                    incidents = reader(get, start, end)
             except Exception as error:
                 print(f"  no crime data for county {county} this time: {error!r}")
                 continue
