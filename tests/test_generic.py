@@ -98,6 +98,16 @@ class GenericTests(QuietTestCase):
         found = generic.discoverer(dict(CONFIG, name_from_slug=True))(get)
         self.assertEqual(found[0]["name"], "The One")
 
+    def test_a_street_that_repeats_the_whole_address_is_cut_back_to_the_street(self):
+        whole = {"street": "915 Silver Spring Ave, Silver Spring, MD 20910-5052", "city": "Silver Spring", "state": "MD", "zip": "20910-5052"}
+        self.assertEqual(generic.tidy(whole), {"street": "915 Silver Spring Ave", "city": "Silver Spring", "state": "MD", "zip": "20910"})
+        plain = {"street": "1771 N. Pierce St.", "city": "Arlington", "state": "VA", "zip": None}
+        self.assertEqual(generic.tidy(plain), plain)
+        page = PAGE.replace('"streetAddress":"', '"streetAddress":"Suite 1, Arlington, VA 22201 / ')
+        self.assertNotEqual(page, PAGE)
+        get = self.web({CONFIG["sitemap"]: SITEMAP, ONE: page + FLOORPLANS})
+        self.assertEqual(generic.discoverer(CONFIG)(get)[0]["address"]["street"], "Suite 1")
+
     def test_run_all_builds_a_generic_discoverer_from_the_managers_line(self):
         get = self.web({CONFIG["sitemap"]: SITEMAP, ONE: PAGE + FLOORPLANS})
         found = discovery.run_all([CONFIG], discover.DISCOVERERS, get, workers=1, sleep=lambda s: None)

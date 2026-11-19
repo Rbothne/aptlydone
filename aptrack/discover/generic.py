@@ -40,6 +40,15 @@ def slug_name(slug, manager):
     return " ".join(manager if word == manager.lower() else word.capitalize() for word in slug.split("-") if word)
 
 
+def tidy(address):
+    """Some sites put the whole address in the street line and nine digits in the ZIP: keep the street and five."""
+    street, city = address.get("street") or "", address.get("city") or ""
+    if city and f", {city}" in street:
+        street = street.split(f", {city}")[0].strip()
+    code = str(address.get("zip") or "")
+    return dict(address, street=street or address.get("street"), zip=code[:5] if code[:5].isdigit() else address.get("zip"))
+
+
 def several(value):
     return value if isinstance(value, list) else [value] if value else []
 
@@ -78,6 +87,7 @@ def discoverer(config):
                     if embed:
                         break
                 slug = url.rstrip("/").rsplit("/", 1)[1]
+                described["address"] = tidy(described["address"])
                 if config.get("name_from_slug"):
                     described["name"] = slug_name(slug, config["name"])
                 found.append(common.building(config["name"], slug, url, described, embed))
