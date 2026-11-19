@@ -5,10 +5,11 @@ Every part is optional: a source that fails leaves what was collected before in 
 """
 
 import re
+import time
 
-from . import affordable, census, crime, rents
+from . import affordable, census, crime, places, rents
 
-PARTS = ("census", "crime", "rents", "affordable")
+PARTS = ("census", "crime", "rents", "affordable", "places")
 
 
 def zip_code(building):
@@ -24,7 +25,7 @@ def zip_code(building):
     return match.group(1) if match and match.group(1).startswith("2") else None
 
 
-def collect(buildings, previous, get, today, now, parts=PARTS, post=None):
+def collect(buildings, previous, get, today, now, parts=PARTS, post=None, sleep=time.sleep):
     """Area data for these (in-region) buildings, starting from what was collected before."""
     area = dict(previous or {})
 
@@ -75,6 +76,23 @@ def collect(buildings, previous, get, today, now, parts=PARTS, post=None):
                 print(f"  {len(area['affordable'])} DC buildings stand on an affordable-housing project")
             except Exception as error:
                 print(f"  no affordable-housing list this time: {error!r}")
+
+    if "places" in parts:
+        placed = [b for b in buildings if b.get("lat") is not None and b.get("lon") is not None]
+        if placed:
+            fresh = places.near(placed, places.fetch_all(get, places.bbox(placed), sleep=sleep))
+            before = area.get("places") or {}
+            # a kind of place that could not be read this week keeps last week's numbers
+            area["places"] = {building_id: {**(before.get(building_id) or {}), **mine} for building_id, mine in fresh.items()}
+            walk = dict(area.get("walk") or {})
+            for building in placed:
+                if building["id"] in walk:
+                    continue
+                try:
+                    walk[building["id"]] = places.walkability(get, building["lat"], building["lon"])
+                except Exception as error:
+                    print(f"  no walkability for {building['id']}: {error!r}")
+            area["walk"] = walk
 
     area["updated"] = now
     return area

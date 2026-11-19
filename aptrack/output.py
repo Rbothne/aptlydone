@@ -5,6 +5,7 @@ import os
 from . import costs, deals, files
 from .area import zip_code
 from .area.affordable import mostly
+from .area.places import dog_score, walk_label
 from .facts import laundry
 
 BUILDING_FIELDS = ("id", "name", "manager", "url", "platform", "address", "lat", "lon", "state", "county", "tract",
@@ -97,9 +98,14 @@ def write_site(buildings, results, state, out_dir, now, area=None):
                 unit["restricted"] = True
     price(entries, units_of)
     crime = area.get("crime") or {}
+    nearby, walk = area.get("places") or {}, area.get("walk") or {}
     for entry in entries:
         entry["crime"] = crime.get(entry["id"])
         entry["zip"] = zip_code(entry)
+        entry["near"] = nearby.get(entry["id"])
+        score = walk.get(entry["id"])
+        entry["walk"] = {"score": score, "label": walk_label(score)} if score is not None else None
+        entry["dog"] = dog_score(entry.get("pets"), (entry.get("features") or []) + (entry.get("amenities") or []), entry["near"])
     tracts = {e["tract"]: area["tracts"][e["tract"]] for e in entries if e.get("tract") in (area.get("tracts") or {})}
     zips = {e["zip"]: area["zips"][e["zip"]] for e in entries if e.get("zip") in (area.get("zips") or {})}
 

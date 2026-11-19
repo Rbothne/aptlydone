@@ -35,6 +35,8 @@ def web(montgomery_fails=False):
             return json.dumps([{"start_date": "2026-11-01T10:00:00.000", "nibrs_code": "120", "latitude": "39.0", "longitude": "-77.1"}]).encode()
         if url == rents.SOURCE:
             return ZORI.encode()
+        if "interpreter" in url or "WalkabilityIndex" in url:
+            raise OSError("not part of this test")
         if url.startswith("https://apps.alexandriava.gov"):
             raise OSError("not part of this test")
         if "Property_and_Land_WebMercator" in url:
@@ -67,7 +69,7 @@ class CollectTests(QuietTestCase):
     def test_collects_census_crime_and_rent_trend(self):
         buildings = [building("dc"), building("moco", county="24031", tract="24031700000", zip_code="20814", lat=39.0, lon=-77.1),
                      building("va", county="51013", tract="51013101701", zip_code="22201", lat=38.89, lon=-77.08)]
-        got = area.collect(buildings, {}, web(), TODAY, "2026-11-18T12:00Z")
+        got = area.collect(buildings, {}, web(), TODAY, "2026-11-18T12:00Z", sleep=lambda s: None)
         self.assertEqual(set(got["tracts"]), {"11001001402"})
         self.assertEqual(got["crime"], {"dc": {"violent": 0, "property": 1}, "moco": {"violent": 1, "property": 0},
                                         "va": {"violent": 1, "property": 0, "period": ["2021-06-28", "2022-06-28"]}})
@@ -78,7 +80,7 @@ class CollectTests(QuietTestCase):
     def test_a_failed_source_keeps_what_was_there(self):
         previous = {"crime": {"moco": {"violent": 4, "property": 9}}, "crime_counties": ["24031"], "tracts": {"x": {}}, "zips": {"1": {}}}
         buildings = [building("dc"), building("moco", county="24031", lat=39.0, lon=-77.1)]
-        got = area.collect(buildings, previous, web(montgomery_fails=True), TODAY, "now")
+        got = area.collect(buildings, previous, web(montgomery_fails=True), TODAY, "now", sleep=lambda s: None)
         self.assertEqual(got["crime"]["moco"], {"violent": 4, "property": 9})
         self.assertEqual(got["crime"]["dc"], {"violent": 0, "property": 1})
         self.assertEqual(got["crime_counties"], ["11001", "24031"])
@@ -102,7 +104,7 @@ class OutputTests(QuietTestCase):
     def test_area_data_is_written_for_the_page(self):
         with tempfile.TemporaryDirectory() as out:
             b = building("dc", manager="X", platform="link", url="https://x.test", neighborhood="Navy Yard", first_seen=TODAY, state="DC")
-            collected = area.collect([b], {}, web(), TODAY, "2026-11-18T12:00Z")
+            collected = area.collect([b], {}, web(), TODAY, "2026-11-18T12:00Z", sleep=lambda s: None)
             output.write_site([b], {}, history.new_state(), out, "2026-11-18T13:00Z", area=collected)
             with open(os.path.join(out, "index.json"), encoding="utf-8") as f:
                 index = json.load(f)
