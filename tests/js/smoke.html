@@ -174,7 +174,7 @@ async function run() {
   slide("minWalk", "16");
   out.walk16 = count();
   out.walk16Label = doc.getElementById("minWalkOut").textContent;
-  const walkScores = () => [...doc.querySelectorAll(".facts li")].map((li) => (li.textContent.match(/Walkability ([\d.]+)/) || [])[1]).filter(Boolean).map(Number);
+  const walkScores = () => [...doc.querySelectorAll("#buildings .facts li")].map((li) => (li.textContent.match(/Walkability ([\d.]+)/) || [])[1]).filter(Boolean).map(Number);
   out.walk16Lowest = Math.min(...walkScores());
   set("sort", "walk");
   out.mostWalkableFirst = walkScores()[0];

@@ -30,7 +30,7 @@
 
   <!-- NEW ENTRIES GO DIRECTLY BELOW THIS LINE -->
 
-  <h2>Published about midnight, 19 November <small>seven more companies, tags drop-down, two more counties of crime, settings export</small></h2>
+  <h2>Published about 12:20 am, 19 November <small>seven more companies, tags drop-down, two more counties of crime, settings export</small></h2>
   <ul>
     <li><b>Seven more companies are tracked:</b> Equity Residential (42 buildings), UDR (25), Cortland (20), Gables (13), LyvWell (10),
       MAA (5) and Simpson (4). Every one of those 119 buildings has prices today. Fourteen companies in all:
@@ -43,11 +43,20 @@
     <li><b>Crime for Howard and Loudoun</b>, from the two dashboard links you sent. Each dashboard hands over a year of incidents with a
       map point and an offence code. Loudoun's covers the Sheriff's Office only, not Leesburg's own police. These are not a documented
       service, so they could stop working without notice; if so those counties keep their last counts. <b>Alexandria and Prince William</b>
-      were added earlier tonight. Nine counties now. <i>The Howard and Loudoun counts reach the page with the next data update, within the hour.</i></li>
+      were added earlier tonight. Nine counties now, covering 559 of the 585 buildings.</li>
     <li><b>Nearby places, walkability and a dog-friendly score.</b> Each building lists what is close (Metro, supermarket, parks, dog park,
       community center, library, gym, pharmacy, places to eat), the EPA walkability score for its block (1 to 20), and a dog score out of 5.
-      There is a Walkability slider and a "Most walkable" sort. <i>These also arrive with the next data update, within the hour</i>:
-      the public OpenStreetMap query servers were all overloaded tonight, so I switched to OpenStreetMap's daily state files, which took an extra hour.</li>
+      There is a Walkability slider and a "Most walkable" sort. Today 327 buildings have a Metro station within half a mile and 506 a
+      supermarket; 291 sit in the EPA's top walkability band. The places come from OpenStreetMap's daily state files (the public
+      OpenStreetMap query servers were all overloaded tonight and ask automated users to stay away), Metro stations from the transit authority's own list.</li>
+    <li><b>Parks are overstated for now.</b> A park is measured to the rectangle around it, not to its real outline, so a building
+      inside the rectangle of a long or large park (Rock Creek, the Parkway) reads "Park next door" when it may be several blocks away.
+      507 of 585 buildings currently count as having a park within a quarter mile, which is too many. Treat "Park nearby" and the park
+      point in the dog score with caution until I measure to the real outline; that is the next fix.</li>
+    <li><b>Equity Residential could not be read from GitHub's servers.</b> All 42 buildings read fine from this computer tonight, which
+      is where today's prices come from, but the first automatic run on GitHub failed on every one. I cannot see GitHub's log from here,
+      so failed reads now record their reason: a building whose latest read failed says, for example, "Latest read failed (HTTP 403)".
+      If Equity turns out to refuse GitHub's servers, I will not work around that; its prices would then only refresh when the tracker is run from this computer.</li>
     <li><b>Google Maps key in Setup</b>, with the times you leave for and from work. With a key, drive times become rush-hour times for
       the next weekday, morning and evening. The key stays in your browser. <b>I could not test this against Google</b> because that needs a key;
       it is written to Google's documentation. Tell me what you see the first time.</li>
