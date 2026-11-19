@@ -57,7 +57,10 @@ def run_all(managers, discoverers, get, limit=None, workers=4, sleep=time.sleep)
     whose site fails or stops answering is left alone, and come back to once after the others are done."""
     def attempt(manager):
         try:
-            return discoverers[manager["discover"]](get, limit=limit)
+            find = discoverers[manager["discover"]]
+            if getattr(find, "needs_config", False):          # a company described entirely by its managers.json line
+                find = find(manager)
+            return find(get, limit=limit)
         except Exception as error:
             print(f"{manager['name']}: discovery failed: {error!r}")
             return None
