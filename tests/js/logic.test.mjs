@@ -67,9 +67,10 @@ test("building facts: parking and pets need a known yes; there is no laundry fil
   assert.equal(unitMatches(unit(), building({ pets: true }), f({ pets: true })), true);
 });
 
-test("tagged only", () => {
-  assert.equal(unitMatches(unit({ tag: null }), building(), f({ tagged: true })), false);
-  assert.equal(unitMatches(unit({ tag: "local" }), building(), f({ tagged: true })), true);
+test("all three deal tags chosen is the old tagged-only", () => {
+  const all = ["absolute", "building", "local"];
+  assert.equal(unitMatches(unit({ tag: null }), building(), f({ deals: all })), false);
+  assert.equal(unitMatches(unit({ tag: "local" }), building(), f({ deals: all })), true);
 });
 
 test("income-restricted units and senior housing are hidden unless switched on", () => {
@@ -286,7 +287,7 @@ test("a unit marked for checking is not a steal: not in tagged-only, not a top p
   assert.equal(isSteal("check"), false);
   assert.equal(isSteal("local"), true);
   assert.equal(isSteal(null), false);
-  assert.equal(unitMatches(unit({ tag: "check" }), building(), f({ tagged: true })), false);
+  assert.equal(unitMatches(unit({ tag: "check" }), building(), f({ deals: ["absolute", "building", "local"] })), false);
   const units = [unit({ id: "check", tag: "check", own: { pct: -45 } }), unit({ id: "local", tag: "local" }), unit({ id: "plain", own: { pct: -5 } })];
   assert.deepEqual(units.sort(compare("picks")).map((u) => u.id), ["local", "plain", "check"]);
   const groups = groupBuildings([building({ id: "A", lat: 1, lon: 1 })], { A: [unit({ id: "A:1", building: "A", tag: "check" })] }, f());
@@ -302,7 +303,7 @@ test("crime counts from an older year say which year", async () => {
 
 test("follow criteria: taken from the filters, put into words, and turned back into filters", async () => {
   const { criteriaFrom, criteriaLabel, criteriaFilters } = await import("../../site/js/logic.js");
-  const criteria = criteriaFrom(f({ beds: [1, 2], minSqft: 700, maxCost: 2600, q: "chevy", tagged: true, counties: ["11001"] }));
+  const criteria = criteriaFrom(f({ beds: [1, 2], minSqft: 700, maxCost: 2600, q: "chevy", deals: ["local"], counties: ["11001"] }));
   assert.deepEqual(criteria, { beds: [1, 2], minSqft: 700, maxCost: 2600 });
   assert.equal(criteriaLabel(criteria), "1 or 2 bed · 700+ sqft · up to $2,600");
   assert.equal(criteriaLabel({ beds: [0], minSqft: null, maxCost: null }), "Studio");
@@ -310,7 +311,7 @@ test("follow criteria: taken from the filters, put into words, and turned back i
   assert.equal(criteriaLabel({ beds: [], minSqft: null, maxCost: null }), "any unit");
   assert.equal(criteriaLabel(undefined), "any unit");
   const back = criteriaFilters(criteria);
-  assert.deepEqual([back.beds, back.minSqft, back.maxCost, back.q, back.tagged, back.counties], [[1, 2], 700, 2600, "", false, []]);
+  assert.deepEqual([back.beds, back.minSqft, back.maxCost, back.q, back.deals, back.counties], [[1, 2], 700, 2600, "", [], []]);
   assert.equal(unitMatches(unit({ beds: 1, sqft: 800, true: 2500 }), building(), back), true);
   assert.equal(unitMatches(unit({ beds: 1, sqft: 650, true: 2500 }), building(), back), false);
 });
@@ -395,4 +396,44 @@ test("nearby tags: what is within reach, nearest first in a fixed order", async 
 test("most walkable sort", () => {
   const units = [unit({ id: "x" }), unit({ id: "low", walkScore: 9 }), unit({ id: "high", walkScore: 18 })];
   assert.deepEqual(units.sort(compareUnits("walk")).map((u) => u.id), ["high", "low", "x"]);
+});
+
+test("deal tags are a choice of any: a unit must carry one of the chosen tags", async () => {
+  assert.deepEqual(DEFAULT_FILTERS.deals, []);
+  assert.equal(unitMatches(unit({ tag: null }), building(), f({ deals: [] })), true);
+  assert.equal(unitMatches(unit({ tag: "local" }), building(), f({ deals: ["absolute", "local"] })), true);
+  assert.equal(unitMatches(unit({ tag: "building" }), building(), f({ deals: ["absolute", "local"] })), false);
+  assert.equal(unitMatches(unit({ tag: null }), building(), f({ deals: ["absolute"] })), false);
+  assert.equal(unitMatches(unit({ tag: "check" }), building(), f({ deals: ["absolute", "building", "local"] })), false);
+});
+
+test("filters saved before the tag drop-down still work: tagged-only means any deal tag", () => {
+  const old = { ...f(), tagged: true };
+  delete old.deals;
+  assert.equal(unitMatches(unit({ tag: "building" }), building(), old), true);
+  assert.equal(unitMatches(unit({ tag: null }), building(), old), false);
+});
+
+test("the tag drop-down: groups, what is chosen, and its label", async () => {
+  const { TAG_GROUPS, chosenTags, tagsLabel, setTag } = await import("../../site/js/logic.js");
+  assert.deepEqual(TAG_GROUPS.map((g) => [g.name, g.tags.map((t) => t.key)]), [
+    ["Deals", ["absolute", "building", "local"]],
+    ["Nearby", ["nearMetro", "nearGrocery", "nearPark", "dogFriendly"]],
+    ["Building", ["ground", "parking", "pets", "highEnd"]],
+  ]);
+  assert.equal(tagsLabel(f()), "Any");
+  assert.deepEqual(chosenTags(f()), []);
+  let filters = setTag(f(), "nearMetro", true);
+  assert.equal(filters.nearMetro, true);
+  assert.equal(tagsLabel(filters), "Near Metro");
+  filters = setTag(filters, "absolute", true);
+  filters = setTag(filters, "local", true);
+  assert.deepEqual(filters.deals, ["absolute", "local"]);
+  assert.deepEqual(chosenTags(filters), ["absolute", "local", "nearMetro"]);
+  assert.equal(tagsLabel(filters), "Absolute steal + 2 more");
+  filters = setTag(filters, "absolute", false);
+  filters = setTag(filters, "nearMetro", false);
+  assert.deepEqual([filters.deals, filters.nearMetro, tagsLabel(filters)], [["local"], false, "Local value"]);
+  assert.deepEqual(setTag(setTag(f(), "local", true), "local", true).deals, ["local"]);       // choosing twice is choosing once
+  assert.equal(tagsLabel({ ...f(), tagged: true, deals: undefined }), "Absolute steal + 2 more");
 });

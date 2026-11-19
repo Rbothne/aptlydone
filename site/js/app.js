@@ -1,8 +1,8 @@
 // Loads the data files and draws the page. Every decision (what matches, what order, what words) is in logic.js.
 
 import {
-  DEFAULT_FILTERS, affordable, affordableNote, ago, areaFacts, countiesLabel, countyGroups, availability, cost, crimeText, criteriaFilters, criteriaFrom, criteriaLabel, driveLabel, incomeNeeded,
-  availableNote, dogText, isSteal, mapPoints, nearbyTags, standing, unitTitle, walkText, groupBuildings, money, perSqft, shortDate, sparkline, tagLabel, tagReason, unitMatches,
+  DEFAULT_FILTERS, TAG_GROUPS, affordable, affordableNote, ago, areaFacts, countiesLabel, countyGroups, availability, cost, crimeText, criteriaFilters, criteriaFrom, criteriaLabel, driveLabel, incomeNeeded,
+  availableNote, dogText, isSteal, mapPoints, nearbyTags, standing, unitTitle, walkText, groupBuildings, money, perSqft, shortDate, sparkline, tagLabel, tagReason, tagsLabel, chosenTags, setTag, unitMatches,
 } from "./logic.js";
 import { driveTimes, geocode, trafficTimes } from "./commute.js";
 import { createStore } from "./store.js";
@@ -484,6 +484,14 @@ function showFilters() {
     box.checked = mine.length > 0 && mine.every((county) => county.checked);
     box.indeterminate = !box.checked && mine.some((county) => county.checked);
   }
+  const chosen = chosenTags(f);
+  $("tagslabel").textContent = tagsLabel(f);
+  for (const box of document.querySelectorAll("#tagspanel input[data-tag]")) box.checked = chosen.includes(box.dataset.tag);
+  for (const box of document.querySelectorAll("#tagspanel input[data-group]")) {
+    const mine = [...document.querySelectorAll(`#tagspanel input[data-tag][data-in="${box.dataset.group}"]`)];
+    box.checked = mine.every((tag) => tag.checked);
+    box.indeterminate = !box.checked && mine.some((tag) => tag.checked);
+  }
   $("manager").value = f.manager;
   $("minRating").value = f.minRating == null ? "" : String(f.minRating);
   $("sort").value = f.sort;
@@ -515,7 +523,10 @@ function wire() {
     $(id).addEventListener("change", () => { const v = $(id).value; state.filters[id] = v === "" ? null : Number(v); changed(); });
   }
   $("moveBy").addEventListener("change", () => { state.filters.moveBy = $("moveBy").value || null; changed(); });
-  document.addEventListener("click", (event) => { if (!$("areas").contains(event.target)) $("areas").open = false; });
+  document.addEventListener("click", (event) => {
+    for (const id of ["areas", "tags"]) if (!$(id).contains(event.target)) $(id).open = false;
+  });
+  buildTags();
   $("manager").addEventListener("change", () => { state.filters.manager = $("manager").value; changed(); });
   $("minRating").addEventListener("change", () => { const v = $("minRating").value; state.filters.minRating = v === "" ? null : Number(v); changed(); });
   $("sort").addEventListener("change", () => { state.filters.sort = $("sort").value; changed(); });
@@ -568,6 +579,21 @@ function wire() {
 }
 
 // ---------- area picker: states with their counties, any number chosen ----------
+
+function buildTags() {
+  const choose = (keys, on) => {
+    for (const key of keys) state.filters = setTag(state.filters, key, on);
+    changed();
+  };
+  $("tagspanel").replaceChildren(...TAG_GROUPS.flatMap((group) => [
+    h("label", { class: "state", title: group.name === "Deals" ? "Units carrying any of the chosen deal tags" : "Every chosen one must hold" },
+      h("input", { type: "checkbox", "data-group": group.name, onchange: (event) => choose(group.tags.map((tag) => tag.key), event.target.checked) }),
+      `${group.name} (all)`),
+    ...group.tags.map((tag) => h("label", { class: "county", title: tag.title },
+      h("input", { type: "checkbox", "data-tag": tag.key, "data-in": group.name, onchange: (event) => choose([tag.key], event.target.checked) }),
+      tag.label)),
+  ]));
+}
 
 function buildAreas(counts) {
   const panel = $("areaspanel");

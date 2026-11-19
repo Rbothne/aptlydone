@@ -2,7 +2,7 @@
 
 export const DEFAULT_FILTERS = Object.freeze({
   q: "", beds: [], minSqft: null, maxCost: null, moveBy: null, floorMin: null, floorMax: null, ground: false,
-  parking: false, pets: false, nearMetro: false, nearGrocery: false, nearPark: false, dogFriendly: false, minWalk: null, tagged: false, highEnd: false, maxViolent: null, maxDrive: null, minRating: null, manager: "", counties: [], showRestricted: false, sort: "picks",
+  parking: false, pets: false, nearMetro: false, nearGrocery: false, nearPark: false, dogFriendly: false, minWalk: null, deals: [], highEnd: false, maxViolent: null, maxDrive: null, minRating: null, manager: "", counties: [], showRestricted: false, sort: "picks",
 });
 
 export const HIGH_END = 67;                 // a building pricier than this share of its neighbours is "high-end for its area"
@@ -53,7 +53,8 @@ export function unitMatches(unit, building, filters) {
   if (filters.nearPark && !within(building, "park", PARK_MILES)) return false;
   if (filters.dogFriendly && !(building.dog && building.dog.score >= DOG_FRIENDLY)) return false;
   if (filters.minWalk != null && !(building.walk && building.walk.score >= filters.minWalk)) return false;
-  if (filters.tagged && !isSteal(unit.tag)) return false;
+  const deals = chosenDeals(filters);
+  if (deals.length && !deals.includes(unit.tag)) return false;
   if (filters.highEnd && !(building.rank && building.rank.pct >= HIGH_END)) return false;
   if (filters.maxViolent != null && !(building.crime && building.crime.violent <= filters.maxViolent)) return false;
   if (filters.maxDrive != null && !(building.drive != null && building.drive <= filters.maxDrive)) return false;
@@ -199,6 +200,54 @@ export function countyGroups(fipsCodes, names) {
       .map((fips) => ({ fips, name: names[fips] || fips }))
       .sort((a, b) => a.name.localeCompare(b.name)),
   })).filter((group) => group.counties.length);
+}
+
+/** The tag drop-down. Deal tags are alternatives (a unit carries one tag); the rest are each a requirement. */
+export const TAG_GROUPS = [
+  { name: "Deals", note: "any of these", tags: [
+    { key: "absolute", label: "Absolute steal", title: "10% or more below its building and 15% or more below its neighbors" },
+    { key: "building", label: "Building steal", title: "15% or more below similar units in the same building" },
+    { key: "local", label: "Local value", title: "20% or more below similar units in buildings within one to two miles" }] },
+  { name: "Nearby", note: "all of these", tags: [
+    { key: "nearMetro", label: "Near Metro", title: "A Metro station within half a mile" },
+    { key: "nearGrocery", label: "Grocery nearby", title: "A supermarket within half a mile" },
+    { key: "nearPark", label: "Park nearby", title: "A park within a quarter mile" },
+    { key: "dogFriendly", label: "Dog-friendly", title: "Pets allowed, plus at least two of: a dog park within half a mile, a park within a quarter mile, a dog run or pet spa on site" }] },
+  { name: "Building", note: "all of these", tags: [
+    { key: "ground", label: "Ground floor", title: "Units on the ground floor only" },
+    { key: "parking", label: "Parking", title: "The building lists parking" },
+    { key: "pets", label: "Pets", title: "The building says pets are allowed" },
+    { key: "highEnd", label: "High-end", title: "Buildings whose one-bedroom cost per sqft is in the top third of buildings within two miles" }] },
+];
+const DEAL_KEYS = TAG_GROUPS[0].tags.map((tag) => tag.key);
+
+/** The deal tags a unit must carry one of. Filters saved before the drop-down said only "tagged". */
+function chosenDeals(filters) {
+  if (Array.isArray(filters.deals)) return filters.deals.filter((key) => DEAL_KEYS.includes(key));
+  return filters.tagged ? DEAL_KEYS : [];
+}
+
+/** Keys of every chosen tag, in the drop-down's order. */
+export function chosenTags(filters) {
+  const deals = chosenDeals(filters);
+  return TAG_GROUPS.flatMap((group) => group.tags.map((tag) => tag.key))
+    .filter((key) => (DEAL_KEYS.includes(key) ? deals.includes(key) : Boolean(filters[key])));
+}
+
+export function tagsLabel(filters) {
+  const chosen = chosenTags(filters);
+  if (!chosen.length) return "Any";
+  const first = TAG_GROUPS.flatMap((group) => group.tags).find((tag) => tag.key === chosen[0]).label;
+  return chosen.length === 1 ? first : `${first} + ${chosen.length - 1} more`;
+}
+
+/** The filters with one tag switched on or off. */
+export function setTag(filters, key, on) {
+  if (!DEAL_KEYS.includes(key)) return { ...filters, [key]: Boolean(on) };
+  const rest = chosenDeals(filters).filter((deal) => deal !== key);
+  const next = { ...filters, deals: DEAL_KEYS.filter((deal) => rest.includes(deal) || (on && deal === key)) };
+  delete next.tagged;
+  return next;
 }
 
 export function countiesLabel(selected, names) {

@@ -14,6 +14,8 @@ async function run() {
   for (let i = 0; i < 100 && !doc.querySelector(".unit"); i++) await wait(100);
   const count = () => doc.getElementById("count").textContent;
   const set = (id, value) => { const el = doc.getElementById(id); el.value = value; el.dispatchEvent(new Event("change")); };
+  const tick = (selector, on) => { const box = doc.querySelector(selector); box.checked = on; box.dispatchEvent(new Event("change")); };
+  const tag = (key, on) => tick(`#tagspanel input[data-tag="${key}"]`, on);
   // first visit: the setup dialog is open; use it, then carry on with a clean slate
   out.setupOpen = doc.getElementById("setup").open;
   doc.querySelector('[data-sbeds="1"]').click();
@@ -29,10 +31,12 @@ async function run() {
   out.welcomed = JSON.parse(win.localStorage.getItem("apt.settings")).welcomed;
   doc.getElementById("reset").click();
   out.standingChip = [...doc.querySelectorAll(".facts li")].map((li) => li.textContent).find((t) => /for its area/.test(t)) || null;
-  doc.querySelector('[data-toggle="highEnd"]').click();
+  tag("highEnd", true);
   out.highEnd = count();
-  doc.querySelector('[data-toggle="highEnd"]').click();
+  out.tagsLabel1 = doc.getElementById("tagslabel").textContent;
+  tag("highEnd", false);
   out.start = count();
+  out.tagButtonsGone = !doc.querySelector('[data-toggle="tagged"], [data-toggle="nearMetro"], [data-toggle="ground"]');
 
   doc.querySelector(".unit").click();
   const detail = doc.querySelector(".detail");
@@ -56,14 +60,20 @@ async function run() {
   out.oneBed700 = count();
   set("maxCost", "2400");
   out.under2400 = count();
-  doc.querySelector('[data-toggle="ground"]').click();
+  tag("ground", true);
   out.ground = count();
   out.groundFloors = [...new Set(win.aptMatches().map((u) => u.floor))];
-  doc.querySelector('[data-toggle="ground"]').click();
-  doc.querySelector('[data-toggle="tagged"]').click();
+  tag("ground", false);
+  tick('#tagspanel input[data-group="Deals"]', true);
   out.tagged = count();
-  doc.querySelector('[data-toggle="tagged"]').click();
-  const tick = (selector, on) => { const box = doc.querySelector(selector); box.checked = on; box.dispatchEvent(new Event("change")); };
+  out.taggedKinds = [...new Set(win.aptMatches().map((u) => u.tag))].sort();
+  out.tagsLabelDeals = doc.getElementById("tagslabel").textContent;
+  tag("building", false);
+  tag("local", false);
+  out.absoluteOnly = count();
+  out.absoluteKinds = [...new Set(win.aptMatches().map((u) => u.tag))];
+  out.dealsGroupHalfTicked = doc.querySelector('#tagspanel input[data-group="Deals"]').indeterminate;
+  tick('#tagspanel input[data-group="Deals"]', false);
   doc.getElementById("reset").click();
   tick('#areaspanel input[data-county="51013"]', true);
   out.arlington = count();
@@ -149,10 +159,17 @@ async function run() {
   out.dogChip = [...doc.querySelectorAll(".facts li")].map((li) => li.textContent).find((t) => /dog/i.test(t)) || null;
   const all = count();
   for (const name of ["nearMetro", "nearGrocery", "nearPark", "dogFriendly"]) {
-    doc.querySelector(`[data-toggle="${name}"]`).click();
+    tag(name, true);
     out[name] = count();
-    doc.querySelector(`[data-toggle="${name}"]`).click();
+    tag(name, false);
   }
+  tag("nearMetro", true);
+  tag("nearGrocery", true);
+  out.metroAndGrocery = count();
+  out.tagsLabelTwo = doc.getElementById("tagslabel").textContent;
+  out.tagsSaved = JSON.parse(win.localStorage.getItem("apt.filters")).nearGrocery;
+  tag("nearMetro", false);
+  tag("nearGrocery", false);
   out.togglesReleased = count() === all;
   slide("minWalk", "16");
   out.walk16 = count();

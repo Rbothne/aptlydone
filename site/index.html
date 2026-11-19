@@ -38,16 +38,11 @@
       <span aria-hidden="true">–</span>
       <input type="number" id="floorMax" min="0" step="1" placeholder="to" inputmode="numeric" aria-label="Highest floor"></label>
 
-    <span class="chips" role="group" aria-label="Must have">
-      <button type="button" data-toggle="ground" aria-pressed="false">Ground floor</button>
-      <button type="button" data-toggle="parking" aria-pressed="false">Parking</button>
-      <button type="button" data-toggle="pets" aria-pressed="false">Pets</button>
-      <button type="button" data-toggle="dogFriendly" aria-pressed="false" title="Pets allowed, plus at least two of: a dog park within half a mile, a park within a quarter mile, a dog run or pet spa on site">Dog-friendly</button>
-      <button type="button" data-toggle="nearMetro" aria-pressed="false" title="A Metro station within half a mile">Near Metro</button>
-      <button type="button" data-toggle="nearGrocery" aria-pressed="false" title="A supermarket within half a mile">Grocery nearby</button>
-      <button type="button" data-toggle="nearPark" aria-pressed="false" title="A park within a quarter mile">Park nearby</button>
-      <button type="button" data-toggle="tagged" aria-pressed="false">Tagged only</button>
-      <button type="button" data-toggle="highEnd" aria-pressed="false" title="Buildings whose one-bedroom cost per sqft is in the top third of buildings within two miles">High-end</button>
+    <details class="picker" id="tags">
+      <summary>Tags: <span id="tagslabel">Any</span></summary>
+      <div class="panel" id="tagspanel"></div>
+    </details>
+    <span class="chips" role="group" aria-label="Also show">
       <button type="button" data-toggle="showRestricted" aria-pressed="false" title="Income-restricted units and senior housing are hidden unless this is on">Income-restricted &amp; senior</button>
     </span>
 
