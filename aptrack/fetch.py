@@ -19,10 +19,11 @@ class RateLimited(Exception):
     """The site answered 429. Callers come back later instead of retrying."""
 
 
-def get(url, *, timeout=25, tries=3, headers=None, opener=urllib.request.urlopen, sleep=time.sleep, raw=False):
+def get(url, *, timeout=25, tries=3, headers=None, opener=urllib.request.urlopen, sleep=time.sleep, raw=False, data=None):
     """Fetch `url` and return the body as bytes, decompressed if the server gzipped it.
-    `raw` returns the bytes exactly as sent, for a piece of a binary file that might only look gzipped."""
-    request = urllib.request.Request(url, headers={
+    `raw` returns the bytes exactly as sent, for a piece of a binary file that might only look gzipped.
+    `data` (bytes) sends it as a POST: a listing service that answers questions (GraphQL) rather than pages."""
+    request = urllib.request.Request(url, data=data, method="POST" if data is not None else "GET", headers={
         "User-Agent": USER_AGENT,
         "Accept": "*/*",
         "Accept-Encoding": "gzip",

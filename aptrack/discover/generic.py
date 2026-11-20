@@ -9,6 +9,14 @@ In place of "sitemap" a line may give "list": one page (or several) whose links 
 for a company whose sitemap covers the whole country but which has a page for this region.
 "name_from_slug": true names each building from the last part of its page address, for a company whose pages
 give a marketing title where the name should be.
+"place_type": "ApartmentComplex" takes the place from that kind of schema.org object only (a page that also
+describes the company's own office first).
+"appfolio": "https://<company>.appfolio.com/listings" reads every building's apartments from the company's
+AppFolio listing page, matched by street address.
+"own_site": true (or a regular expression whose first group is the address) follows the company page's link
+to the building's own website and looks there for its listings, when the company page has none.
+
+Any listing system a reader exists for is recognised on the pages looked at (common.recognise), not only SightMap.
 
 It works for any company whose building pages describe themselves in schema.org data (name, street address)
 and embed a SightMap unit map on the page or on one of the listed sub-pages. A building with no map found
@@ -68,29 +76,37 @@ def discoverer(config):
         for url in list(dict.fromkeys(urls))[:limit]:
             try:
                 page = get(url).decode("utf-8", "replace")
-                described = common.place(page)
+                described = common.place(page, kinds=several(config.get("place_type")) or None)
                 if not described:
                     watch.miss(url)
                     continue
                 watch.ok()
                 if described["address"]["state"] not in common.REGION_STATES:
                     continue
-                embed = None
-                for path in paths:
+                described["address"] = tidy(described["address"])
+                listing = None
+                if config.get("appfolio"):              # the company lists every apartment on one AppFolio page
+                    listing = ("appfolio", f"{config['appfolio']}#{described['address']['street']}")
+                for path in [] if listing else paths:
+                    address = url if path == "" else url.rstrip("/") + path
                     try:
-                        html = page if path == "" else get(url.rstrip("/") + path).decode("utf-8", "replace")
+                        html = page if path == "" else get(address).decode("utf-8", "replace")
                     except fetch.RateLimited:
                         raise
                     except Exception:
                         continue
-                    embed = common.sightmap_embed(html)
-                    if embed:
+                    listing = common.recognise(address, html)
+                    if listing:
                         break
+                platform, feed = listing or ("link", None)
                 slug = url.rstrip("/").rsplit("/", 1)[1]
-                described["address"] = tidy(described["address"])
                 if config.get("name_from_slug"):
                     described["name"] = slug_name(slug, config["name"])
-                found.append(common.building(config["name"], slug, url, described, embed))
+                if platform == "link" and config.get("own_site"):           # the company page links the building's own site
+                    own = common.own_link(page, config["own_site"])
+                    if own:
+                        platform, feed = common.site_feed(get, own)
+                found.append(common.building(config["name"], slug, url, described, feed, platform))
             except fetch.RateLimited:
                 raise
             except Exception as error:

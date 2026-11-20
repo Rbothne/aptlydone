@@ -37,13 +37,15 @@ def described(page_html):
             "address": {"street": prop.get("address"), "city": prop.get("city"), "state": prop.get("state"), "zip": prop.get("zip")}}
 
 
-def parse(url, page_html, site_html):
+def parse(url, page_html, site):
+    """`site` is what the building's own website was found to hold: site_feed's (platform, feed), or a page's html."""
     place = described(page_html)
     if not place:
         return None
     own = website(page_html)
     slug = url.rstrip("/").rsplit("/", 1)[1]
-    return common.building("Willow Bridge", slug, own or url, place, common.sightmap_embed(site_html) if own else None)
+    platform, feed = common.found_on(own, site) if own else ("link", None)
+    return common.building("Willow Bridge", slug, own or url, place, feed, platform)
 
 
 def discover(get, limit=None):
@@ -60,7 +62,7 @@ def discover(get, limit=None):
             if place["address"]["state"] not in common.REGION_STATES:
                 continue
             own = website(page)
-            found.append(parse(url, page, common.own_site_html(get, own) if own else ""))
+            found.append(parse(url, page, common.site_feed(get, own) if own else ""))
         except fetch.RateLimited:
             raise
         except Exception as error:

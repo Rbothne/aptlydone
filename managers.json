@@ -1,7 +1,7 @@
 {
   "settings": {
     "delay_seconds": 1.0,
-    "site_delays": {"sightmap.com": 0.25, "www.bozzuto.com": 0.25, "www.gables.com": 5},
+    "site_delays": {"sightmap.com": 0.25, "www.bozzuto.com": 0.25, "www.gables.com": 5, "www.polingerco.com": 3, "keenermgmt.appfolio.com": 10},
     "counties": ["11001", "51013", "51510", "51059", "51600", "51610", "51107", "51153", "51683", "51685", "24031", "24033", "24027", "24003"]
   },
   "managers": [
@@ -34,6 +34,26 @@
     {"name": "Simpson", "site": "www.simpsonpropertygroup.com", "discover": "generic",
      "sitemap": "https://www.simpsonpropertygroup.com/sitemap.xml",
      "pattern": "https://www\\.simpsonpropertygroup\\.com/apartments/[^/<\\s]+-(?:virginia|maryland|washington-dc|dc)/[^/<\\s]+",
-     "map_paths": ["/apartment-floor-plans"]}
+     "map_paths": ["/apartment-floor-plans"]},
+    {"name": "Polinger", "site": "www.polingerco.com", "discover": "rentpress_list",
+     "list": "https://www.polingerco.com/apartments/"},
+    {"name": "Keener", "site": "keenermanagement.com", "discover": "generic",
+     "sitemap": "https://keenermanagement.com/sitemap-0.xml",
+     "pattern": "https://keenermanagement\\.com/properties/[a-z0-9-]+/",
+     "place_type": "ApartmentComplex", "appfolio": "https://keenermgmt.appfolio.com/listings"},
+    {"name": "AIR Communities", "site": "www.aircommunities.com", "discover": "cards",
+     "list": "https://www.aircommunities.com/en/community.html",
+     "card": "data-state=\"(?P<state>[A-Z]{2})\" data-city=\"(?P<city>[^\"]+)\"(?:(?!data-state=).)*?<a href=\"(?P<site>https?://[^\"]+)\" class=\"commName[^\"]*\"[^>]*>(?P<name>[^<]+)</a>(?:(?!data-state=).)*?<p class=\"address[^\"]*\">(?P<address>[^<]+)</p>"},
+    {"name": "B.F. Saul", "site": "bfsaul.com", "discover": "cards",
+     "list": "https://bfsaul.com/properties/residential/",
+     "within": "<ul id=\"menu-residential-links-only\".*?</ul>",
+     "card": "<a href=\"(?P<site>https?://[^\"]+)\">(?P<name>[^<]+)</a>"},
+    {"name": "JBG SMITH", "site": "www.jbgsmith.com", "discover": "jbgsmith",
+     "paused": "its buildings' websites run on RentCafe, whose terms of use forbid any robot, spider or scraper"},
+    {"name": "Mill Creek", "site": "millcreekplaces.com", "discover": "wpjson",
+     "api": "https://millcreekplaces.com/wp-json/wp/v2/community",
+     "fields": {"name": "title.rendered", "street": "acf.street_address", "city": "acf.city", "state": "acf.state",
+                "zip": "acf.zip_code", "lat": "acf.latitude", "lon": "acf.longitude", "website": "acf.community_url"},
+     "paused": "its buildings' websites answer automated visitors with a Cloudflare challenge (HTTP 403) nearly every time"}
   ]
 }

@@ -34,6 +34,55 @@ def parse(url, page_html, manager):
     return entry
 
 
+PROPERTY_LIST = re.compile(r"data-properties='([^']*)'")
+
+
+def listed_discoverer(config):
+    """A company whose RentPress site lists its buildings on one page (`list` in its managers.json line) but whose
+    floor plans live on each building's own website: the list gives name, address and coordinates, and the
+    building's website is looked through for the listing system it uses."""
+    pages = config["list"] if isinstance(config["list"], list) else [config["list"]]
+
+    def discover(get, limit=None):
+        props = []
+        for page in pages:
+            try:
+                props += attribute(PROPERTY_LIST, get(page).decode("utf-8", "replace"))
+            except ReadError as error:
+                raise fetch.RateLimited(f"no building list in {page}") from error       # come back later, keep what is known
+        found = []
+        for prop in props[:limit]:
+            if not isinstance(prop, dict) or not prop.get("property_name"):
+                continue
+            if prop.get("property_state") not in common.REGION_STATES:
+                continue
+            described = {
+                "name": prop["property_name"],
+                "address": {"street": prop.get("property_address"), "city": prop.get("property_city"),
+                            "state": prop.get("property_state"), "zip": prop.get("property_zip")},
+                "lat": common.number(prop.get("property_latitude")),
+                "lon": common.number(prop.get("property_longitude")),
+            }
+            page_url = prop.get("property_post_link") or pages[0]
+            own = prop.get("property_website") or prop.get("property_availability_url")
+            if own and not own.startswith("http"):
+                own = "https://" + own.lstrip("/")
+            try:
+                platform, feed = common.site_feed(get, own) if own else ("link", None)
+            except fetch.RateLimited:
+                raise
+            except Exception as error:
+                print(f"  {prop['property_name']}: its website could not be read: {error!r}")
+                platform, feed = "link", None
+            slug = page_url.rstrip("/").rsplit("/", 1)[1]
+            found.append(common.building(config["name"], slug, own or page_url, described, feed, platform))
+        return found
+    return discover
+
+
+listed_discoverer.needs_config = True
+
+
 def discoverer(manager, site):
     """A discover(get, limit) function for one RentPress site."""
     def discover(get, limit=None):

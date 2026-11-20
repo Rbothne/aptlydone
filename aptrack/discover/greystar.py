@@ -20,13 +20,15 @@ def website(page_html):
     return match.group(1) if match else None
 
 
-def parse(url, page_html, site_html):
+def parse(url, page_html, site):
+    """`site` is what the building's own website was found to hold: site_feed's (platform, feed), or a page's html."""
     described = common.place(page_html)
     if not described:
         return None
     own = website(page_html)
     slug = url.rstrip("/").rsplit("/", 2)[1]
-    return common.building("Greystar", slug, own or url, described, common.sightmap_embed(site_html) if own else None)
+    platform, feed = common.found_on(own, site) if own else ("link", None)
+    return common.building("Greystar", slug, own or url, described, feed, platform)
 
 
 def discover(get, limit=None):
@@ -40,7 +42,7 @@ def discover(get, limit=None):
                 continue
             watch.ok()
             own = website(page)
-            found.append(parse(url, page, common.own_site_html(get, own) if own else ""))
+            found.append(parse(url, page, common.site_feed(get, own) if own else ""))
         except fetch.RateLimited:
             raise
         except Exception as error:

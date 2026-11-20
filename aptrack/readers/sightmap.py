@@ -93,6 +93,10 @@ def parse(feed, building):
         if unit:
             units.append(unit)
     if listed and not units:
+        if not any(u.get("available_on") or u.get("status") or u.get("display_price") for u in listed):
+            # A map of the whole building with no listing behind it: nothing is advertised as available here.
+            raise ReadError(f"{building['id']}: the unit map shows all {len(listed)} apartments but no prices or "
+                            "move-in dates; the company publishes no availability for this building")
         raise ReadError(f"{building['id']}: {len(listed)} units listed, none with a price")
 
     return {

@@ -40,7 +40,12 @@ def merge(previous, found, day, partial=False):
                     new[key] = old[key]
             if new.get("lat") is None and old.get("lat") is not None:
                 new["lat"], new["lon"] = old["lat"], old["lon"]
-            if old.get("feed_api") and old.get("feed") == building.get("feed"):
+            if new.get("platform") == "link" and old.get("platform") not in (None, "link") and old.get("feed") \
+                    and old.get("url") == new.get("url"):
+                # Its website could not be read this time (many refuse automated visitors now and then): the listing
+                # found before still stands. A reader that then fails marks the building stale, as for any failure.
+                new["platform"], new["feed"] = old["platform"], old["feed"]
+            if old.get("feed_api") and old.get("feed") == new.get("feed"):
                 new["feed_api"] = old["feed_api"]
             merged[new["id"]] = new
     succeeded = {manager for manager, buildings in found.items() if buildings is not None}
