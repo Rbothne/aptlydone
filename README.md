@@ -74,7 +74,7 @@ Each week `discover.py` sends every building's street address to the Census Bure
 
 Add `"paused": "<why>"` to the company's line in `managers.json`. A paused company is not searched for buildings, not read, not given area data and not on the page. Nothing about it is deleted: its discoverer and reader stay in the code (a test keeps them registered), its buildings stay in `data/buildings.json` with their locations, and its price history stays in `data/state.json` with every unit marked as no longer listed. Delete the `"paused"` entry and the next run searches and reads it again, picking each unit's history back up.
 
-Equity Residential is paused: its terms of use forbid automated reading without written consent, and its site refuses GitHub's servers (HTTP 403) while answering a home connection. The git tag `with-equity` marks the last commit that tracked it.
+Equity Residential was paused on 2026-11-19 and brought back on 2026-11-20 at the owner's instruction. Its terms of use forbid automated reading without written consent, and its site refuses GitHub's servers (HTTP 403) while answering a home connection, so its prices refresh only when `build.py` is run from a home machine and the data branch saved; between such runs GitHub's runs mark its buildings stale. To pause it again, put `"paused": "<why>"` back on its line.
 
 ## A building's own website
 
