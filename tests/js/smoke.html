@@ -332,6 +332,38 @@ async function run() {
   out.onMapPopup = ((doc.querySelector(".leaflet-popup-content b") || {}).textContent || null) === wanted;
   out.onMapZoom = win.aptMapZoom();
   doc.querySelector('[data-tab="buildings"]').click();
+  // who lives nearby: limits on the tract's median age, degrees, and race and ethnicity
+  doc.getElementById("reset").click();
+  const limit = (key, side, value) => { const el = doc.querySelector(`#peoplepanel input[data-measure="${key}"][data-side="${side}"]`); el.value = value; el.dispatchEvent(new Event("change")); };
+  const places = () => [...new Set(win.aptMatches().map((u) => u.building))].map((id) => win.aptBuilding(id).place);
+  const everything = count();
+  limit("age", 0, "30"); limit("age", 1, "40");
+  out.peopleAge = count();
+  out.peopleAgeLabel = doc.getElementById("peoplelabel").textContent;
+  out.peopleAgeHolds = places().every((p) => Math.round(p.age) >= 30 && Math.round(p.age) <= 40) && count() !== everything;
+  limit("degree", 0, "80");
+  out.peopleDegree = count();
+  out.peopleDegreeHolds = places().every((p) => p.degree >= 80);
+  out.peopleSaved = JSON.stringify(JSON.parse(win.localStorage.getItem("apt.filters")).area);
+  limit("asian", 0, "15");
+  out.peopleRace = count();
+  out.peopleRaceLabel = doc.getElementById("peoplelabel").textContent;
+  out.peopleRaceHolds = places().every((p) => p.race.asian >= 15);
+  // switched off, the race limits are hidden and stop applying; the others stay
+  const sw = doc.getElementById("demographics");
+  sw.checked = false; sw.dispatchEvent(new Event("change"));
+  out.peopleRaceOffCountBack = count() === out.peopleDegree;
+  out.peopleRaceRowsHidden = [...doc.querySelectorAll("#peoplepanel [data-race]")].every((row) => row.hidden)
+    && !doc.querySelector("#peoplepanel [data-norace]").hidden;
+  out.peopleRaceOffLabel = doc.getElementById("peoplelabel").textContent;
+  sw.checked = true; sw.dispatchEvent(new Event("change"));
+  out.peopleRaceBackOn = count() === out.peopleRace;
+  doc.querySelector('[data-tab="followed"]').click();
+  out.peopleOnFollowed = doc.getElementById("count").textContent;
+  doc.querySelector('[data-tab="buildings"]').click();
+  doc.getElementById("reset").click();
+  out.peopleReset = count() === everything && doc.getElementById("peoplelabel").textContent === "Any"
+    && [...doc.querySelectorAll("#peoplepanel input")].every((el) => el.value === "");
   document.getElementById("out").textContent = JSON.stringify(out, null, 1);
 }
 run().catch((error) => { document.getElementById("out").textContent = "ERROR " + error.stack; });

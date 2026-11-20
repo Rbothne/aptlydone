@@ -307,3 +307,66 @@ test("followed: a no-go ZIP does not hide a building you chose to follow", async
   const [group] = followedGroups(index, { b1: [unit()] }, f({ nogo: ["20015"] }), 5, [{ id: "b1" }], []);
   assert.equal(group.units.length, 1);
 });
+
+// ---------- who lives nearby: median age, degrees, race and ethnicity ----------
+
+const PLACE = { age: 38.6, degree: 81, race: { white: 65, black: 6, asian: 20, hispanic: 4, other: 5 } };
+
+test("area limits: a building is kept when its tract is inside every limit that is set", async () => {
+  const { areaMatches } = await import("../../site/js/logic.js");
+  assert.equal(areaMatches(PLACE, {}), true);
+  assert.equal(areaMatches(PLACE, undefined), true);
+  assert.equal(areaMatches(PLACE, { age: [30, 40] }), true);
+  assert.equal(areaMatches(PLACE, { age: [39, null] }), true);            // shown as "Median age 39", so 39 and up keeps it
+  assert.equal(areaMatches(PLACE, { age: [40, null] }), false);
+  assert.equal(areaMatches(PLACE, { age: [null, 38] }), false);
+  assert.equal(areaMatches(PLACE, { degree: [80, null] }), true);
+  assert.equal(areaMatches(PLACE, { degree: [82, null] }), false);
+  assert.equal(areaMatches(PLACE, { asian: [15, null], white: [null, 70] }), true);
+  assert.equal(areaMatches(PLACE, { asian: [15, null], white: [null, 60] }), false);
+  assert.equal(areaMatches(PLACE, { black: [null, 6] }), true);
+});
+
+test("area limits: a building with no figure for something that is limited is hidden", async () => {
+  const { areaMatches } = await import("../../site/js/logic.js");
+  assert.equal(areaMatches(null, { age: [30, null] }), false);
+  assert.equal(areaMatches({ age: 30 }, { white: [10, null] }), false);
+  assert.equal(areaMatches({ age: null, degree: 50 }, { age: [null, 50] }), false);
+  assert.equal(areaMatches(null, {}), true);
+});
+
+test("area limits narrow the list like any other filter", () => {
+  const here = building({ place: PLACE });
+  assert.equal(unitMatches(unit(), here, f({ area: { degree: [80, null] } })), true);
+  assert.equal(unitMatches(unit(), here, f({ area: { degree: [90, null] } })), false);
+  assert.equal(unitMatches(unit(), building(), f({ area: { degree: [90, null] } })), false);
+  assert.equal(unitMatches(unit(), building(), f()), true);
+  assert.deepEqual(DEFAULT_FILTERS.area, {});
+});
+
+test("area limits: setting, clearing, and putting them into words", async () => {
+  const { AREA_MEASURES, setBound, areaLabel } = await import("../../site/js/logic.js");
+  assert.deepEqual(AREA_MEASURES.map((m) => m.key), ["age", "degree", "white", "black", "asian", "hispanic", "other"]);
+  assert.deepEqual(AREA_MEASURES.filter((m) => m.race).map((m) => m.key), ["white", "black", "asian", "hispanic", "other"]);
+  const none = {};
+  const one = setBound(none, "age", 0, 30);
+  assert.deepEqual(none, {});                                           // never changed in place: the defaults share it
+  assert.deepEqual(one, { age: [30, null] });
+  assert.deepEqual(setBound(one, "age", 1, 40), { age: [30, 40] });
+  assert.deepEqual(setBound(setBound(one, "age", 1, 40), "age", 0, null), { age: [null, 40] });
+  assert.deepEqual(setBound(one, "age", 0, null), {});
+  assert.deepEqual(setBound(one, "nonsense", 0, 5), one);
+  assert.equal(areaLabel({}), "Any");
+  assert.equal(areaLabel(undefined), "Any");
+  assert.equal(areaLabel({ age: [30, 40] }), "Median age 30 to 40");
+  assert.equal(areaLabel({ age: [null, 40] }), "Median age up to 40");
+  assert.equal(areaLabel({ degree: [70, null] }), "Degree 70%+");
+  assert.equal(areaLabel({ degree: [70, null], asian: [10, 30] }), "Degree 70%+ · Asian 10 to 30%");
+  assert.equal(areaLabel({ age: [30, null], degree: [70, null], asian: [10, 30] }), "3 limits");
+});
+
+test("area limits: with race and ethnicity switched off, those limits do nothing", async () => {
+  const { withoutRace } = await import("../../site/js/logic.js");
+  assert.deepEqual(withoutRace({ age: [30, null], white: [null, 50], other: [1, 2] }), { age: [30, null] });
+  assert.deepEqual(withoutRace(undefined), {});
+});

@@ -4,6 +4,7 @@ export const DEFAULT_FILTERS = Object.freeze({
   q: "", beds: [], minSqft: null, maxCost: null, moveBy: null, floorMin: null, floorMax: null, ground: false,
   ownDoor: false, balcony: false, quietAir: false, noSites: false,
   parking: false, pets: false, nearMetro: false, nearGrocery: false, nearPark: false, dogFriendly: false, minWalk: null, deals: [], highEnd: false, maxViolentX: null, maxDrive: null, minRating: null, manager: "", counties: [], showRestricted: false, sort: "picks",
+  area: {},        // limits on who lives nearby: {age: [from, to], degree: [...], white: [...], ...}; see AREA_MEASURES
 });
 
 export const HIGH_END = 67;                 // a building pricier than this share of its neighbours is "high-end for its area"
@@ -63,6 +64,7 @@ export function unitMatches(unit, building, filters) {
   if (filters.nearPark && !within(building, "park", PARK_MILES)) return false;
   if (filters.dogFriendly && !(building.dog && building.dog.score >= DOG_FRIENDLY)) return false;
   if (filters.minWalk != null && !(building.walk && building.walk.score >= filters.minWalk)) return false;
+  if (!areaMatches(building.place, filters.area)) return false;
   const deals = chosenDeals(filters);
   if (deals.length && !(deals.includes(unit.tag) || (deals.includes("drop") && unit.drop))) return false;
   if (filters.highEnd && !(building.rank && building.rank.pct >= HIGH_END)) return false;
@@ -75,6 +77,63 @@ export function unitMatches(unit, building, filters) {
   const q = filters.q.trim().toLowerCase();
   if (q && !searchable(building).includes(q)) return false;
   return true;
+}
+
+/**
+ * What can be limited about the people of a building's census tract. Each limit is [from, to], either end open (null).
+ * These narrow the list and nothing else: none of them feeds a deal tag or Top picks.
+ */
+export const AREA_MEASURES = [
+  { key: "age", label: "Median age", short: "Median age", unit: "" },
+  { key: "degree", label: "Adults with a degree", short: "Degree", unit: "%" },
+  { key: "white", label: "White", short: "White", unit: "%", race: true },
+  { key: "black", label: "Black", short: "Black", unit: "%", race: true },
+  { key: "asian", label: "Asian", short: "Asian", unit: "%", race: true },
+  { key: "hispanic", label: "Hispanic", short: "Hispanic", unit: "%", race: true },
+  { key: "other", label: "Other", short: "Other", unit: "%", race: true },
+];
+
+const limited = (area) => AREA_MEASURES.filter((m) => area && Array.isArray(area[m.key]) && area[m.key].some((end) => end != null));
+
+/** Does a tract sit inside every limit that is set? A figure that is missing fails a limit on it. Compared as shown: rounded. */
+export function areaMatches(place, area) {
+  for (const measure of limited(area)) {
+    const raw = !place ? null : measure.race ? place.race && place.race[measure.key] : place[measure.key];
+    if (raw == null) return false;
+    const value = Math.round(raw);
+    const [from, to] = area[measure.key];
+    if (from != null && value < from) return false;
+    if (to != null && value > to) return false;
+  }
+  return true;
+}
+
+/** The limits with one end changed (side 0 is "from", 1 is "to"); a limit with both ends open is dropped. Never changes `area`. */
+export function setBound(area, key, side, value) {
+  if (!AREA_MEASURES.some((m) => m.key === key)) return area;
+  const next = { ...(area || {}) };
+  const ends = Array.isArray(next[key]) ? [next[key][0] ?? null, next[key][1] ?? null] : [null, null];
+  ends[side] = value;
+  if (ends[0] == null && ends[1] == null) delete next[key];
+  else next[key] = ends;
+  return next;
+}
+
+/** The limits that still apply when race and ethnicity are switched off. */
+export function withoutRace(area) {
+  return Object.fromEntries(limited(area).filter((m) => !m.race).map((m) => [m.key, area[m.key]]));
+}
+
+/** The limits in a few words for the picker: "Any", "Median age 30 to 40", "Degree 70%+ · Asian 10 to 30%", "3 limits". */
+export function areaLabel(area) {
+  const set = limited(area);
+  if (!set.length) return "Any";
+  if (set.length > 2) return `${set.length} limits`;
+  return set.map(({ key, short, unit }) => {
+    const [from, to] = area[key];
+    if (from != null && to != null) return `${short} ${from} to ${to}${unit}`;
+    return from != null ? `${short} ${from}${unit}+` : `${short} up to ${to}${unit}`;
+  }).join(" · ");
 }
 
 // Compare two values that may be missing: missing always goes last, whichever way the sort runs.

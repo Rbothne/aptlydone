@@ -83,6 +83,11 @@ dialog#setup { max-height: calc(100vh - 32px); overflow-y: auto; }
 .picker .panel label.state:first-child { margin-top: 0; }
 .picker .panel label.county { padding-left: 20px; }
 .picker .panel small { margin-left: auto; padding-left: 12px; }
+.picker .panel .bound { display: flex; gap: 6px; align-items: center; padding: 3px 2px; color: var(--ink); white-space: nowrap; }
+.picker .panel .bound span:first-child { flex: 1; padding-right: 10px; }
+.picker .panel .bound input { width: 4.6em; }
+.picker .panel .heading { font-weight: 600; margin-top: 8px; padding: 3px 2px; color: var(--ink); white-space: nowrap; }
+.picker .panel p { margin: 0 2px 6px; font-size: 12.5px; white-space: normal; min-width: 250px; }
 
 /* ---------- buildings ---------- */
 main { padding: 14px 16px 30px; max-width: 1180px; margin: 0 auto; }

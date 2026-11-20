@@ -63,6 +63,10 @@
       <summary>Areas: <span id="areaslabel">All areas</span></summary>
       <div class="panel" id="areaspanel"></div>
     </details>
+    <details class="picker" id="people">
+      <summary title="Limits on the census tract the building is in: median age, adults with a degree, race and ethnicity. Buildings with no figure for something you limit are hidden.">Who lives nearby: <span id="peoplelabel">Any</span></summary>
+      <div class="panel" id="peoplepanel"></div>
+    </details>
     <label>Sort <select id="sort">
       <option value="picks">Top picks</option>
       <option value="cost">Lowest monthly cost</option>
@@ -214,7 +218,9 @@
   (so far: <span id="crime-counties">none</span>). Counties count offences differently, so compare across a border with care, and county figures can miss incidents handled by a
   city's own police. Arlington's counts are from the last year it published locations, June 2021 to June 2022.
   A building's violent count is also given against the <b>typical</b> building: the middle one of all tracked buildings that have counts<span id="crime-typical"></span>.
-  <b>About the area</b> figures are for the census tract (American Community Survey, 5-year) and the ZIP code (Zillow's rent index).</p>
+  <b>About the area</b> figures are for the census tract (American Community Survey, 5-year) and the ZIP code (Zillow's rent index).
+  <b>Who lives nearby</b> limits the list by those tract figures: median age, the share of adults with a degree, and race and ethnicity.
+  They only narrow the list; none of them feeds a deal tag or Top picks. The race and ethnicity limits go away, and stop applying, when the switch below is off.</p>
   <p><b>Nearby</b> places are from OpenStreetMap (Metro stations from the transit authority's list), measured in a straight line from the building; parks are measured to their edge.
   <b>Walkability</b> is the EPA's National Walkability Index for the block (1 to 20). <b>Dog-friendly</b> is out of 5: one point for
   allowing pets, two for a dog park within half a mile (one if within a mile), one for a park within a quarter mile, one for a dog run
@@ -230,7 +236,7 @@
   coordinates, and those coordinates are sent to the public OSRM routing server along with the buildings' locations.
   If you paste a Google Maps key into Setup, drive times become rush-hour times for the next weekday, morning and evening: your work
   coordinates and the buildings' locations are then sent to Google with your key. The key stays in this browser and is left out of the settings export.</p>
-  <p><label><input type="checkbox" id="demographics"> Show race and ethnicity in "About the area"</label></p>
+  <p><label><input type="checkbox" id="demographics"> Show race and ethnicity in "About the area", on the map, and as limits under "Who lives nearby"</label></p>
 </footer>
 
 <script src="vendor/leaflet/leaflet.js"></script>

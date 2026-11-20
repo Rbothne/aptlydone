@@ -36,6 +36,7 @@ export function createStore(storage) {
     }
     if (!Array.isArray(filters.beds)) filters.beds = [];
     if (!Array.isArray(filters.counties)) filters.counties = [];
+    if (!filters.area || typeof filters.area !== "object" || Array.isArray(filters.area)) filters.area = {};
     return filters;
   }
 

@@ -4,7 +4,7 @@ import {
   DEFAULT_FILTERS, TAG_GROUPS, affordable, affordableNote, ago, areaFacts, countiesLabel, countyGroups, availability, cost, crimeText, driveLabel, followedGroups, incomeNeeded,
   availableNote, dogText, isSteal, mapPoints, nearbyTags, standing, unitTitle, walkText, groupBuildings, money, perSqft, shortDate, sparkline, staleText, tagLabel, tagReason, tagsLabel, chosenTags, setTag, unitMatches,
   CRIME_STOPS, TRADEOFFS, crimeStopLabel, dropText, noiseTags, relateCrime, typicalOf, worksTags, worth, worthText,
-  pageFor, popupFacts,
+  pageFor, popupFacts, AREA_MEASURES, areaLabel, setBound, withoutRace,
 } from "./logic.js";
 import { driveTimes, geocode, trafficTimes } from "./commute.js";
 import { createStore } from "./store.js";
@@ -189,7 +189,8 @@ function detail(unit, building) {
 
 /** The filters plus the standing no-go ZIP codes. */
 function active() {
-  return { ...state.filters, nogo: state.nogo };
+  // race and ethnicity limits apply only while that information is switched on
+  return { ...state.filters, nogo: state.nogo, area: state.demographics ? state.filters.area : withoutRace(state.filters.area) };
 }
 
 function setNogo(zip, on) {
@@ -559,6 +560,13 @@ function showFilters() {
     box.checked = mine.every((tag) => tag.checked);
     box.indeterminate = !box.checked && mine.some((tag) => tag.checked);
   }
+  $("peoplelabel").textContent = areaLabel(active().area);
+  for (const box of document.querySelectorAll("#peoplepanel input[data-measure]")) {
+    const ends = (f.area || {})[box.dataset.measure];
+    box.value = ends && ends[Number(box.dataset.side)] != null ? ends[Number(box.dataset.side)] : "";
+  }
+  for (const row of document.querySelectorAll("#peoplepanel [data-race]")) row.hidden = !state.demographics;
+  for (const row of document.querySelectorAll("#peoplepanel [data-norace]")) row.hidden = state.demographics;
   $("manager").value = f.manager;
   $("minRating").value = f.minRating == null ? "" : String(f.minRating);
   $("sort").value = f.sort;
@@ -592,9 +600,10 @@ function wire() {
   }
   $("moveBy").addEventListener("change", () => { state.filters.moveBy = $("moveBy").value || null; changed(); });
   document.addEventListener("click", (event) => {
-    for (const id of ["areas", "tags"]) if (!$(id).contains(event.target)) $(id).open = false;
+    for (const id of ["areas", "tags", "people"]) if (!$(id).contains(event.target)) $(id).open = false;
   });
   buildTags();
+  buildPeople();
   $("manager").addEventListener("change", () => { state.filters.manager = $("manager").value; changed(); });
   $("minRating").addEventListener("change", () => { const v = $("minRating").value; state.filters.minRating = v === "" ? null : Number(v); changed(); });
   $("sort").addEventListener("change", () => { state.filters.sort = $("sort").value; changed(); });
@@ -629,6 +638,7 @@ function wire() {
   $("demographics").addEventListener("change", () => {
     state.demographics = $("demographics").checked;
     store.setSetting("demographics", state.demographics);
+    showFilters();
     draw();
   });
   $("reset").addEventListener("click", () => { state.filters = { ...DEFAULT_FILTERS }; changed(); });
@@ -656,6 +666,27 @@ function buildTags() {
       h("input", { type: "checkbox", "data-tag": tag.key, "data-in": group.name, onchange: (event) => choose([tag.key], event.target.checked) }),
       tag.label)),
   ]));
+}
+
+/** "Who lives nearby": a from and a to for each thing that can be limited about the building's census tract. */
+function buildPeople() {
+  const box = (measure, side) => h("input", {
+    type: "number", min: "0", max: measure.unit ? "100" : "120", step: "1", inputmode: "numeric", placeholder: side ? "to" : "from",
+    "data-measure": measure.key, "data-side": String(side), "aria-label": `${measure.label}, ${side ? "at most" : "at least"}`,
+    onchange: (event) => {
+      const typed = event.target.value;
+      state.filters.area = setBound(state.filters.area, measure.key, side, typed === "" ? null : Number(typed));
+      changed();
+    },
+  });
+  const row = (measure) => h("div", { class: "bound", "data-race": measure.race ? "1" : null },
+    h("span", null, measure.label + (measure.unit ? ", %" : "")), box(measure, 0), "–", box(measure, 1));
+  $("peoplepanel").replaceChildren(
+    h("p", { class: "muted" }, "For the census tract the building is in. Leave a box empty for no limit."),
+    ...AREA_MEASURES.filter((measure) => !measure.race).map(row),
+    h("div", { class: "heading", "data-race": "1" }, "Race and ethnicity, % of residents"),
+    ...AREA_MEASURES.filter((measure) => measure.race).map(row),
+    h("p", { class: "muted", "data-norace": "1" }, "Race and ethnicity are switched off at the bottom of the page."));
 }
 
 function buildAreas(counts) {
@@ -898,6 +929,7 @@ async function load() {
   state.index = index.buildings;
   state.byId = Object.fromEntries(index.buildings.map((b) => [b.id, b]));
   state.tracts = index.tracts || {};
+  for (const building of index.buildings) building.place = state.tracts[building.tract] || null;      // what "Who lives nearby" limits
   state.zips = index.zips || {};
   state.crimeCounties = index.crime_counties || [];
   state.counties = index.counties;
