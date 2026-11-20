@@ -409,6 +409,19 @@ async function run() {
   win.fetch = realFetch;
   win.aptMapClose();
   doc.querySelector('[data-tab="buildings"]').click();
+  // on the Map tab an open filter panel is drawn over the map, not under it. The map's tiles ignore the pointer, so asking
+  // "what is at this point" cannot see them on top; what can be checked is that the map keeps its high layers to itself
+  // (the library stacks them at 400 to 1000, the filter bar sits at 5) and that the bar is above the map.
+  doc.querySelector('[data-tab="map"]').click();
+  await wait(300);
+  const layers = [...doc.querySelectorAll("#mapbox .leaflet-pane, #mapbox .leaflet-top")].map((el) => Number(win.getComputedStyle(el).zIndex) || 0);
+  out.mapLayersStackHigh = Math.max(...layers) > Number(win.getComputedStyle(doc.getElementById("top")).zIndex);
+  out.mapKeepsItsLayersToItself = win.getComputedStyle(doc.getElementById("mapbox")).isolation === "isolate";
+  // and the map's own buttons can still be reached
+  const plus = doc.querySelector(".leaflet-control-zoom-in"), at = plus.getBoundingClientRect();
+  out.mapZoomButtonReachable = doc.elementFromPoint(Math.round(at.left + at.width / 2), Math.round(at.top + at.height / 2)) === plus
+    || plus.contains(doc.elementFromPoint(Math.round(at.left + at.width / 2), Math.round(at.top + at.height / 2)));
+  doc.querySelector('[data-tab="buildings"]').click();
   // who lives nearby: limits on the tract's median age, degrees, and race and ethnicity
   doc.getElementById("reset").click();
   // opened by a click, as a person would; then typing applies without leaving the box
