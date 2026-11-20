@@ -30,6 +30,24 @@
 
   <!-- NEW ENTRIES GO DIRECTLY BELOW THIS LINE -->
 
+  <h2>Published about 11:45 pm, 19 November <small>"Who lives nearby" not working: two causes fixed</small></h2>
+  <ul>
+    <li><b>What I could and could not reproduce.</b> On a desktop with the current files the panel opened and filtered, so I
+      could not see the fault you saw. I found two ways it would fail, and fixed both. If it still does nothing for you, tell
+      me the device and what you see when you click it.</li>
+    <li><b>Old and new files mixed for ten minutes after every publish.</b> Your browser keeps each of the page's files for ten
+      minutes, each on its own clock. Right after a publish it could show the new page (with the new picker) while still running
+      the old script (which knows nothing about it), so the picker opened empty. Every publish now names its script folder after
+      itself, so a page always runs the scripts it was published with. This applies to every future change, not just this one.</li>
+    <li><b>On a phone the panel was cut off.</b> It floated inside the filter bar, which clipped it and scrolled sideways. On a
+      narrow screen all three panels (Tags, Areas, Who lives nearby) now open in place at full width. Checked at phone width in a
+      desktop browser, not on a real phone.</li>
+    <li><b>Near the right edge a panel ran off the screen</b> at some window widths (Tags and Areas too). A panel that would
+      now opens leftwards.</li>
+    <li><b>Limits apply as you type.</b> Before, a number did nothing until you pressed Enter or clicked elsewhere, which also
+      looks like "not working".</li>
+  </ul>
+
   <h2>Published about 11:30 pm, 19 November <small>filter by who lives nearby: median age, degrees, race and ethnicity</small></h2>
   <ul>
     <li><b>New filter: "Who lives nearby".</b> It sits next to Areas and opens a small panel with a "from" and a "to" box for each

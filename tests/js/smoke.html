@@ -334,18 +334,29 @@ async function run() {
   doc.querySelector('[data-tab="buildings"]').click();
   // who lives nearby: limits on the tract's median age, degrees, and race and ethnicity
   doc.getElementById("reset").click();
-  const limit = (key, side, value) => { const el = doc.querySelector(`#peoplepanel input[data-measure="${key}"][data-side="${side}"]`); el.value = value; el.dispatchEvent(new Event("change")); };
+  // opened by a click, as a person would; then typing applies without leaving the box
+  doc.querySelector("#people summary").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: win }));
+  await wait(100);
+  out.peopleOpensOnClick = doc.getElementById("people").open && doc.querySelectorAll("#peoplepanel .bound").length === 7;
+  const limit = async (key, side, value) => {
+    const el = doc.querySelector(`#peoplepanel input[data-measure="${key}"][data-side="${side}"]`);
+    el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: win }));
+    el.focus(); el.value = value; el.dispatchEvent(new Event("input", { bubbles: true }));
+    await wait(400);
+    el.blur();
+  };
   const places = () => [...new Set(win.aptMatches().map((u) => u.building))].map((id) => win.aptBuilding(id).place);
   const everything = count();
-  limit("age", 0, "30"); limit("age", 1, "40");
+  await limit("age", 0, "30"); await limit("age", 1, "40");
+  out.peopleStaysOpenWhileTyping = doc.getElementById("people").open;
   out.peopleAge = count();
   out.peopleAgeLabel = doc.getElementById("peoplelabel").textContent;
   out.peopleAgeHolds = places().every((p) => Math.round(p.age) >= 30 && Math.round(p.age) <= 40) && count() !== everything;
-  limit("degree", 0, "80");
+  await limit("degree", 0, "80");
   out.peopleDegree = count();
   out.peopleDegreeHolds = places().every((p) => p.degree >= 80);
   out.peopleSaved = JSON.stringify(JSON.parse(win.localStorage.getItem("apt.filters")).area);
-  limit("asian", 0, "15");
+  await limit("asian", 0, "15");
   out.peopleRace = count();
   out.peopleRaceLabel = doc.getElementById("peoplelabel").textContent;
   out.peopleRaceHolds = places().every((p) => p.race.asian >= 15);

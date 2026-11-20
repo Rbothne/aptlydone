@@ -562,6 +562,7 @@ function showFilters() {
   }
   $("peoplelabel").textContent = areaLabel(active().area);
   for (const box of document.querySelectorAll("#peoplepanel input[data-measure]")) {
+    if (box === document.activeElement) continue;            // do not rewrite a box while it is being typed in
     const ends = (f.area || {})[box.dataset.measure];
     box.value = ends && ends[Number(box.dataset.side)] != null ? ends[Number(box.dataset.side)] : "";
   }
@@ -602,6 +603,13 @@ function wire() {
   document.addEventListener("click", (event) => {
     for (const id of ["areas", "tags", "people"]) if (!$(id).contains(event.target)) $(id).open = false;
   });
+  for (const id of ["areas", "tags", "people"]) {          // a panel that would run off the right edge opens leftwards
+    $(id).addEventListener("toggle", () => {
+      $(id).classList.remove("end");
+      const panel = $(id).querySelector(".panel");
+      if ($(id).open && panel.getBoundingClientRect().right > document.documentElement.clientWidth - 8) $(id).classList.add("end");
+    });
+  }
   buildTags();
   buildPeople();
   $("manager").addEventListener("change", () => { state.filters.manager = $("manager").value; changed(); });
@@ -670,13 +678,17 @@ function buildTags() {
 
 /** "Who lives nearby": a from and a to for each thing that can be limited about the building's census tract. */
 function buildPeople() {
+  let typing;
   const box = (measure, side) => h("input", {
     type: "number", min: "0", max: measure.unit ? "100" : "120", step: "1", inputmode: "numeric", placeholder: side ? "to" : "from",
     "data-measure": measure.key, "data-side": String(side), "aria-label": `${measure.label}, ${side ? "at most" : "at least"}`,
-    onchange: (event) => {
+    oninput: (event) => {
       const typed = event.target.value;
-      state.filters.area = setBound(state.filters.area, measure.key, side, typed === "" ? null : Number(typed));
-      changed();
+      clearTimeout(typing);
+      typing = setTimeout(() => {
+        state.filters.area = setBound(state.filters.area, measure.key, side, typed === "" ? null : Number(typed));
+        changed();
+      }, 250);
     },
   });
   const row = (measure) => h("div", { class: "bound", "data-race": measure.race ? "1" : null },

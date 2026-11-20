@@ -49,6 +49,10 @@ Python 3.12 or later, standard library only.
 
 To exercise the page in a real browser, copy `tests/js/smoke.html` to `site/_smoke.html`, serve `site/`, and open `/_smoke.html`: it clicks through details, stars and every filter and prints what it saw.
 
+## Publishing the page
+
+`update.yml` publishes `site/`. Just before it does, `python3 -m aptrack.stamp site <commit>` moves `site/js` to `site/js-<commit>` and points `index.html` at it (the stylesheet gets `?v=<commit>`). GitHub Pages lets a browser keep each file for ten minutes, so without this a browser could run a new page with old scripts for a while after each publish. The repository's own `site/js` is never renamed; only the copy being published.
+
 ## Where a building is
 
 Each week `discover.py` sends every building's street address to the Census Bureau's batch address service (`discovery.check_addresses`, one request) and keeps the answer on the building as `placed`. An address is asked about once.

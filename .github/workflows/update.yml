@@ -65,6 +65,10 @@ jobs:
         if: env.REBUILD == 'true' || env.HAVE_DATA == 'false'
         run: bash .github/scripts/data-branch.sh save
 
+      # Browsers keep each file for ten minutes; this keeps one publish's files together (see aptrack/stamp.py).
+      - name: Stamp the page with this commit
+        run: python3 -m aptrack.stamp site "$GITHUB_SHA"
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
