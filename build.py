@@ -1,6 +1,9 @@
 """Read every building's available units, update the price history, and write the files the page loads.
 
-    py build.py                    every building in data/buildings.json that is in the region
+    py build.py                    every building in data/buildings.json that is in the region, except those whose
+                                   listing system is read a share at a time ("spread" in managers.json settings)
+    py build.py --spread           the next share of those: a few buildings each run, round and round
+    py build.py --all              every building, spread or not (a full read from a home machine)
     py build.py --only <id>        one building
     py build.py --limit 10         the first 10 buildings (for testing)
     py build.py --probe            read one building per listing system and report; writes nothing
@@ -16,7 +19,7 @@ import sys
 import time
 from urllib.parse import urlparse
 
-from aptrack import companies, fetch, files, history, output
+from aptrack import companies, fetch, files, history, output, spread
 from aptrack.facts import FACTS
 from aptrack.readers import READERS, NotAnswering, ReadError
 
@@ -198,6 +201,8 @@ def main():
     parser.add_argument("--only", help="read one building (its id)")
     parser.add_argument("--limit", type=int, help="read the first N buildings")
     parser.add_argument("--probe", action="store_true", help="read one building per listing system; write nothing")
+    parser.add_argument("--spread", action="store_true", help="read only the next share of the listing systems that are spread through the day")
+    parser.add_argument("--all", action="store_true", help="read every building, including those normally spread through the day")
     args = parser.parse_args()
 
     config = files.load(MANAGERS, None)
@@ -214,12 +219,22 @@ def main():
     if args.probe:
         sys.exit(0 if probe(buildings, get) else 1)
 
-    chosen = [b for b in buildings if readable(b) and (not args.only or b["id"] == args.only)][:args.limit]
-    if not chosen:
-        sys.exit("no readable buildings match")
     state = files.load(STATE, None) or history.new_state()
     before = copy.deepcopy(state)
     day = files.today()
+    parts = spread.shares(settings)
+    if args.only or args.all:
+        pool = buildings
+    elif args.spread:
+        pool = spread.turn([b for b in buildings if readable(b)], state, parts)
+        if not pool:
+            print("nothing is spread through the day: nothing to read")
+            return
+    else:
+        pool = spread.rest(buildings, parts)
+    chosen = [b for b in pool if readable(b) and (not args.only or b["id"] == args.only)][:args.limit]
+    if not chosen:
+        sys.exit("no readable buildings match")
 
     results = run(chosen, state, get, day, workers=settings.get("workers"))
     history.retire(state, {b["id"] for b in buildings}, day)
@@ -234,7 +249,7 @@ def main():
     count = totals(state, day)
     print(f"{len(results)} buildings read, {len(chosen) - len(results)} failed; {count['listed']} units listed, "
           f"{count['new']} new today, {count['gone']} gone today, {count['changed']} price changes today")
-    if too_many_failures(chosen, results):
+    if not args.spread and too_many_failures(chosen, results):       # a spread share is small, and its sites refuse often: not an alarm
         sys.exit(f"More than {FAIL_SHARE:.0%} of buildings could not be read. The data was saved, but something is wrong.")
 
 

@@ -49,6 +49,10 @@ Python 3.12 or later, standard library only.
 
 To exercise the page in a real browser, copy `tests/js/smoke.html` to `site/_smoke.html`, serve `site/`, and open `/_smoke.html`: it clicks through details, stars and every filter and prints what it saw.
 
+## Reading a few buildings at a time
+
+`"spread": {"rentcafe": 6}` in the settings of `managers.json` takes RentCafe buildings out of the ordinary runs and reads them in six shares (`aptrack/spread.py`). `spread.yml` runs `build.py --spread` every two hours: it reads the next share, in the order of the buildings' ids, and keeps the id it stopped at in `state["spread"]`, so late or missed runs lose nothing. All RentCafe sites also share one clock (`"rentcafe": 2` in `site_delays`): one request every two seconds across all of them. `build.py --all` reads everything in one go, for a full read from a home machine. A spread run never ends in failure because of refusals: its sites refuse often, and a share is small.
+
 ## Publishing the page
 
 `update.yml` publishes `site/`. Just before it does, `python3 -m aptrack.stamp site <commit>` moves `site/js` to `site/js-<commit>` and points `index.html` at it (the stylesheet gets `?v=<commit>`). GitHub Pages lets a browser keep each file for ten minutes, so without this a browser could run a new page with old scripts for a while after each publish. The repository's own `site/js` is never renamed; only the copy being published.

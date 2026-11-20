@@ -30,6 +30,25 @@
 
   <!-- NEW ENTRIES GO DIRECTLY BELOW THIS LINE -->
 
+  <h2>Published about 3:15 am, 20 November <small>RentCafe buildings are read a few at a time, every two hours</small></h2>
+  <ul>
+    <li><b>RentCafe buildings now have a job of their own.</b> They are no longer read with everything else twice a day.
+      A separate job runs every two hours and reads the next sixth of them (11 of the 61), one building after another, two
+      seconds between requests, then moves on to the next sixth at the following run. Each building is tried about twice a day.</li>
+    <li><b>Why:</b> all those sites sit behind one service, and asking for all 61 in one go is what I think turned its bot
+      check against the tracker last night. A trickle through the day is the considerate way to ask.</li>
+    <li><b>What it is not:</b> a way round the check. Nothing is disguised and nothing rotates; it is the same tracker, under
+      its own name, asking less often. If the check still refuses, those buildings stay unread. From this machine it was still
+      refusing when I tried one share just now (11 of 11).</li>
+    <li><b>GitHub starts timed jobs late</b>, sometimes by hours, so "every two hours" is the intention, not a promise.
+      The job remembers which building it stopped at, so a late or missed run loses nothing.</li>
+    <li><b>Not built:</b> I had also offered to fall back to floor-plan prices when the per-apartment pages are refused.
+      Looking at last night's refusals, they hit the first page of a site, where there is nothing to fall back to, so it
+      would not have helped.</li>
+    <li><b>To change the pace:</b> the number of shares is one setting (<code>"spread": {"rentcafe": 6}</code> in
+      managers.json), and the timing is one line in the new job's file.</li>
+  </ul>
+
   <h2>Published about 3 am, 20 November <small>RentCafe sites: asked one at a time, and where that stands tonight</small></h2>
   <ul>
     <li><b>Tonight RentCafe's bot check ended up refusing everything from this machine.</b> Earlier in the night, reading JBG

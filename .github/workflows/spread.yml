@@ -1,0 +1,48 @@
+name: Track units, a share at a time
+
+# Buildings whose websites sit behind one service (RentCafe) are not read with the rest. Every two hours this reads
+# the next sixth of them ("spread" in managers.json settings), one building after another, so that service sees a
+# trickle through the day instead of every building at once. See aptrack/spread.py.
+
+on:
+  schedule:
+    - cron: "50 */2 * * *"      # every two hours, at ten to the hour (GitHub starts scheduled runs late, sometimes by hours)
+  workflow_dispatch:
+
+permissions:
+  contents: write               # to replace the data branch
+  pages: write                  # to publish the site
+  id-token: write               # required by the Pages deploy action
+
+concurrency:                    # one run at a time, shared with the other tracking, so two never race on the data branch
+  group: tracking
+  cancel-in-progress: false
+
+jobs:
+  share:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get the latest data
+        run: bash .github/scripts/data-branch.sh load
+
+      - name: Read the next share
+        run: python3 build.py --spread
+
+      - name: Save the data
+        run: bash .github/scripts/data-branch.sh save
+
+      - name: Stamp the page with this commit
+        run: python3 -m aptrack.stamp site "$GITHUB_SHA"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
