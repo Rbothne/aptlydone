@@ -96,6 +96,37 @@ class ThrottleTests(unittest.TestCase):
         self.assertLess(time.monotonic() - start, 0.4)
 
 
+class SharedPaceTests(unittest.TestCase):
+    """Many buildings' own websites can sit behind one service (RentCafe hosts hundreds). Asked side by side they
+    look like one burst to that service, so they wait their turn on one clock."""
+
+    def test_sites_sharing_a_clock_wait_for_each_other(self):
+        throttle = fetch.Throttle(0.0, delays={"rentcafe": 0.2})
+        throttle.share(["a.test", "b.test"], "rentcafe")
+        start = time.monotonic()
+        throttle.wait("https://a.test/1")
+        throttle.wait("https://b.test/1")
+        throttle.wait("https://a.test/2")
+        self.assertGreaterEqual(time.monotonic() - start, 0.4)
+
+    def test_other_sites_are_not_held_up_by_a_shared_clock(self):
+        throttle = fetch.Throttle(0.0, delays={"rentcafe": 0.5})
+        throttle.share(["a.test"], "rentcafe")
+        start = time.monotonic()
+        throttle.wait("https://a.test/1")
+        throttle.wait("https://c.test/1")
+        self.assertLess(time.monotonic() - start, 0.4)
+
+    def test_slowing_down_one_site_of_a_shared_clock_slows_the_clock(self):
+        throttle = fetch.Throttle(0.3, delays={"rentcafe": 0.0})
+        throttle.share(["a.test", "b.test"], "rentcafe")
+        throttle.slow_down("a.test")
+        start = time.monotonic()
+        throttle.wait("https://a.test/1")
+        throttle.wait("https://b.test/1")
+        self.assertGreaterEqual(time.monotonic() - start, 0.3)
+
+
 class SiteDelayTests(unittest.TestCase):
     def test_a_site_can_have_its_own_shorter_delay(self):
         throttle = fetch.Throttle(0.5, delays={"fast.test": 0.0})

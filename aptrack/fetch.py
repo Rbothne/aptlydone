@@ -63,16 +63,26 @@ class Throttle:
         self.delay = delay
         self.delays = delays or {}
         self._next = {}
+        self._clock = {}                      # host -> the name of a clock it shares with other hosts
         self._lock = threading.Lock()
+
+    def share(self, hosts, name):
+        """Put several hosts on one clock, `name`, spaced by `delays[name]`: sites that sit behind one service
+        (many buildings' RentCafe sites, say) then take turns instead of all being asked in the same second."""
+        with self._lock:
+            for host in hosts:
+                self._clock[host] = name
 
     def slow_down(self, host):
         """Put a site that has pushed back on the default spacing for the rest of the run (never faster than it was)."""
         with self._lock:
+            host = self._clock.get(host, host)
             self.delays[host] = max(self.delays.get(host, self.delay), self.delay)
 
     def wait(self, url):
         host = urlparse(url).netloc
         with self._lock:
+            host = self._clock.get(host, host)
             now = time.monotonic()
             at = max(now, self._next.get(host, now))
             self._next[host] = at + self.delays.get(host, self.delay)

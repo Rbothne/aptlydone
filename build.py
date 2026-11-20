@@ -207,6 +207,10 @@ def main():
         sys.exit("data/buildings.json is missing: run discover.py first")
     buildings = companies.tracked(known, config["managers"])     # a paused company's buildings stay known, and are left alone
     get = fetch.polite(settings["delay_seconds"], settings.get("site_delays"))
+    # Every RentCafe building site sits behind RentCafe's own service: they share one clock ("rentcafe" in site_delays)
+    throttle = getattr(get, "throttle", None)
+    if throttle is not None:
+        throttle.share({host(b) for b in buildings if b.get("platform") == "rentcafe" and b.get("feed")}, "rentcafe")
     if args.probe:
         sys.exit(0 if probe(buildings, get) else 1)
 
