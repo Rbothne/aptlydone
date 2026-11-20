@@ -140,7 +140,7 @@ class MillCreekTests(QuietTestCase):
 
 class ManagersTests(unittest.TestCase):
     def test_paused_companies_say_why(self):
-        self.assertIn("RentCafe", line("JBG SMITH")["paused"])
+        self.assertNotIn("paused", line("JBG SMITH"))             # RentCafe sites are read now, at the owner's instruction
         self.assertIn("Cloudflare", line("Mill Creek")["paused"])
         self.assertNotIn("paused", line("Polinger"))
 

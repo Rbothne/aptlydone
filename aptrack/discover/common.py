@@ -5,7 +5,7 @@ import re
 from urllib.parse import urljoin, urlsplit
 
 from .. import fetch
-from ..readers import g5, jonah, offers, rentpress
+from ..readers import g5, jonah, offers, rentcafe, rentpress
 
 LD_JSON = re.compile(r'<script[^>]*application/ld\+json[^>]*>(.*?)</script>', re.S)
 SIGHTMAP_EMBED = re.compile(r"https:\\?/\\?/sightmap\.com\\?/embed\\?/(\w+)")
@@ -131,7 +131,7 @@ def building(manager, slug, url, described, feed, platform=None):
     return entry
 
 
-UNIT_LEVEL = ("sightmap", "jonah", "g5", "offers")                  # sources that price each apartment
+UNIT_LEVEL = ("sightmap", "jonah", "g5", "offers", "rentcafe")                  # sources that price each apartment
 LISTING_PATH = re.compile(r"floor|avail|apartments/?$|units|pricing", re.I)
 SITE_PAGES = 7                                                     # pages looked at on one building's website, at most
 
@@ -145,6 +145,8 @@ def recognise(url, page_html):
         return "sightmap", embed
     if url is None:
         return None
+    if rentcafe.is_floor_plans(page_html):
+        return "rentcafe", url
     if jonah.page_data(page_html) is not None:
         return "jonah", url
     widget = g5.config(page_html)
@@ -174,7 +176,6 @@ def listing_links(page_html, page_url):
     return list(dict.fromkeys(out))
 
 
-RENTCAFE_SITE = re.compile(r"cdngeneralmvc\.rentcafe\.com|ysi\.SiteId\s*=")       # a site hosted by RentCafe itself
 PLAN_DETAIL = re.compile(r"/availability/[^/]+/[^/]+/[^/]+")       # one floor plan's page, not a list of them
 
 
@@ -201,8 +202,6 @@ def site_feed(get, own):
         found = recognise(address, html)
         if found and found[0] in UNIT_LEVEL:
             return found
-        if RENTCAFE_SITE.search(html):          # a RentCafe site: its terms forbid automated reading, so look no further
-            return best or found or ("link", None)
         best = best or found
         queue += [link for link in listing_links(html, address) if link not in seen and link not in queue]
         if address == own and base + "/availability" not in queue:

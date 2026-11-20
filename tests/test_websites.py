@@ -224,7 +224,7 @@ class RecogniseTests(QuietTestCase):
         with_map = G5_PAGE.replace('"sightmapID": ""', '"sightmapID": "xyz789"')
         self.assertEqual(common.recognise(url, with_map), ("sightmap", "https://sightmap.com/embed/xyz789"))
         self.assertEqual(common.recognise(url, AVAILABILITY), ("offers", url))
-        self.assertIsNone(common.recognise(url, "<html>ysi.unitsList = [];</html>"))      # RentCafe: its terms forbid reading it
+        self.assertIsNone(common.recognise(url, "<html>ysi.unitsList = [];</html>"))      # RentCafe's script alone is not a floor-plans page
         self.assertIsNone(common.recognise(url, "<html></html>"))
 
     def test_listing_links_are_the_sites_own_floor_plan_and_availability_pages(self):
@@ -245,12 +245,6 @@ class RecogniseTests(QuietTestCase):
         get = web({"https://site.test/": "<html>Welcome</html>", "https://site.test/availability": AVAILABILITY}, asked)
         self.assertEqual(common.site_feed(get, "https://site.test/"), ("offers", "https://site.test/availability"))
         self.assertEqual(common.site_feed(web({"https://site.test/": "<html></html>"}), "https://site.test/"), ("link", None))
-
-    def test_a_rentcafe_site_is_not_looked_through(self):
-        asked = []
-        page = '<script>ysi.SiteId = 123;</script><a href="/floorplans/a1">A1</a>'
-        self.assertEqual(common.site_feed(web({"https://site.test/floorplans": page}, asked), "https://site.test/"), ("link", None))
-        self.assertEqual(asked, ["https://site.test/floorplans"])
 
     def test_site_feed_asks_a_limited_number_of_pages(self):
         many = "".join(f'<a href="/floorplans/p{n}">p</a>' for n in range(30))
@@ -291,10 +285,9 @@ class SightMapWithoutListingsTests(unittest.TestCase):
 
 
 class RegisteredTests(unittest.TestCase):
-    def test_new_readers_are_registered_and_rentcafe_is_not(self):
+    def test_new_readers_are_registered(self):
         for name, module in (("jonah", jonah), ("g5", g5), ("offers", offers), ("appfolio", appfolio)):
             self.assertIs(READERS[name], module.read)
-        self.assertNotIn("rentcafe", READERS)
 
 
 class PostTests(unittest.TestCase):
