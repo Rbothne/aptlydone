@@ -4,17 +4,22 @@ answer lists every building with its address, coordinates and its own website, w
 the listing system it uses.
 
 The number is read from the page each time, never kept here. Used at the owner's instruction (2026-11-20).
+
+Asked for floor plans too, the same search lists each building's plans with a starting price and the number free.
+A building whose own website prices each apartment (a unit map) is read from that. One whose website is a
+RentCafe site (which refuse the tracker) or names no listing system is read from Kettler's plans instead
+(readers/kettler.py): a floor plan's starting price is less than an apartment's price, and far more than nothing.
 """
 
 import json
 import re
 
 from .. import fetch
+from ..readers.kettler import API, NUMBER, PAGE
 from . import common
 
-PAGE = "https://www.kettler.com/find-your-home/our-communities"
-API = "https://www.kettler.com/api/v1/properties?api_key={}&include_properties=1&per_page=500"
-NUMBER = re.compile(r"ng-init='init\((\d+)\)'")
+PLANS = "https://www.kettler.com/api/v1/properties#{}"       # a building's feed when it is read from Kettler's plans
+BETTER = ("sightmap", "jonah", "g5", "offers")                # websites that price each apartment and answer the tracker
 
 
 def text(value):
@@ -50,6 +55,8 @@ def discover(get, limit=None):
                 raise
             except Exception as error:
                 print(f"  {name}: its website could not be read: {error!r}")
-        slug = re.sub(r"[^a-z0-9]+", "-", (text(prop.get("slug")) or name).lower()).strip("-")
+        if platform not in BETTER and prop.get("floorplans") and prop.get("property_id") is not None:
+            platform, feed = "kettler", PLANS.format(prop["property_id"])
+        slug =re.sub(r"[^a-z0-9]+", "-", (text(prop.get("slug")) or name).lower()).strip("-")
         found.append(common.building("Kettler", slug, own or PAGE, place, feed, platform))
     return found

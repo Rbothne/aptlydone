@@ -38,6 +38,11 @@ class CommonTests(unittest.TestCase):
         self.assertEqual(common.sightmap_embed(FLOORPLANS), "https://sightmap.com/embed/y8px84x5v19")
         self.assertIsNone(common.sightmap_embed("<html></html>"))
 
+    def test_a_unit_map_address_run_together_with_what_follows_it_is_cut_at_the_maps_own_name(self):
+        # Two Kettler sites print the address straight into another word; a map's name is always eleven characters.
+        self.assertEqual(common.sightmap_embed("x https://sightmap.com/embed/4d7p16movkxaspx_MenuLink y"),
+                         "https://sightmap.com/embed/4d7p16movkx")
+
     def test_the_sightmap_script_is_not_a_unit_map(self):
         script = '<script src="https://sightmap.com/embed/api.js"></script>'
         self.assertEqual(common.sightmap_embed(script + '<iframe data-src="https://sightmap.com/embed/yjp2k7d9pxl"></iframe>'),

@@ -84,7 +84,9 @@ def sightmap_embed(page_html):
     """The address of a SightMap unit map named in a page, or None."""
     for name in SIGHTMAP_EMBED.findall(page_html or ""):
         if name != "api":                      # sightmap.com/embed/api.js is the script, not a map
-            return f"https://sightmap.com/embed/{name}"
+            # A map's name is eleven characters; a page that prints the address straight into another word
+            # ("...embed/4d7p16movkxaspx_MenuLink") is cut back to it.
+            return f"https://sightmap.com/embed/{name[:11]}"
     return None
 
 

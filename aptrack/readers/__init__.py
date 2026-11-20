@@ -14,7 +14,7 @@ class NotAnswering(ReadError):
     Several of these in a row mean the site has stopped answering properly, not that one building changed."""
 
 
-from . import appfolio, avalon, camden, dweck, equity, g5, jonah, offers, rentcafe, rentpress, sightmap, udr  # noqa: E402  (ReadError must exist before the readers import it)
+from . import appfolio, avalon, camden, dweck, equity, g5, greystar, jonah, kettler, offers, rentcafe, rentpress, sightmap, udr  # noqa: E402  (ReadError must exist before the readers import it)
 
 READERS = {
     "sightmap": sightmap.read,
@@ -29,4 +29,6 @@ READERS = {
     "appfolio": appfolio.read,
     "rentcafe": rentcafe.read,
     "dweck": dweck.read,
+    "kettler": kettler.read,
+    "greystar": greystar.read,
 }

@@ -1,10 +1,17 @@
 """Greystar: the company sitemap names every building with its state; each company page gives the address and a
-link to the building's own website, whose floor-plans page may name a SightMap unit map."""
+link to the building's own website, whose floor-plans page may name a SightMap unit map.
+
+The company page also carries the building's free apartments in the data it hands its scripts. A building whose
+own website prices each apartment and answers the tracker is read from that; any other is read from the company
+page (readers/greystar.py)."""
 
 import re
 
 from .. import fetch
+from ..readers import greystar as company_page
 from . import common
+
+BETTER = ("sightmap", "jonah", "g5", "offers")       # websites that price each apartment and answer the tracker
 
 SITEMAP = "https://www.greystar.com/sitemap-pdp.xml"
 BUILDING = re.compile(r"<loc>\s*(https://www\.greystar\.com/[^/<\s]+-(?:va|md|dc)/p_\d+)\s*</loc>")
@@ -28,6 +35,8 @@ def parse(url, page_html, site):
     own = website(page_html)
     slug = url.rstrip("/").rsplit("/", 2)[1]
     platform, feed = common.found_on(own, site) if own else ("link", None)
+    if platform not in BETTER and company_page.has_units(page_html):
+        platform, feed = "greystar", url          # the company page itself lists the building's apartments
     return common.building("Greystar", slug, own or url, described, feed, platform)
 
 
