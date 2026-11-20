@@ -108,3 +108,28 @@ Add a line to `managers.json`. If the company's building pages carry schema.org 
      "map_paths": ["", "/floorplans"]}
 
 `sitemap` may be a list; `pattern` is a regular expression matching building pages in it; `map_paths` are the sub-pages to look on for the unit map. In place of `sitemap`, `list` names a page (a company's page for this region, say) whose links are matched against the pattern. `name_from_slug: true` names buildings from their page address when the page's own name is a marketing title. Otherwise, if its buildings use a listing system that already has a reader, only a discovery module is needed (`aptrack/discover/`): list the building pages from the company's sitemap and return each building's name, address and feed address. A new listing system also needs a reader (`aptrack/readers/`) that returns units in the common format.
+
+## Where the data comes from
+
+Few of these are official APIs: most are the data a site's own pages already load, read under the rules above.
+
+| Source | Used for |
+|---|---|
+| Management companies' sitemaps and building pages | Finding every building each company runs, with its name and address |
+| SightMap unit-map feed | Unit rent, size, floor, availability, fees and amenities (most buildings) |
+| Company sites (Camden, AvalonBay, Equity, UDR) | Unit listings embedded in their own pages |
+| RentCafe, RentPress, AppFolio, Jonah, G5, schema.org offers | Unit or floor-plan prices for buildings on those listing systems |
+| Census Bureau batch address service | Placing each address: coordinates, ZIP code, census tract, county |
+| Census Reporter (ACS 5-year figures) | Demographics per tract: income, age, education, median rent |
+| County open crime data, Alexandria's police search form, Howard's and Loudoun's public dashboards | Violent and property crime within half a mile of each building (nine counties) |
+| Zillow rent index | Rent trend per ZIP code |
+| OpenStreetMap (Geofabrik's state files) | Nearby parks, dog parks, supermarkets, gyms, places to eat, pharmacies, libraries |
+| Transit authority station list (DC's open map service) | Distance to the nearest Metro station |
+| EPA National Walkability Index | Walkability of each building's block group |
+| US DOT National Transportation Noise Map | Aircraft, road and rail noise at each building |
+| DC building permits | Construction next door or on the building's own lot (DC only) |
+| DC affordable-housing list | Flagging income-restricted buildings |
+| OpenStreetMap's Nominatim and the public OSRM server | Turning a work address into drive times without traffic |
+| Google Routes (optional, your own key) | Rush-hour drive times |
+| Leaflet with OpenStreetMap tiles | The map view |
+| GitHub Actions and GitHub Pages | Running the scheduled reads and hosting the page |
