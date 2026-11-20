@@ -7,7 +7,10 @@ name: Track units, a share at a time
 on:
   schedule:
     - cron: "50 */2 * * *"      # every two hours, at ten to the hour (GitHub starts scheduled runs late, sometimes by hours)
-  workflow_dispatch:
+  workflow_dispatch:            # the "Run workflow" button on GitHub's Actions page
+  push:                         # or by hand from a terminal: change .github/kick-share and push
+    branches: [main]
+    paths: [".github/kick-share"]
 
 permissions:
   contents: write               # to replace the data branch
