@@ -15,7 +15,7 @@ concurrency:                    # shared with the unit tracking, so the two neve
 jobs:
   discover:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 180        # Dweck's site asks for five minutes between requests: its fifteen pages alone take 80 minutes
     steps:
       - uses: actions/checkout@v4
 

@@ -1,8 +1,9 @@
 {
   "settings": {
     "delay_seconds": 1.0,
-    "site_delays": {"sightmap.com": 0.25, "www.bozzuto.com": 0.25, "www.gables.com": 5, "www.polingerco.com": 3, "keenermgmt.appfolio.com": 10, "rentcafe": 2},
-    "spread": {"rentcafe": 6},
+    "site_delays": {"sightmap.com": 0.25, "www.bozzuto.com": 0.25, "www.gables.com": 5, "www.polingerco.com": 3, "keenermgmt.appfolio.com": 10, "rentcafe": 2,
+                    "www.dweckproperties.com": 300},
+    "spread": {"rentcafe": 6, "dweck": 8},
     "counties": ["11001", "51013", "51510", "51059", "51600", "51610", "51107", "51153", "51683", "51685", "24031", "24033", "24027", "24003"]
   },
   "managers": [
@@ -50,6 +51,7 @@
      "card": "<a href=\"(?P<site>https?://[^\"]+)\">(?P<name>[^<]+)</a>"},
     {"name": "JBG SMITH", "site": "www.jbgsmith.com", "discover": "jbgsmith"},
     {"name": "Kettler", "site": "www.kettler.com", "discover": "kettler"},
+    {"name": "Dweck", "site": "www.dweckproperties.com", "discover": "dweck"},
     {"name": "Van Metre", "site": "www.vanmetreapartments.com", "discover": "cards",
      "list": "https://www.vanmetreapartments.com/",
      "card": "<a href=\"(?P<site>https://www\\.[a-z0-9-]+apt\\.com/)\" class=\"\" title="},

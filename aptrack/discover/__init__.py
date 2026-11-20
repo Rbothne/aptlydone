@@ -1,6 +1,6 @@
 """One discoverer per management company. Each is `discover(get, limit=None) -> [building, ...]`."""
 
-from . import avalon, bozzuto, camden, cards, equity, generic, greystar, jbgsmith, kettler, rentpress, udr, willowbridge, windsor, wpjson
+from . import avalon, bozzuto, camden, cards, dweck, equity, generic, greystar, jbgsmith, kettler, rentpress, udr, willowbridge, windsor, wpjson
 
 DISCOVERERS = {
     "bozzuto": bozzuto.discover,
@@ -14,6 +14,7 @@ DISCOVERERS = {
     "udr": udr.discover,
     "jbgsmith": jbgsmith.discover,
     "kettler": kettler.discover,
+    "dweck": dweck.discover,
     "generic": generic.discoverer,          # built per company from its managers.json line
     "rentpress_list": rentpress.listed_discoverer,      # likewise: a RentPress page listing a company's buildings
     "wpjson": wpjson.discoverer,
