@@ -132,3 +132,40 @@ test("drive wording with traffic", () => {
   assert.equal(driveLabel(38, 52), "38 min to work, 52 min home (typical traffic)");
   assert.equal(driveLabel(75, null), "1 h 15 min to work (typical traffic)");
 });
+
+// ---------- the trip drawn on the map ----------
+
+test("the route address goes from the home to the work place and asks for the line", async () => {
+  const { routeUrl } = await import("../../site/js/commute.js");
+  assert.equal(routeUrl(buildings[0], work),
+    "https://router.project-osrm.org/route/v1/driving/-77,38.9;-76.8,39.1?overview=full&geometries=geojson");
+});
+
+test("a route is its line as latitude,longitude pairs and its whole minutes", async () => {
+  const { route } = await import("../../site/js/commute.js");
+  const asked = [];
+  const found = await route(buildings[0], work, async (url) => {
+    asked.push(url);
+    return { code: "Ok", routes: [{ duration: 1510, geometry: { type: "LineString", coordinates: [[-77, 38.9], [-76.9, 39.0], [-76.8, 39.1]] } }] };
+  });
+  assert.deepEqual(found, { line: [[38.9, -77], [39.0, -76.9], [39.1, -76.8]], minutes: 25 });
+  assert.equal(asked.length, 1);
+});
+
+test("no route is null, never an error: the straight line stays", async () => {
+  const { route } = await import("../../site/js/commute.js");
+  assert.equal(await route(buildings[0], work, async () => ({ code: "NoRoute", routes: [] })), null);
+  assert.equal(await route(buildings[0], work, async () => ({ code: "Ok", routes: [{ duration: 60, geometry: { coordinates: [[-77, 38.9]] } }] })), null);
+  assert.equal(await route(buildings[0], work, async () => { throw new Error("429 from router.project-osrm.org"); }), null);
+  assert.equal(await route(buildings[2], work, async () => { throw new Error("should not be asked"); }), null);
+  assert.equal(await route(buildings[0], null, async () => { throw new Error("should not be asked"); }), null);
+});
+
+test("the trip in words for the map: the time when known, what to do when it is not", async () => {
+  const { tripText } = await import("../../site/js/logic.js");
+  assert.equal(tripText({ drive: 25, driveTraffic: false }, true), "25 min drive to work (no traffic)");
+  assert.equal(tripText({ drive: 38, drivePm: 45, driveTraffic: true }, true), "38 min to work, 45 min home (typical traffic)");
+  assert.equal(tripText({ drive: null }, true), "Drive to work not timed yet: press Time my drive");
+  assert.equal(tripText({ drive: null }, false), "Set a work address to see the drive from here");
+  assert.equal(tripText({ drive: 25, driveTraffic: false }, false), "Set a work address to see the drive from here");
+});

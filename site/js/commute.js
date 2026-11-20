@@ -48,6 +48,29 @@ export async function driveTimes(work, buildings, getJson = fetchJson) {
   return times;
 }
 
+// ---------- one trip, for drawing on the map ----------
+
+const OSRM_ROUTE = "https://router.project-osrm.org/route/v1/driving/";
+
+export function routeUrl(home, work) {
+  return `${OSRM_ROUTE}${home.lon},${home.lat};${work.lon},${work.lat}?overview=full&geometries=geojson`;
+}
+
+/** The usual drive from a home to the work place, without traffic: {line: [[lat, lon], ...], minutes}; null when there is none to show. */
+export async function route(home, work, getJson = fetchJson) {
+  if (!home || !work || home.lat == null || home.lon == null || work.lat == null || work.lon == null) return null;
+  let answer;
+  try {
+    answer = await getJson(routeUrl(home, work));
+  } catch {
+    return null;
+  }
+  const found = answer && answer.code === "Ok" && Array.isArray(answer.routes) ? answer.routes[0] : null;
+  const points = found && found.geometry && Array.isArray(found.geometry.coordinates) ? found.geometry.coordinates : [];
+  if (points.length < 2) return null;
+  return { line: points.map(([lon, lat]) => [lat, lon]), minutes: Math.round(found.duration / 60) };
+}
+
 // ---------- with a Google key: typical traffic at the hours you actually drive ----------
 
 const ROUTES = "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix";

@@ -655,6 +655,13 @@ export function driveLabel(minutes, evening) {
   return `${time(minutes)} to work${evening == null ? "" : `, ${time(evening)} home`} (typical traffic)`;
 }
 
+/** The drive to work, for the map's pop-up: the time when it is known, and what to do when it is not. */
+export function tripText(building, hasWork) {
+  if (!hasWork) return "Set a work address to see the drive from here";
+  if (building.drive == null) return "Drive to work not timed yet: press Time my drive";
+  return building.driveTraffic ? driveLabel(building.drive, building.drivePm) : driveLabel(building.drive);
+}
+
 export function money(n) {
   return n == null ? "—" : "$" + Math.round(n).toLocaleString("en-US");
 }

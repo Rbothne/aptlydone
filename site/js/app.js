@@ -4,9 +4,9 @@ import {
   DEFAULT_FILTERS, TAG_GROUPS, affordable, affordableNote, ago, areaFacts, countiesLabel, countyGroups, availability, cost, crimeText, driveLabel, followedGroups, incomeNeeded,
   availableNote, dogText, isSteal, mapPoints, nearbyTags, standing, unitTitle, walkText, groupBuildings, money, perSqft, shortDate, sparkline, staleText, tagLabel, tagReason, tagsLabel, chosenTags, setTag, unitMatches,
   CRIME_STOPS, TRADEOFFS, crimeStopLabel, dropText, noiseTags, relateCrime, typicalOf, worksTags, worth, worthText,
-  pageFor, popupFacts, AREA_MEASURES, areaLabel, setBound, withoutRace,
+  pageFor, popupFacts, tripText, AREA_MEASURES, areaLabel, setBound, withoutRace,
 } from "./logic.js";
-import { driveTimes, geocode, trafficTimes } from "./commute.js";
+import { driveTimes, geocode, route, trafficTimes } from "./commute.js";
 import { createStore } from "./store.js";
 
 const COUNTY = {
@@ -330,7 +330,51 @@ function drawBuildings() {
 // ---------- map ----------
 
 const TAG_COLOUR = { absolute: "#c0392b", building: "#1f7a52", local: "#2d6fa8" };
-const chart = { map: null, layer: null, fitted: false, markers: {}, open: null, redrawing: false };     // open: the building whose pop-up is showing
+const chart = { map: null, layer: null, fitted: false, markers: {}, open: null, redrawing: false, trip: null, routes: new Map(), tripFor: null, pinned: false };
+// open: the building whose pop-up is showing. tripFor: the building whose drive is drawn. pinned: the drive stays drawn
+// without the pop-up (after "Show the whole trip"), until another building is opened or the map itself is clicked.
+
+/**
+ * The trip from the building whose pop-up is open to the work place: a straight dashed line at once, replaced by the
+ * road route when the routing service answers (asked once per building and work place; without traffic).
+ */
+function drawTrip(building) {
+  if (!chart.trip) return;
+  chart.trip.clearLayers();
+  if (!building || !state.work || building.lat == null || building.lon == null) { chart.tripFor = null; chart.pinned = false; return; }
+  chart.tripFor = building.id;
+  const L = window.L;
+  const key = `${building.id}|${state.work.lat},${state.work.lon}`;
+  const show = (line, routed) => {
+    chart.trip.clearLayers();
+    const drawn = L.polyline(line, { color: "#d99a00", weight: 4, opacity: 0.9, dashArray: routed ? null : "6 8", interactive: false, className: routed ? "trip routed" : "trip" })
+      .addTo(chart.trip).bringToBack();                   // behind the dots
+    if (chart.pinned) {                                   // with the pop-up gone, the line says whose drive it is
+      drawn.bindTooltip(`${building.name} · ${tripText(building, true)}`, { permanent: true, direction: "center", className: "triplabel" }).openTooltip();
+    }
+  };
+  const known = chart.routes.get(key);
+  if (known && known.line) { show(known.line, true); return; }
+  show([[building.lat, building.lon], [state.work.lat, state.work.lon]], false);
+  if (known) return;                                  // already asked: still waiting, or there was no route
+  chart.routes.set(key, {});
+  route(building, state.work).then((found) => {
+    if (!found) return;
+    chart.routes.set(key, found);
+    if (chart.tripFor === building.id && state.tab === "map") show(found.line, true);
+  });
+}
+
+/** Put the pop-up away (it sits on top of the line) and move the map so the building, the work place and the drive between them are all in view. */
+function showWholeTrip(building) {
+  if (!chart.map || !state.work) return;
+  chart.pinned = true;
+  chart.map.closePopup();
+  drawTrip(building);
+  const known = chart.routes.get(`${building.id}|${state.work.lat},${state.work.lon}`);
+  const line = known && known.line ? known.line : [[building.lat, building.lon], [state.work.lat, state.work.lon]];
+  chart.map.fitBounds(line, { padding: [40, 40], animate: false });
+}
 
 function popup(point) {
   const { building, deal } = point;
@@ -341,8 +385,10 @@ function popup(point) {
     deal && h("p", null, h("b", null, "Best deal: "),
       `${unitTitle(deal)} · ${[bedsLabel(deal.beds), deal.sqft && `${deal.sqft.toLocaleString("en-US")} sqft`].filter(Boolean).join(" · ")} · ${money(cost(deal))}/mo`),
     deal && h("p", { class: "vs" }, tagReason(deal) ? tagReason(deal) + "." : "No similar units to compare it with yet."),
+    h("p", { class: building.drive != null && state.work ? "trip" : "place" }, tripText(building, Boolean(state.work))),
     popupFacts(building, state.tracts[building.tract], state.demographics).map((line) => h("p", { class: "place" }, line)),
     h("button", { type: "button", onclick: () => showInList(building) }, "Go to it in the list"),
+    state.work && h("button", { type: "button", style: "margin-left:6px", onclick: () => showWholeTrip(building) }, "Show the whole trip"),
     building.zip && h("button", { type: "button", style: "margin-left:6px;background:none;color:#a8321f;border-color:#a8321f",
       onclick: () => setNogo(building.zip, true) }, `No-go ZIP ${building.zip}`));
 }
@@ -372,7 +418,8 @@ function showInList(building) {
 function showOnMap(building) {
   showTab("map");
   if (!chart.map) return;
-  chart.map.setView([building.lat, building.lon], Math.max(chart.map.getZoom(), 15));
+  // not animated: Leaflet ignores a view change asked for while a zoom animation is running (the first fit, on a map just made)
+  chart.map.setView([building.lat, building.lon], Math.max(chart.map.getZoom(), 15), { animate: false });
   const marker = chart.markers[building.id];
   if (marker) marker.openPopup();
 }
@@ -385,6 +432,8 @@ function drawMap(groups) {
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(chart.map);
+    chart.trip = L.layerGroup().addTo(chart.map);      // under the dots, so they stay clickable
+    chart.map.on("click", () => { if (chart.pinned && !chart.open) drawTrip(null); });      // a click on the map itself puts a drive left on show away
     chart.layer = L.layerGroup().addTo(chart.map);
   }
   chart.map.invalidateSize();
@@ -404,17 +453,20 @@ function drawMap(groups) {
       radius: 5 + Math.min(9, Math.sqrt(point.count)), weight: 1.5, color: "#ffffff",
       fillColor: TAG_COLOUR[point.tag] || "#8a8a85", fillOpacity: 0.9,
     }).bindPopup(() => popup(point), { minWidth: 260 }).bindTooltip(point.name)
-      .on("popupopen", () => { chart.open = point.id; })
-      .on("popupclose", () => { if (!chart.redrawing) chart.open = null; })
+      .on("popupopen", () => { chart.open = point.id; chart.pinned = false; drawTrip(point.building); })
+      .on("popupclose", () => { if (!chart.redrawing) { chart.open = null; if (!chart.pinned) drawTrip(null); } })
       .addTo(chart.layer);
   }
   chart.redrawing = false;
   if (!chart.fitted && points.length) {
-    chart.map.fitBounds(points.map((p) => [p.lat, p.lon]), { padding: [30, 30] });
+    chart.map.fitBounds(points.map((p) => [p.lat, p.lon]), { padding: [30, 30], animate: false });
     chart.fitted = true;
   }
   if (chart.open && chart.markers[chart.open]) chart.markers[chart.open].openPopup();      // the pop-up that was open stays open
-  else chart.open = null;
+  else {
+    chart.open = null;
+    drawTrip(chart.pinned && chart.tripFor ? state.byId[chart.tripFor] : null);      // a drive left on show stays through a redraw
+  }
 }
 
 /** The Followed tab: the buildings list, narrowed to buildings you follow or hold a followed unit in. */
@@ -979,4 +1031,10 @@ load();
 window.aptMatches = () => state.index.flatMap((b) => (state.units[b.id] || []).filter((u) => unitMatches(u, b, active())));
 window.aptBuilding = (id) => state.byId[id];
 window.aptMapZoom = () => (chart.map ? chart.map.getZoom() : null);
+window.aptMapClose = () => { if (chart.map) chart.map.closePopup(); };
+window.aptMapClick = () => { if (chart.map) chart.map.fire("click", { latlng: chart.map.getCenter() }); };
+window.aptMapSees = (place) => Boolean(chart.map && place && chart.map.getBounds().contains([place.lat, place.lon]));
+window.aptWork = () => state.work;
+window.aptMapOpen = () => chart.open;
+window.aptMapZoomTo = (place, zoom) => chart.map.setView([place.lat, place.lon], zoom, { animate: false });
 window.aptFacts = () => state.index.flatMap((b) => [...noiseTags(b.noise), ...worksTags(b.works)].map((note) => note.text));

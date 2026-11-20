@@ -301,6 +301,7 @@ async function run() {
   if (dot) { dot.dispatchEvent(new MouseEvent("click", { bubbles: true, view: win })); await wait(400); }
   out.popup = (doc.querySelector(".leaflet-popup-content") || {}).textContent || null;
   out.popupLines = [...doc.querySelectorAll(".leaflet-popup-content p")].map((p) => p.textContent);
+  out.popupAsksForWork = out.popupLines.includes("Set a work address to see the drive from here") && !doc.querySelector("#mapbox path.trip");
   // from the map to the same building in the list: filters untouched, the card in view and marked
   const before = count();
   const named = doc.querySelector(".leaflet-popup-content b").textContent;
@@ -331,6 +332,82 @@ async function run() {
   out.onMapTab = !doc.getElementById("map").hidden;
   out.onMapPopup = ((doc.querySelector(".leaflet-popup-content b") || {}).textContent || null) === wanted;
   out.onMapZoom = win.aptMapZoom();
+  doc.querySelector('[data-tab="buildings"]').click();
+  // the drive to work on the map, with the two public services stood in for (nothing leaves this machine)
+  const asked = { route: 0 };
+  const realFetch = win.fetch.bind(win);
+  win.fetch = async (url, options) => {
+    const u = String(url);
+    const json = (body) => ({ ok: true, status: 200, json: async () => body });
+    if (u.includes("nominatim.openstreetmap.org")) return json([{ lat: "38.8977", lon: "-77.0063", display_name: "Union Station, Washington, District of Columbia" }]);
+    if (u.includes("/table/v1/")) {
+      const n = u.split("/driving/")[1].split("?")[0].split(";").length;
+      return json({ code: "Ok", durations: [Array.from({ length: n }, (_, i) => i * 60)] });
+    }
+    if (u.includes("/route/v1/")) {
+      asked.route += 1;
+      const [[alon, alat], [blon, blat]] = u.split("/driving/")[1].split("?")[0].split(";").map((pair) => pair.split(",").map(Number));
+      return json({ code: "Ok", routes: [{ duration: 900, geometry: { coordinates: [[alon, alat], [alon, blat], [(alon + blon) / 2, blat], [blon, blat]] } }] });
+    }
+    return realFetch(url, options);
+  };
+  doc.getElementById("reset").click();
+  doc.getElementById("work").value = "Union Station, Washington DC";
+  doc.getElementById("setwork").click();
+  await wait(1500);
+  out.tripTimed = doc.getElementById("workstatus").textContent;
+  doc.querySelector('[data-tab="map"]').click();
+  await wait(300);
+  win.aptMapClose();
+  await wait(100);
+  out.tripNoLineBeforeAClick = !doc.querySelector("#mapbox path.trip");
+  doc.querySelector("#mapbox path.leaflet-interactive").dispatchEvent(new MouseEvent("click", { bubbles: true, view: win }));
+  await wait(600);
+  out.tripPopupLine = [...doc.querySelectorAll(".leaflet-popup-content p.trip")].map((p) => p.textContent);
+  out.tripLineDrawn = doc.querySelectorAll("#mapbox path.trip").length;
+  out.tripLineIsTheRoute = Boolean(doc.querySelector("#mapbox path.trip.routed"));
+  out.tripLineNotInTheWay = win.getComputedStyle(doc.querySelector("#mapbox path.trip")).pointerEvents === "none";
+  const tripHome = win.aptBuilding(Object.keys(win.aptMapOpen ? { [win.aptMapOpen()]: 1 } : {})[0]);
+  win.aptMapZoomTo(tripHome, 17);                      // close in on the home, so the work place is out of view
+  await wait(300);
+  out.tripWorkOutOfViewUpClose = !win.aptMapSees(win.aptWork()) && win.aptMapSees(tripHome);
+  [...doc.querySelectorAll(".leaflet-popup-content button")].find((b) => /whole trip/.test(b.textContent)).click();
+  await wait(600);
+  out.tripWholeShowsBothEnds = win.aptMapSees(win.aptWork()) && win.aptMapSees(tripHome);
+  // the pop-up would sit on top of the line, so it is put away and the line is labelled instead
+  out.tripWholePutsThePopupAway = !doc.querySelector(".leaflet-popup-content") && doc.querySelectorAll("#mapbox path.trip.routed").length === 1;
+  out.tripWholeLabel = (doc.querySelector("#mapbox .triplabel") || {}).textContent || null;
+  doc.querySelector('[data-beds="1"]').click();                           // a redraw (a filter change) keeps it
+  await wait(200);
+  out.tripWholeSurvivesARedraw = doc.querySelectorAll("#mapbox path.trip").length === 1 && Boolean(doc.querySelector("#mapbox .triplabel"));
+  doc.querySelector('[data-beds="1"]').click();
+  win.aptMapClick();                                                       // a click on the map itself puts it away
+  await wait(500);                                                         // the label fades out over a fifth of a second
+  out.tripWholeGoneOnMapClick = !doc.querySelector("#mapbox path.trip") && !doc.querySelector("#mapbox .triplabel");
+  // an ordinary pop-up: the line goes when the pop-up is closed
+  doc.querySelector("#mapbox path.leaflet-interactive").dispatchEvent(new MouseEvent("click", { bubbles: true, view: win }));
+  await wait(300);
+  out.tripBackWithAPopup = doc.querySelectorAll("#mapbox path.trip").length === 1 && !doc.querySelector("#mapbox .triplabel");
+  win.aptMapClose();
+  await wait(200);
+  out.tripLineGoneWhenClosed = !doc.querySelector("#mapbox path.trip");
+  const routesAsked = asked.route;
+  doc.querySelector('[data-tab="buildings"]').click();
+  const tripCard = doc.querySelector("#buildings article.building");
+  tripCard.querySelector(".onmap").click();
+  await wait(600);
+  out.tripFromTheList = doc.querySelectorAll("#mapbox path.trip").length === 1;
+  win.aptMapClose();
+  tripCard.querySelector(".onmap").click();
+  await wait(600);
+  out.tripRoutesAsked = [routesAsked, asked.route];
+  // no work place: no line
+  doc.getElementById("work").value = "";
+  doc.getElementById("setwork").click();
+  await wait(300);
+  out.tripGoneWithoutWork = !doc.querySelector("#mapbox path.trip");
+  win.fetch = realFetch;
+  win.aptMapClose();
   doc.querySelector('[data-tab="buildings"]').click();
   // who lives nearby: limits on the tract's median age, degrees, and race and ethnicity
   doc.getElementById("reset").click();
@@ -375,6 +452,17 @@ async function run() {
   doc.getElementById("reset").click();
   out.peopleReset = count() === everything && doc.getElementById("peoplelabel").textContent === "Any"
     && [...doc.querySelectorAll("#peoplepanel input")].every((el) => el.value === "");
+  // "On the map" as the very first look at the map: a fresh page, straight from the list
+  await new Promise((resolve) => { frame.addEventListener("load", resolve, { once: true }); win.location.reload(); });
+  const win2 = frame.contentWindow, doc2 = frame.contentDocument;
+  for (let i = 0; i < 100 && !doc2.querySelector(".unit"); i++) await wait(100);
+  if (doc2.getElementById("setup").open) doc2.getElementById("s-close").click();
+  const first = doc2.querySelector("#buildings article.building");
+  first.querySelector(".onmap").click();
+  await wait(800);
+  out.firstMapZoom = win2.aptMapZoom();
+  out.firstMapSeesIt = win2.aptMapSees(win2.aptBuilding(first.dataset.id));
+  out.firstMapPopup = ((doc2.querySelector(".leaflet-popup-content b") || {}).textContent || null) === first.querySelector("h2 a").textContent;
   document.getElementById("out").textContent = JSON.stringify(out, null, 1);
 }
 run().catch((error) => { document.getElementById("out").textContent = "ERROR " + error.stack; });
