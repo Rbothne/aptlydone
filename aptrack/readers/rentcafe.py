@@ -21,12 +21,17 @@ SITE = re.compile(r"cdngeneralmvc\.rentcafe\.com|ysi\.SiteId\s*=")
 PLAN_DATA = re.compile(r'data-floorplan-name="')
 TAG = re.compile(r"<a\b[^>]*>")
 AVAILABLE = re.compile(r'data-selenium-id="floorplan-\d+-apply-btn"')
-APARTMENT = re.compile(r"Apartment:\s*<span[^>]*>\s*#?\s*([^<]+?)\s*</span>")
+# Where one apartment's listing starts: a card ("Apartment: <span># 520743</span>") or a table row, by the site's layout.
+APARTMENT = re.compile(r'Apartment:\s*<span[^>]*>|<tr\b[^>]*class="[^"]*unit-container')
 ATTRIBUTE = r'{}="([^"]*)"'
 MONEY = re.compile(r"\$\s?([\d,]+(?:\.\d+)?)")
-FREE_ON = re.compile(r"Date Available:\s*(?:<[^>]+>\s*)*(\d{1,2})/(\d{1,2})/(\d{4})")
+# The day an apartment is free: "Date Available: <span>12/26/2026</span>" on a card, or the date in a table row's
+# availability cell ("Date: 12/26/2026"). No date means free now ("Available Now", "Date: Available").
+FREE_ON = re.compile(r'(?:Date Available:|<td\b[^>]*class="[^"]*td-card-available[^"]*"[^>]*>)(?:\s|<[^>]+>|Date:)*(\d{1,2})/(\d{1,2})/(\d{4})')
 TERM = re.compile(r"(\d+)\s*-\s*month term")
-ABOUT = re.compile(r'<div[^>]*id="amenities\d+"[^>]*>(.*?)</div>', re.S)
+# What the listing says about the apartment: a card's "Amenities" panel, or a table row's details cell.
+ABOUT = re.compile(r'<div[^>]*id="amenities\d+"[^>]*>(.*?)</div>|<td\b[^>]*class="[^"]*td-card-details[^"]*"[^>]*>(.*?)</td>', re.S)
+LABEL = re.compile(r"^\s*Amenities:\s*", re.I)
 FLOOR = re.compile(r"\b(\d{1,2})(?:st|nd|rd|th)\s+Floor\b", re.I)
 BATHS = re.compile(r"(\d+(?:\.\d)?)\s*Bath", re.I)
 
@@ -57,23 +62,26 @@ def first_amount(text):
 
 
 def parse_plan(page_html, building, url):
-    """The apartments a plan's page lists."""
-    start = (page_html or "").find('id="availApts"')
-    if start < 0:
+    """The apartments a plan's page lists; None when the page is not a RentCafe page at all (a block page, say)."""
+    if not SITE.search(page_html or ""):
         return None
-    marks = list(APARTMENT.finditer(page_html, start))
+    marks = list(APARTMENT.finditer(page_html))
     units = []
     for i, mark in enumerate(marks):
         block = page_html[mark.start():marks[i + 1].start() if i + 1 < len(marks) else len(page_html)]
+        code = attribute(block, "data-unit-code")
+        if not code:
+            continue
         name = attribute(block, "data-floorplan-name")
         free = FREE_ON.search(block)
         term = TERM.search(block)
         about = ABOUT.search(block)
-        notes = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", about.group(1)))).strip() if about else ""
+        said = (about.group(1) or about.group(2) or "") if about else ""
+        notes = LABEL.sub("", re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", said))).strip())
         floor = FLOOR.search(notes)
         baths = BATHS.search(name or "")
         unit = make_unit(
-            building["id"], html.unescape(mark.group(1)),
+            building["id"], code,
             rent=first_amount(attribute(block, "data-fp_base_charge")),
             fees=first_amount(attribute(block, "data-fp_inclusive_charge")),
             plan=name,

@@ -104,6 +104,36 @@ class RentCafeReaderTest(unittest.TestCase):
             rentcafe.read(BUILDING, web(pages))
 
 
+def row(unit_id, code, sqft, when, base, fee, name, beds, term):
+    """The same apartment as a row of a table, as other RentCafe sites lay a plan's page out."""
+    return f'''<tr data-selenium-id="urow1" class="unit-container" id="unit-container-{unit_id}">
+      <td class="td-card-name" data-selenium-id="Apt1"><p class="d-block d-lg-none td-label">Apartment:</p> #{code}</td>
+      <td class="td-card-sqft"><p class="td-label">Sq. Ft.:</p> {sqft}</td>
+      <td class="td-card-rent"><p> Total Monthly Leasing Price <a href="#" data-fp-estimator-url="/rentestimate/x?unitid={unit_id}"
+        data-fp_base_charge="{base}" data-fp_inclusive_charge="{fee}" data-floorplan-name="{name}" data-floorplan-size="{beds}"
+        data-floorplan-sqft="{sqft}" data-unit-code="{code}"></a></p> Base rent $2,033 &middot; {term}-month term</td>
+      <td class="td-card-details"><p class="td-label">Amenities:</p> Dark Finish West Facing</td>
+      <td class="td-card-available"><p class="td-label">Date:</p> {when}</td></tr>'''
+
+
+TABLE = HEAD + "<table><tbody>"     + row(44178783, "W21114", 412, "11/26/2026", f"$2,033 {TO} -$2,831", "$65", "West Half - Studio | S02a", "0.0", 12)     + row(44178790, "W21203", 412, "Available", "$2,101", "$65", "West Half - Studio | S02a", "0.0", 12)     + "</tbody></table>"
+
+
+class RentCafeTableTest(unittest.TestCase):
+    def test_apartments_listed_as_table_rows_are_read_too(self):
+        units = {u["unit"]: u for u in rentcafe.parse_plan(TABLE, BUILDING, "https://www.example-apts.com/floorplans/s02a")}
+        self.assertEqual(sorted(units), ["W21114", "W21203"])
+        first = units["W21114"]
+        self.assertEqual((first["rent"], first["fees"], first["lease"], first["sqft"], first["beds"], first["available"]),
+                         (2033, 65, 12, 412, 0, "2026-11-26"))
+        self.assertEqual((units["W21203"]["rent"], units["W21203"]["available"]), (2101, None))       # "Date: Available"
+        self.assertEqual(first["notes"], "Dark Finish West Facing")
+
+    def test_a_plans_page_with_no_apartments_left_reads_as_none_and_a_block_page_does_not(self):
+        self.assertEqual(rentcafe.parse_plan(HEAD + "<h1>Studio | S02</h1><p>Contact us</p>", BUILDING, "u"), [])
+        self.assertIsNone(rentcafe.parse_plan("<html><title>Just a moment...</title></html>", BUILDING, "u"))
+
+
 class RentCafeDiscoveryTest(unittest.TestCase):
     def test_a_rentcafe_floor_plans_page_is_recognised(self):
         self.assertEqual(common.recognise("https://www.example-apts.com/floorplans", LIST),
