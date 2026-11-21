@@ -476,6 +476,21 @@ async function run() {
   out.firstMapZoom = win2.aptMapZoom();
   out.firstMapSeesIt = win2.aptMapSees(win2.aptBuilding(first.dataset.id));
   out.firstMapPopup = ((doc2.querySelector(".leaflet-popup-content b") || {}).textContent || null) === first.querySelector("h2 a").textContent;
+  // a mistyped search is guessed at, and the page owns up to it
+  const type = async (text) => { const box = doc2.getElementById("q"); box.value = text; box.dispatchEvent(new Event("input")); await wait(400); };
+  const shown = () => doc2.querySelectorAll("#buildings article.building").length;
+  doc2.querySelector('[data-tab="buildings"]').click();
+  await type("bethesda");
+  out.searchExact = shown();
+  out.searchExactSilent = doc2.getElementById("guess").hidden;
+  await type("bethseda");
+  out.searchGuessed = shown() === out.searchExact && shown() > 0;
+  out.searchGuessNote = doc2.getElementById("guess").hidden ? null : doc2.getElementById("guess").textContent;
+  out.searchKeepsWhatWasTyped = doc2.getElementById("q").value === "bethseda";
+  await type("qqqqzzzz");
+  out.searchNoGuess = shown() === 0 ? doc2.getElementById("guess").textContent : null;
+  await type("");
+  out.searchCleared = doc2.getElementById("guess").hidden && shown() > 0;
   document.getElementById("out").textContent = JSON.stringify(out, null, 1);
 }
 run().catch((error) => { document.getElementById("out").textContent = "ERROR " + error.stack; });

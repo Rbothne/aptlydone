@@ -35,10 +35,111 @@ export function cost(unit) {
   return unit.true ?? unit.rent ?? null;
 }
 
-function searchable(building) {
+/** What the search box looks through for a building: its name, neighborhood, company and address. */
+function searchFields(building) {
   const a = building.address || {};
-  return [building.name, building.neighborhood, building.manager, a.city, a.zip, a.street, a.full]
-    .filter(Boolean).join(" ").toLowerCase();
+  return [building.name, building.neighborhood, building.manager, a.city, a.zip, a.street, a.full].filter(Boolean).map(String);
+}
+
+function searchable(building) {
+  return searchFields(building).join(" ").toLowerCase();
+}
+
+/** Does the search box let this building through? `among` is set by searchFor when the text had to be guessed at. */
+export function textMatches(building, filters) {
+  if (filters.among) return filters.among.has(building.id);
+  const q = (filters.q || "").trim().toLowerCase();
+  return !q || searchable(building).includes(q);
+}
+
+// ---------- a mistyped search ----------
+
+const unaccented = (text) => String(text).normalize("NFD").replace(/[̀-ͯ]/g, "");
+const RUN_TOGETHER = 5;                       // letters a search needs before "navyyard" may match "Navy Yard"
+
+/** How many typing mistakes a searched word may hold: none in a number or a short word, where one letter changes the place. */
+function slack(word) {
+  if (/\d/.test(word) || word.length < 4) return 0;
+  return word.length < 8 ? 1 : 2;
+}
+
+/**
+ * Typing mistakes between what was typed and the closest beginning of a word: a letter wrong, missing or extra, or two
+ * swapped, count one each. Judged against the word's beginning so that a search still being typed finds its word.
+ */
+export function mistakes(typed, word) {
+  let before = null, last = Array.from({ length: word.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= typed.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= word.length; j++) {
+      const same = typed[i - 1] === word[j - 1];
+      row[j] = Math.min(last[j] + 1, row[j - 1] + 1, last[j - 1] + (same ? 0 : 1));
+      if (before && j > 1 && typed[i - 1] === word[j - 2] && typed[i - 2] === word[j - 1]) row[j] = Math.min(row[j], before[j - 2] + 1);
+    }
+    before = last;
+    last = row;
+  }
+  return Math.min(...last);
+}
+
+/**
+ * The buildings a mistyped search most likely meant: {ids, words}, or null when nothing is close. Every word typed has
+ * to be found in the same building, within its allowance of mistakes; only the buildings with the fewest mistakes are
+ * kept. `words` are the spellings that were taken, for telling the user ("Bethesda"); empty when the search only ran
+ * words together or split them ("navyyard").
+ */
+export function closest(index, q) {
+  const typed = unaccented(q).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  if (!typed.length) return null;
+  const run = typed.join("");
+  let least = Infinity, ids = [];
+  const taken = new Map();
+  for (const building of index) {
+    const fields = searchFields(building).map(unaccented);
+    let total = 0, phrase = [];
+    if (run.length >= RUN_TOGETHER && fields.some((field) => field.toLowerCase().replace(/[^a-z0-9]+/g, "").includes(run))) phrase = null;
+    else {
+      const have = fields.flatMap((field) => field.split(/[^A-Za-z0-9]+/).filter(Boolean));
+      for (const word of typed) {
+        let best = Infinity, spelling = null;
+        for (const candidate of have) {
+          const off = mistakes(word, candidate.toLowerCase());
+          if (off < best) [best, spelling] = [off, candidate];
+        }
+        if (best > slack(word)) { total = Infinity; break; }
+        total += best;
+        phrase.push(spelling);
+      }
+    }
+    if (total === Infinity || total > least) continue;
+    if (total < least) { least = total; ids = []; taken.clear(); }
+    ids.push(building.id);
+    if (phrase) taken.set(phrase.join(" ").toLowerCase(), phrase.join(" "));
+  }
+  return ids.length ? { ids: new Set(ids), words: [...taken.values()] } : null;
+}
+
+/**
+ * The filters as the search box should apply them, and what had to be guessed. A search that matches some building's
+ * text is left alone (guess null). One that matches none is taken as mistyped: the filters gain `among`, the closest
+ * buildings, and guess says what was asked and which spellings were taken; found is false when nothing is close.
+ */
+export function searchFor(index, filters) {
+  const asked = (filters.q || "").trim();
+  if (!asked || index.some((building) => searchable(building).includes(asked.toLowerCase()))) return { filters, guess: null };
+  const hit = closest(index, asked);
+  if (!hit) return { filters, guess: { asked, found: false, words: [] } };
+  return { filters: { ...filters, among: hit.ids }, guess: { asked, found: true, words: hit.words } };
+}
+
+/** The line under the count that owns up to a guessed search. */
+export function guessText(guess) {
+  if (!guess) return "";
+  const nothing = `Nothing matches "${guess.asked}"`;
+  if (!guess.found) return `${nothing}, and nothing tracked is spelled close to it.`;
+  if (!guess.words.length) return `${nothing} exactly. Showing the closest matches.`;
+  const more = guess.words.length > 3 ? " and more" : "";
+  return `${nothing}. Showing the closest ${guess.words.length > 1 ? "matches" : "match"}: ${guess.words.slice(0, 3).join(", ")}${more}.`;
 }
 
 export function unitMatches(unit, building, filters) {
@@ -74,9 +175,7 @@ export function unitMatches(unit, building, filters) {
   if (filters.manager && building.manager !== filters.manager) return false;
   if (filters.nogo && building.zip && filters.nogo.includes(building.zip)) return false;
   if (filters.counties && filters.counties.length && !filters.counties.includes(building.county)) return false;
-  const q = filters.q.trim().toLowerCase();
-  if (q && !searchable(building).includes(q)) return false;
-  return true;
+  return textMatches(building, filters);
 }
 
 /**

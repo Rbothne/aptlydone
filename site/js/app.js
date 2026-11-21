@@ -4,7 +4,7 @@ import {
   DEFAULT_FILTERS, TAG_GROUPS, affordable, affordableNote, ago, areaFacts, countiesLabel, countyGroups, availability, cost, crimeText, driveLabel, followedGroups, incomeNeeded,
   availableNote, dogText, isSteal, mapPoints, nearbyTags, standing, unitTitle, walkText, groupBuildings, money, perSqft, shortDate, sparkline, staleText, tagLabel, tagReason, tagsLabel, chosenTags, setTag, unitMatches,
   CRIME_STOPS, TRADEOFFS, crimeStopLabel, dropText, noiseTags, relateCrime, typicalOf, worksTags, worth, worthText,
-  pageFor, popupFacts, tripText, AREA_MEASURES, areaLabel, setBound, withoutRace,
+  pageFor, popupFacts, tripText, AREA_MEASURES, areaLabel, setBound, withoutRace, guessText, searchFor, textMatches,
 } from "./logic.js";
 import { driveTimes, geocode, route, trafficTimes } from "./commute.js";
 import { createStore } from "./store.js";
@@ -190,7 +190,11 @@ function detail(unit, building) {
 /** The filters plus the standing no-go ZIP codes. */
 function active() {
   // race and ethnicity limits apply only while that information is switched on
-  return { ...state.filters, nogo: state.nogo, area: state.demographics ? state.filters.area : withoutRace(state.filters.area) };
+  const asked = { ...state.filters, nogo: state.nogo, area: state.demographics ? state.filters.area : withoutRace(state.filters.area) };
+  // a search that matches no building is taken as mistyped: the closest spellings are shown, and the page says so
+  const { filters, guess } = searchFor(state.index, asked);
+  state.guess = guess;
+  return filters;
 }
 
 function setNogo(zip, on) {
@@ -291,11 +295,9 @@ function lostCard({ building, units }) {
 }
 
 function noPrices() {
-  const { filters } = state;
-  const q = filters.q.trim().toLowerCase();
+  const filters = active();
   const silent = state.index.filter((b) => !(state.units[b.id] || []).length
-    && (!filters.counties.length || filters.counties.includes(b.county))
-    && (!q || [b.name, b.neighborhood].filter(Boolean).join(" ").toLowerCase().includes(q)));
+    && (!filters.counties.length || filters.counties.includes(b.county)) && textMatches(b, filters));
   if (!silent.length) return null;
   return h("details", { class: "noprices" },
     h("summary", null, `${plural(silent.length, "building")} with no prices published right now`),
@@ -492,6 +494,8 @@ function draw() {
   drawNogo();
   const groups = drawBuildings();
   drawFollowed();
+  $("guess").textContent = guessText(state.guess);
+  $("guess").hidden = !state.guess;
   $("buildings").hidden = state.tab !== "buildings";
   $("followed").hidden = state.tab !== "followed";
   $("map").hidden = state.tab !== "map";
@@ -1028,7 +1032,7 @@ async function load() {
 load();
 
 // Kept for the console: which units match right now.
-window.aptMatches = () => state.index.flatMap((b) => (state.units[b.id] || []).filter((u) => unitMatches(u, b, active())));
+window.aptMatches = () => { const filters = active(); return state.index.flatMap((b) => (state.units[b.id] || []).filter((u) => unitMatches(u, b, filters))); };
 window.aptBuilding = (id) => state.byId[id];
 window.aptMapZoom = () => (chart.map ? chart.map.getZoom() : null);
 window.aptMapClose = () => { if (chart.map) chart.map.closePopup(); };

@@ -40,6 +40,7 @@ h1 { font-size: 16px; margin: 0; letter-spacing: .01em; }
 #filtersbtn { display: none; }
 #count { color: var(--muted); margin: 8px 0 2px; }
 #count b { color: var(--ink); font-weight: 600; }
+#guess { margin: 2px 0 4px; font-size: 13px; }
 #nogo { color: var(--muted); margin: 0 0 4px; font-size: 12.5px; }
 #nogo button, .facts button { border: 1px dashed var(--line); background: none; border-radius: 6px; padding: 1px 7px; margin-left: 4px;
   font-size: 12.5px; color: var(--muted); }
