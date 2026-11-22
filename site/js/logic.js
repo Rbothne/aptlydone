@@ -815,3 +815,24 @@ export function sparkline(history, width, height) {
     return `${i ? "L" : "M"}${+x.toFixed(1)} ${+y.toFixed(1)}`;
   }).join("");
 }
+
+/**
+ * The colour of the ring round a building's dot on the map, from its published rating: deep purple at 3.5 or less,
+ * through plum, rose and orange, to gold at 5. None (no rating, or a rating of 0, which no reviewer gives) is null.
+ * These hues are kept apart from the tag colours that fill the dots.
+ */
+export const RATING_RAMP = [[3.5, "#3b0f70"], [4.0, "#8c2981"], [4.3, "#de4968"], [4.6, "#f98e09"], [5.0, "#fcd116"]];
+export function ratingColour(rating) {
+  if (rating == null || !(rating > 0)) return null;
+  const stops = RATING_RAMP;
+  if (rating <= stops[0][0]) return stops[0][1];
+  for (let i = 1; i < stops.length; i++) {
+    const [hi, top] = stops[i];
+    if (rating > hi) continue;
+    const [lo, bottom] = stops[i - 1];
+    const t = (rating - lo) / (hi - lo);
+    const mix = (k) => Math.round(parseInt(bottom.slice(k, k + 2), 16) * (1 - t) + parseInt(top.slice(k, k + 2), 16) * t);
+    return "#" + [1, 3, 5].map((k) => mix(k).toString(16).padStart(2, "0")).join("");
+  }
+  return stops[stops.length - 1][1];
+}

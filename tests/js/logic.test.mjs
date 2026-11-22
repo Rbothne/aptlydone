@@ -429,3 +429,15 @@ test("a building not read for days says its prices were withdrawn", async () => 
   assert.equal(staleText({ stale: true, expired: true, read: "2026-11-19", why: "HTTP 403" }), "Not read since Nov 19 (HTTP 403); prices withdrawn until it reads again");
   assert.equal(staleText({ stale: true, expired: true, read: "2026-11-19" }), "Not read since Nov 19; prices withdrawn until it reads again");
 });
+
+test("the ring colour follows the rating, from purple to gold, and is absent without one", async () => {
+  const { ratingColour } = await import("../../site/js/logic.js");
+  assert.equal(ratingColour(null), null);
+  assert.equal(ratingColour(0), null);
+  assert.equal(ratingColour(2.5), "#3b0f70");
+  assert.equal(ratingColour(4.0), "#8c2981");
+  assert.equal(ratingColour(5), "#fcd116");
+  assert.equal(ratingColour(5.4), "#fcd116");
+  assert.match(ratingColour(4.45), /^#[0-9a-f]{6}$/);
+  assert.notEqual(ratingColour(4.45), ratingColour(4.3));
+});

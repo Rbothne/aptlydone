@@ -231,3 +231,20 @@ footer label { cursor: pointer; }
 .leaflet-popup-content p.place { color: #555; }
 .leaflet-popup-content p.trip { color: #8a6200; font-weight: 600; }
 .leaflet-tooltip.triplabel { font: 600 12.5px/1.3 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; color: #3d2c00; background: #ffe9a8; border: 1px solid #d99a00; }
+
+/* map: follow from the pop-up, the star on followed buildings, the key to the rating rings */
+.leaflet-popup-content button.follow { margin: 0 0 0 4px; background: none; color: var(--muted, #666); border-color: var(--line, #ccc); padding: 1px 9px; vertical-align: 1px; }
+.leaflet-popup-content button.follow[aria-pressed="true"] { color: #d99a00; border-color: #d99a00; }
+.followpin { font-size: 14px; line-height: 14px; text-align: center; color: #ffc61a; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 1px #000; }
+.ratingkey { background: rgba(255, 255, 255, 0.92); border-radius: 8px; padding: 6px 9px; font: 12px/1.3 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #333; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3); width: 150px; }
+.ratingkey b { display: block; font-weight: 600; margin-bottom: 3px; }
+.ratingkey .ramp { display: block; height: 9px; border-radius: 5px; }
+.ratingkey .ends { display: flex; justify-content: space-between; color: #555; margin-top: 2px; }
+.ratingkey .none { display: flex; align-items: center; gap: 5px; color: #555; margin-top: 3px; }
+.ratingkey .none i { width: 9px; height: 9px; border-radius: 50%; background: #8a8a85; box-shadow: 0 0 0 1.5px #fff, 0 0 0 2.5px #bbb; }
+/* the layers button: words instead of the library's picture, which is not shipped here */
+.leaflet-control-layers-toggle { background-image: none !important; width: auto !important; height: auto !important; padding: 6px 10px;
+  font: 600 12.5px/1.2 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; color: #1f4d3a; text-decoration: none; }
+.leaflet-control-layers-toggle::after { content: "Layers"; }
+.leaflet-control-layers-expanded { font: 13px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }

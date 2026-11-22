@@ -4,7 +4,7 @@ import {
   DEFAULT_FILTERS, TAG_GROUPS, affordable, affordableNote, ago, areaFacts, countiesLabel, countyGroups, availability, cost, crimeText, driveLabel, followedGroups, incomeNeeded,
   availableNote, dogText, isSteal, mapPoints, nearbyTags, standing, unitTitle, walkText, groupBuildings, money, perSqft, shortDate, sparkline, staleText, tagLabel, tagReason, tagsLabel, chosenTags, setTag, unitMatches,
   CRIME_STOPS, TRADEOFFS, crimeStopLabel, dropText, noiseTags, relateCrime, typicalOf, worksTags, worth, worthText,
-  pageFor, popupFacts, tripText, AREA_MEASURES, areaLabel, setBound, withoutRace, guessText, searchFor, textMatches,
+  pageFor, popupFacts, tripText, ratingColour, RATING_RAMP, AREA_MEASURES, areaLabel, setBound, withoutRace, guessText, searchFor, textMatches,
 } from "./logic.js";
 import { driveTimes, geocode, route, trafficTimes } from "./commute.js";
 import { createStore } from "./store.js";
@@ -383,7 +383,9 @@ function showWholeTrip(building) {
 function popup(point) {
   const { building, deal } = point;
   return h("div", null,
-    h("p", null, h("b", null, building.name), building.rating != null && ` ★ ${building.rating}`),
+    h("p", null, h("b", null, building.name), building.rating > 0 && ` ★ ${building.rating}`,
+      building.rating_count != null && building.rating > 0 && h("small", null, ` (${building.rating_count.toLocaleString("en-US")})`),
+      " ", followButton(building)),
     h("p", null, [building.neighborhood, address(building)].filter(Boolean).join(" · ")),
     h("p", null, `${plural(point.count, "unit")} match`, point.tag && ` · best tag: ${tagLabel(point.tag)}`),
     deal && h("p", null, h("b", null, "Best deal: "),
@@ -428,14 +430,66 @@ function showOnMap(building) {
   if (marker) marker.openPopup();
 }
 
+// The map's backgrounds and the layers that can be laid over them. The choice is remembered in this browser.
+const BASES = {
+  Streets: () => L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  }),
+  Satellite: () => L.layerGroup([
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+      maxZoom: 19, maxNativeZoom: 18, attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics",
+    }),
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", {
+      maxZoom: 19, maxNativeZoom: 18, pane: "overlayPane",
+    }),
+  ]),
+  Transit: () => L.tileLayer("https://tile.memomaps.de/tilegen/{z}/{x}/{y}.png", {
+    maxZoom: 18, attribution: 'Transit map <a href="https://memomaps.de/">memomaps.de</a> (CC-BY-SA), data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  }),
+};
+const OVERLAYS = {
+  "Rail and Metro lines": () => L.tileLayer("https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png", {
+    maxZoom: 19, subdomains: "abc", opacity: 0.85,
+    attribution: 'Rail lines <a href="https://www.openrailwaymap.org/">OpenRailwayMap</a> (CC-BY-SA)',
+  }),
+};
+
+function addLayers(L, map) {
+  const chosen = store.getSetting("mapLayers", { base: "Streets", over: [] }) || {};
+  const bases = Object.fromEntries(Object.entries(BASES).map(([name, make]) => [name, make()]));
+  const overs = Object.fromEntries(Object.entries(OVERLAYS).map(([name, make]) => [name, make()]));
+  (bases[chosen.base] || bases.Streets).addTo(map);
+  for (const name of chosen.over || []) if (overs[name]) overs[name].addTo(map);
+  L.control.layers(bases, overs, { position: "topright" }).addTo(map);
+  const remember = () => store.setSetting("mapLayers", {
+    base: Object.keys(bases).find((name) => map.hasLayer(bases[name])) || "Streets",
+    over: Object.keys(overs).filter((name) => map.hasLayer(overs[name])),
+  });
+  map.on("baselayerchange overlayadd overlayremove", remember);
+  ratingLegend(L).addTo(map);
+}
+
+/** The key to the rings, in the map's corner: the gradient from the lowest rating to the highest. */
+function ratingLegend(L) {
+  const control = L.control({ position: "topleft" });
+  control.onAdd = () => {
+    const lo = RATING_RAMP[0][0], hi = RATING_RAMP[RATING_RAMP.length - 1][0];
+    const stops = RATING_RAMP.map(([at, colour]) => `${colour} ${Math.round(((at - lo) / (hi - lo)) * 100)}%`).join(", ");
+    return h("div", { class: "ratingkey", title: "The ring round each dot is the building's rating on its manager's site. A thin white ring: no rating published." },
+      h("b", null, "Rating ring"),
+      h("span", { class: "ramp", style: `background: linear-gradient(to right, ${stops})` }),
+      h("span", { class: "ends" }, h("span", null, `${lo} or less`), h("span", null, `${hi}`)),
+      h("span", { class: "none" }, h("i"), "no rating"));
+  };
+  return control;
+}
+
 function drawMap(groups) {
   if (state.tab !== "map" || !window.L) return;
   const L = window.L;
   if (!chart.map) {
     chart.map = L.map("mapbox", { scrollWheelZoom: true }).setView([38.9, -77.03], 10);
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(chart.map);
+    addLayers(L, chart.map);
     chart.trip = L.layerGroup().addTo(chart.map);      // under the dots, so they stay clickable
     chart.map.on("click", () => { if (chart.pinned && !chart.open) drawTrip(null); });      // a click on the map itself puts a drive left on show away
     chart.layer = L.layerGroup().addTo(chart.map);
@@ -453,13 +507,25 @@ function drawMap(groups) {
   // Draw untagged buildings first so tagged ones sit on top.
   points.sort((a, b) => Number(Boolean(a.tag)) - Number(Boolean(b.tag)));
   for (const point of points) {
+    const radius = 5 + Math.min(9, Math.sqrt(point.count));
+    const ring = ratingColour(point.building.rating);
+    if (ring) {                                       // the rating ring, outside the dot's white edge so it never runs into the tag colour
+      L.circleMarker([point.lat, point.lon], { radius: radius + 3, weight: 3.5, color: ring, opacity: 1, fill: false, interactive: false, className: "ring" })
+        .addTo(chart.layer);
+    }
     chart.markers[point.id] = L.circleMarker([point.lat, point.lon], {
-      radius: 5 + Math.min(9, Math.sqrt(point.count)), weight: 1.5, color: "#ffffff",
+      radius, weight: 1.5, color: "#ffffff",
       fillColor: TAG_COLOUR[point.tag] || "#8a8a85", fillOpacity: 0.9,
     }).bindPopup(() => popup(point), { minWidth: 260 }).bindTooltip(point.name)
       .on("popupopen", () => { chart.open = point.id; chart.pinned = false; drawTrip(point.building); })
       .on("popupclose", () => { if (!chart.redrawing) { chart.open = null; if (!chart.pinned) drawTrip(null); } })
       .addTo(chart.layer);
+    if (store.isFollowing(point.id)) {                  // a followed building wears a small star, clear of the dot
+      L.marker([point.lat, point.lon], {
+        icon: L.divIcon({ className: "followpin", html: "★", iconSize: [14, 14], iconAnchor: [-radius + 4, radius + 10] }),
+        interactive: false, keyboard: false,
+      }).addTo(chart.layer);
+    }
   }
   chart.redrawing = false;
   if (!chart.fitted && points.length) {
