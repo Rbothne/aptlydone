@@ -34,6 +34,8 @@ const state = {
   work: store.getSetting("work", null),             // {address, lat, lon, label}: kept in this browser only
   filters: store.getFilters(), tab: "buildings", shown: PAGE, expanded: new Set(), open: new Set(),
   scroll: {},                                      // how far down each tab was when it was left, to come back to the same spot
+  whole: false,                                    // every county's units arrived on this visit
+  newsShut: false,                                 // the list of new units was folded away
 };
 
 const $ = (id) => document.getElementById(id);
@@ -93,7 +95,7 @@ function unitRow(unit, building, listed = true) {
     h("button", {
       class: "star", type: "button", "aria-pressed": String(starred), title: starred ? "Stop following" : "Follow this unit",
       "aria-label": starred ? "Stop following" : "Follow this unit",
-      onclick: (event) => { event.stopPropagation(); store.toggleStar(unit, building); draw(); },
+      onclick: (event) => { event.stopPropagation(); store.toggleStar(unit, building); watch(); draw(); },
     }, starred ? "★" : "☆"),
     h("div", { class: "what" },
       unit.tag && h("span", {
@@ -250,7 +252,7 @@ function followButton(building) {
   return h("button", {
     class: "follow", type: "button", "aria-pressed": String(following),
     title: following ? "Stop following this building" : "Follow this building. It stays under Followed, showing whatever matches your filters.",
-    onclick: () => { store.toggleFollow(building); draw(); },
+    onclick: () => { store.toggleFollow(building); watch(); draw(); },
   }, following ? "★ Following" : "☆ Follow building");
 }
 
@@ -471,16 +473,42 @@ function drawMap(groups) {
   }
 }
 
+/**
+ * Look for newly tagged units in the followed buildings (see noteArrivals in store.js). Also run when something is
+ * followed, so a building starts from what it lists at that moment. Not run on a visit where part of the data failed
+ * to load: units missing today would all be announced as new on the next visit.
+ */
+function watch() {
+  if (state.whole) store.noteArrivals(state.units, state.byId, new Date().toISOString().slice(0, 10));
+}
+
+/** Newly tagged units in followed buildings, as a list that stays until it is cleared or two weeks pass. */
+function newsBox() {
+  const notes = store.arrivals();
+  $("n-news").textContent = notes.length ? `${notes.length} new` : "";
+  if (!notes.length) return null;
+  return h("details", { class: "news", open: !state.newsShut, ontoggle: (event) => { state.newsShut = !event.target.open; } },
+    h("summary", null, `Newly tagged in followed buildings (${notes.length})`),
+    h("ul", null, notes.map((note) => h("li", null,
+      `${shortDate(note.kind === "tagged" ? note.day : note.first || note.day)} · `, h("span", { class: `tag ${note.tag}` }, tagLabel(note.tag)), " ",
+      note.url ? h("a", { href: note.url, target: "_blank", rel: "noopener" }, note.title) : note.title, ` at ${note.name}`,
+      [bedsLabel(note.beds), note.sqft && `${note.sqft.toLocaleString("en-US")} sqft`, note.cost != null && `${money(note.cost)}/mo`]
+        .filter(Boolean).map((fact) => ` · ${fact}`),
+      h("small", null, note.kind === "tagged" ? " · already listed, the tag is new" : " · new listing", note.drop && ` · ${note.drop}`)))),
+    h("button", { class: "pill", type: "button", onclick: () => { store.clearArrivals(); draw(); } }, "Clear"));
+}
+
 /** The Followed tab: the buildings list, narrowed to buildings you follow or hold a followed unit in. */
 function drawFollowed() {
   const groups = followedGroups(state.index, state.units, active(), BEST, store.follows(), store.stars());
   $("n-followed").textContent = groups.length ? String(groups.length) : "";
   const section = $("followed");
+  const news = newsBox();
   if (!groups.length) {
     section.replaceChildren(h("p", { class: "empty" }, "Nothing followed yet. Use the ☆ on a unit, or \"Follow building\": either keeps that building here, showing whatever matches your filters, with the units you followed first."));
     return groups;
   }
-  section.replaceChildren(...groups.map((group) => (group.tracked ? buildingCard(group) : lostCard(group))));
+  section.replaceChildren(...[news, ...groups.map((group) => (group.tracked ? buildingCard(group) : lostCard(group)))].filter(Boolean));
   if (state.tab === "followed") {
     const matching = groups.reduce((n, group) => n + group.units.length - group.unlisted.length, 0);
     $("count").replaceChildren(
@@ -968,6 +996,7 @@ function wireSetup() {
     state.values = store.getSetting("values", {});
     $("setup").close();
     showWork();
+    watch();
     changed();
     $("workstatus").textContent = `Settings loaded: ${result.stars} followed units, ${result.follows} followed buildings.` + (state.work ? " Press Time my drive to time drives here." : "");
   });
@@ -1024,6 +1053,8 @@ async function load() {
     for (const unit of state.units[building.id] || []) unit.walkScore = building.walk ? building.walk.score : null;
   }
   store.refreshStars(state.unitsById, state.byId);
+  state.whole = files.every((file) => file.status === "fulfilled");
+  watch();
   showWork();
   draw();
   if (!store.getSetting("welcomed", false)) openSetup();

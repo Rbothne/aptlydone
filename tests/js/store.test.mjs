@@ -149,3 +149,185 @@ test("importing text that is not an export changes nothing", () => {
   }
   assert.equal(store.getFilters().minSqft, 900);
 });
+
+// ---------- new tagged units in followed buildings ----------
+
+const tagged = (n, more = {}) => unit({ id: `b1:${n}`, unit: String(n), tag: "local", first: "2026-11-21", url: `https://example.test/b1/${n}`, ...more });
+const listing = (...units) => ({ b1: units });
+const known = { b1: building };
+
+test("following a building starts from what it lists now: nothing is announced", () => {
+  const store = createStore(fakeStorage());
+  store.toggleFollow(building);
+  assert.deepEqual(store.noteArrivals(listing(tagged(101), tagged(102)), known, "2026-11-21"), []);
+  assert.deepEqual(store.arrivals(), []);
+});
+
+test("a tagged unit that appears in a followed building is announced, once", () => {
+  const storage = fakeStorage();
+  const store = createStore(storage);
+  store.toggleFollow(building);
+  store.noteArrivals(listing(tagged(101)), known, "2026-11-20");
+  const fresh = tagged(102, { tag: "absolute", beds: 2, sqft: 950, rent: 2400, true: 2500 });
+  store.noteArrivals(listing(tagged(101), fresh), known, "2026-11-21");
+  assert.deepEqual(createStore(storage).arrivals(), [{
+    id: "b1:102", building: "b1", name: "The Example", title: "#102", tag: "absolute", beds: 2, sqft: 950, cost: 2500,
+    url: "https://example.test/b1/102", first: "2026-11-21", day: "2026-11-21", kind: "new", drop: null,
+  }]);
+  store.noteArrivals(listing(tagged(101), fresh), known, "2026-11-22");
+  assert.equal(store.arrivals().length, 1);
+});
+
+test("a new unit without a tag is not announced until it gains one", () => {
+  const store = createStore(fakeStorage());
+  store.toggleFollow(building);
+  store.noteArrivals(listing(tagged(101)), known, "2026-11-20");
+  store.noteArrivals(listing(tagged(101), tagged(102, { tag: null })), known, "2026-11-21");
+  assert.deepEqual(store.arrivals(), []);
+  const cut = { was: 2600, by: 200, pct: -7.7, day: "2026-11-22" };
+  store.noteArrivals(listing(tagged(101), tagged(102, { tag: "local", drop: cut })), known, "2026-11-22");
+  const [note, ...rest] = store.arrivals();
+  assert.deepEqual(rest, []);
+  assert.equal(note.id, "b1:102");
+  assert.equal(note.kind, "tagged");
+  assert.equal(note.day, "2026-11-22");
+  assert.equal(note.drop, "Down $200 (8%) since Nov 22, from $2,600");
+});
+
+test("a unit listed without a tag when its building was followed is announced when it gains one", () => {
+  const store = createStore(fakeStorage());
+  store.toggleFollow(building);
+  store.noteArrivals(listing(tagged(101, { tag: null })), known, "2026-11-20");
+  store.noteArrivals(listing(tagged(101, { tag: "building" })), known, "2026-11-21");
+  assert.deepEqual(store.arrivals().map((note) => [note.id, note.kind, note.tag]), [["b1:101", "tagged", "building"]]);
+  store.noteArrivals(listing(tagged(101, { tag: "building" })), known, "2026-11-22");
+  assert.equal(store.arrivals().length, 1);
+});
+
+test("a tag that turns into another tag is not announced", () => {
+  const store = createStore(fakeStorage());
+  store.toggleFollow(building);
+  store.noteArrivals(listing(tagged(101, { tag: "local" })), known, "2026-11-20");
+  store.noteArrivals(listing(tagged(101, { tag: "absolute" })), known, "2026-11-21");
+  assert.deepEqual(store.arrivals(), []);
+});
+
+test("a unit that loses its tag and gains it back is announced again, in place of the older announcement", () => {
+  const store = createStore(fakeStorage());
+  store.toggleFollow(building);
+  store.noteArrivals(listing(tagged(101, { tag: null })), known, "2026-11-20");
+  store.noteArrivals(listing(tagged(101)), known, "2026-11-21");
+  store.noteArrivals(listing(tagged(101, { tag: null })), known, "2026-11-22");
+  store.noteArrivals(listing(tagged(101)), known, "2026-11-23");
+  assert.deepEqual(store.arrivals().map((note) => [note.id, note.day]), [["b1:101", "2026-11-23"]]);
+});
+
+test("a tag gained while a building could not be read is announced when it reads again", () => {
+  const store = createStore(fakeStorage());
+  store.toggleFollow(building);
+  store.noteArrivals(listing(tagged(101, { tag: null }), tagged(102)), known, "2026-11-20");
+  store.noteArrivals(listing(), { b1: { ...building, stale: true, expired: true } }, "2026-11-25");
+  store.noteArrivals(listing(tagged(101), tagged(102)), known, "2026-11-26");
+  assert.deepEqual(store.arrivals().map((note) => [note.id, note.kind]), [["b1:101", "tagged"]]);
+});
+
+test("a building kept under Followed by a starred unit is watched too", () => {
+  const store = createStore(fakeStorage());
+  store.toggleStar(tagged(101), building);
+  store.noteArrivals(listing(tagged(101)), known, "2026-11-20");
+  store.noteArrivals(listing(tagged(101), tagged(102)), known, "2026-11-21");
+  assert.deepEqual(store.arrivals().map((note) => note.id), ["b1:102"]);
+});
+
+test("a building nobody follows announces nothing", () => {
+  const store = createStore(fakeStorage());
+  store.noteArrivals(listing(tagged(101)), known, "2026-11-20");
+  store.noteArrivals(listing(tagged(101), tagged(102)), known, "2026-11-21");
+  assert.deepEqual(store.arrivals(), []);
+});
+
+test("a unit that leaves and is listed again is announced again", () => {
+  const store = createStore(fakeStorage());
+  store.toggleFollow(building);
+  store.noteArrivals(listing(tagged(101), tagged(102)), known, "2026-11-20");
+  store.noteArrivals(listing(tagged(101)), known, "2026-11-21");
+  store.noteArrivals(listing(tagged(101), tagged(102)), known, "2026-11-22");
+  assert.deepEqual(store.arrivals().map((note) => note.id), ["b1:102"]);
+});
+
+test("units that vanish while a building cannot be read are not announced when they return", () => {
+  const store = createStore(fakeStorage());
+  store.toggleFollow(building);
+  store.noteArrivals(listing(tagged(101), tagged(102)), known, "2026-11-20");
+  store.noteArrivals(listing(), { b1: { ...building, stale: true, expired: true } }, "2026-11-25");
+  store.noteArrivals(listing(tagged(101), tagged(102), tagged(103)), known, "2026-11-26");
+  assert.deepEqual(store.arrivals().map((note) => note.id), ["b1:103"]);
+});
+
+test("a followed building missing from the data for a while announces nothing when it returns", () => {
+  const store = createStore(fakeStorage());
+  store.toggleFollow(building);
+  store.noteArrivals(listing(tagged(101)), known, "2026-11-20");
+  store.noteArrivals({}, {}, "2026-11-21");
+  store.noteArrivals(listing(tagged(101)), known, "2026-11-22");
+  assert.deepEqual(store.arrivals(), []);
+});
+
+test("announcements are kept two weeks, newest first, sixty at most", () => {
+  const store = createStore(fakeStorage());
+  store.toggleFollow(building);
+  store.noteArrivals(listing(), known, "2026-11-01");
+  store.noteArrivals(listing(tagged(101)), known, "2026-11-02");
+  store.noteArrivals(listing(tagged(101), tagged(102)), known, "2026-11-10");
+  assert.deepEqual(store.arrivals().map((note) => note.id), ["b1:102", "b1:101"]);
+  store.noteArrivals(listing(tagged(101), tagged(102)), known, "2026-11-16");
+  assert.deepEqual(store.arrivals().map((note) => note.id), ["b1:102", "b1:101"]);       // fourteen days old: still there
+  store.noteArrivals(listing(tagged(101), tagged(102)), known, "2026-11-17");
+  assert.deepEqual(store.arrivals().map((note) => note.id), ["b1:102"]);
+  const many = Array.from({ length: 70 }, (_, i) => tagged(200 + i));
+  store.noteArrivals(listing(tagged(101), tagged(102), ...many), known, "2026-11-18");
+  assert.equal(store.arrivals().length, 60);
+});
+
+test("unfollowing a building drops its announcements, and following again starts afresh", () => {
+  const store = createStore(fakeStorage());
+  store.toggleFollow(building);
+  store.noteArrivals(listing(tagged(101)), known, "2026-11-20");
+  store.noteArrivals(listing(tagged(101), tagged(102)), known, "2026-11-21");
+  store.toggleFollow(building);
+  assert.deepEqual(store.noteArrivals(listing(tagged(101), tagged(102)), known, "2026-11-21"), []);
+  store.toggleFollow(building);
+  assert.deepEqual(store.noteArrivals(listing(tagged(101), tagged(102), tagged(103)), known, "2026-11-22"), []);
+});
+
+test("clearing the announcements does not bring them back", () => {
+  const store = createStore(fakeStorage());
+  store.toggleFollow(building);
+  store.noteArrivals(listing(tagged(101)), known, "2026-11-20");
+  store.noteArrivals(listing(tagged(101), tagged(102)), known, "2026-11-21");
+  store.clearArrivals();
+  assert.deepEqual(store.arrivals(), []);
+  assert.deepEqual(store.noteArrivals(listing(tagged(101), tagged(102)), known, "2026-11-22"), []);
+});
+
+test("announcements work in memory when storage is blocked, and survive corrupt saved data", () => {
+  for (const storage of [brokenStorage, fakeStorage({ "apt.news": "{not json" }), fakeStorage({ "apt.news": "[1,2]" }),
+    fakeStorage({ "apt.news": JSON.stringify({ seen: "x", notes: [null, 3, { id: "b1:9" }] }) })]) {
+    const store = createStore(storage);
+    assert.deepEqual(store.arrivals(), []);
+    store.toggleFollow(building);
+    store.noteArrivals(listing(tagged(101)), known, "2026-11-20");
+    store.noteArrivals(listing(tagged(101), tagged(102)), known, "2026-11-21");
+    assert.deepEqual(store.arrivals().map((note) => note.id), ["b1:102"]);
+  }
+});
+
+test("a unit priced by floor plan is announced under its plan's name", () => {
+  const store = createStore(fakeStorage());
+  store.toggleFollow(building);
+  store.noteArrivals(listing(), known, "2026-11-20");
+  store.noteArrivals(listing(tagged(102, { plan: "Adams", count: 3, true: null, rent: 2836 })), known, "2026-11-21");
+  const [note] = store.arrivals();
+  assert.equal(note.title, "Adams");
+  assert.equal(note.cost, 2836);
+});

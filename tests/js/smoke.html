@@ -491,6 +491,51 @@ async function run() {
   out.searchNoGuess = shown() === 0 ? doc2.getElementById("guess").textContent : null;
   await type("");
   out.searchCleared = doc2.getElementById("guess").hidden && shown() > 0;
+  // a followed building that lists a tagged unit it did not list at the last visit says so on Followed
+  const fresh = async (from) => {
+    await new Promise((resolve) => { frame.addEventListener("load", resolve, { once: true }); from.location.reload(); });
+    const w = frame.contentWindow, d = frame.contentDocument;
+    for (let i = 0; i < 100 && !d.querySelector(".unit"); i++) await wait(100);
+    return [w, d];
+  };
+  const newsSaved = (w) => JSON.parse(w.localStorage.getItem("apt.news") || "{}");
+  for (const key of ["apt.follows", "apt.stars", "apt.news"]) win2.localStorage.removeItem(key);
+  doc2.getElementById("reset").click();
+  const [win3, doc3] = await fresh(win2);
+  const arrival = win3.aptMatches().find((u) => u.tag && u.url);
+  const home = win3.aptBuilding(arrival.building);
+  const box3 = doc3.getElementById("q"); box3.value = home.name; box3.dispatchEvent(new Event("input"));
+  await wait(400);
+  doc3.querySelector(`#buildings article[data-id="${home.id}"] .follow`).click();
+  out.newsQuietOnFollow = newsSaved(win3).notes.length === 0 && newsSaved(win3).seen[home.id][arrival.id] === arrival.tag && doc3.getElementById("n-news").textContent === "";
+  box3.value = ""; box3.dispatchEvent(new Event("input"));
+  await wait(400);
+  const earlier = newsSaved(win3);                                        // as if the last visit came before that unit was listed
+  delete earlier.seen[home.id][arrival.id];
+  win3.localStorage.setItem("apt.news", JSON.stringify(earlier));
+  const [win4, doc4] = await fresh(win3);
+  out.newsTabCount = doc4.getElementById("n-news").textContent;
+  doc4.querySelector('[data-tab="followed"]').click();
+  const news4 = doc4.querySelector("#followed .news");
+  out.newsBox = news4 ? news4.textContent.replace(/\s+/g, " ") : null;
+  out.newsBoxOpenAndFirst = Boolean(news4 && news4.open && news4 === doc4.getElementById("followed").firstElementChild);
+  out.newsNamesTheUnit = Boolean(news4 && news4.querySelector("a").href === new URL(arrival.url).href && news4.textContent.includes(home.name)
+    && news4.querySelector(".tag").classList.contains(arrival.tag));
+  const [win5, doc5] = await fresh(win4);
+  out.newsNotRepeated = newsSaved(win5).notes.length === 1 && doc5.getElementById("n-news").textContent === "1 new";
+  doc5.querySelector('[data-tab="followed"]').click();
+  doc5.querySelector("#followed .news button").click();
+  out.newsCleared = !doc5.querySelector("#followed .news") && doc5.getElementById("n-news").textContent === "" && newsSaved(win5).notes.length === 0
+    && newsSaved(win5).seen[home.id][arrival.id] === arrival.tag;
+  const untagged = newsSaved(win5);                                       // as if that unit was listed without a tag at the last visit
+  untagged.seen[home.id][arrival.id] = "";
+  win5.localStorage.setItem("apt.news", JSON.stringify(untagged));
+  const [win6, doc6] = await fresh(win5);
+  out.newsGainedTagCount = doc6.getElementById("n-news").textContent;
+  doc6.querySelector('[data-tab="followed"]').click();
+  out.newsGainedTag = (doc6.querySelector("#followed .news li") || { textContent: null }).textContent;
+  doc6.querySelector(`#followed article[data-id="${home.id}"] .follow`).click();
+  out.newsForgetsUnfollowed = !(home.id in newsSaved(win6).seen) && !doc6.querySelector("#followed .news");
   document.getElementById("out").textContent = JSON.stringify(out, null, 1);
 }
 run().catch((error) => { document.getElementById("out").textContent = "ERROR " + error.stack; });
