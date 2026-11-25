@@ -22,9 +22,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -73,5 +70,25 @@ jobs:
         with:
           path: site
 
+  # Publishing is its own job, after the build job has ended: deploy-pages run in the same job as the upload has
+  # repeatedly failed to see the artifact it was just handed ("No artifacts named github-pages", every run from
+  # 23 November). Once the build job is over the artifact is listed. A failed deploy is tried once more a minute later.
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.again.outputs.page_url || steps.deploy.outputs.page_url }}
+    steps:
       - id: deploy
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - name: Wait before trying again
+        if: steps.deploy.outcome == 'failure'
+        run: sleep 60
+
+      - id: again
+        if: steps.deploy.outcome == 'failure'
         uses: actions/deploy-pages@v4
