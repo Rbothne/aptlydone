@@ -4,7 +4,7 @@ import {
   DEFAULT_FILTERS, TAG_GROUPS, affordable, affordableNote, ago, areaFacts, countiesLabel, countyGroups, availability, cost, crimeText, driveLabel, followedGroups, incomeNeeded,
   availableNote, dogText, isSteal, mapPoints, nearbyTags, standing, unitTitle, walkText, groupBuildings, money, perSqft, shortDate, sparkline, staleText, tagLabel, tagReason, tagsLabel, chosenTags, setTag, unitMatches,
   CRIME_STOPS, TRADEOFFS, crimeStopLabel, dropText, noiseTags, relateCrime, typicalOf, worksTags, worth, worthText,
-  pageFor, popupFacts, tripText, ratingColour, RATING_RAMP, AREA_MEASURES, areaLabel, setBound, withoutRace, guessText, searchFor, textMatches,
+  pageFor, popupFacts, tripText, ratingColour, ratingSource, ratingTier, RATING_TIERS, LOW_RATING_COLOUR, AREA_MEASURES, areaLabel, setBound, withoutRace, guessText, searchFor, textMatches,
 } from "./logic.js";
 import { driveTimes, geocode, route, trafficTimes } from "./commute.js";
 import { createStore } from "./store.js";
@@ -263,14 +263,11 @@ function buildingCard(group) {
   const unlisted = group.unlisted || [];              // followed units that are no longer listed, kept as last seen
   return h("article", { class: "building", "data-id": building.id },
     h("header", null,
-      h("h2", null, h("a", { href: building.url, target: "_blank", rel: "noopener" }, building.name), " ", followButton(building),
+      h("h2", null, h("a", { href: building.url, target: "_blank", rel: "noopener", ...heat(building) }, building.name), " ", followButton(building),
         building.lat != null && building.lon != null && h("button", {
           class: "follow onmap", type: "button", title: "Show this building on the map", onclick: () => showOnMap(building),
         }, "On the map")),
-      building.rating != null
-        ? h("span", { class: "rating", title: "Rating published on the manager's site" }, `★ ${building.rating}`,
-            building.rating_count != null && h("small", null, ` (${building.rating_count.toLocaleString("en-US")})`))
-        : h("span", null),
+      ratingBadge(building) || h("span", null),
       h("div", { class: "where" }, [building.neighborhood, address(building), building.manager].filter(Boolean).join(" · "))),
     building.special && h("p", { class: "offer" }, building.special,
       h("small", null, "Building-wide offer: it may not apply to every unit.")),
@@ -380,12 +377,29 @@ function showWholeTrip(building) {
   chart.map.fitBounds(line, { padding: [40, 40], animate: false });
 }
 
+/** The building's name takes its rating tier's colour, as titles do in the catalogue: class and hover text. */
+function heat(building) {
+  const tier = ratingTier(building.rating);
+  if (!tier) return {};
+  const source = ratingSource(building);
+  return { class: `heat-${tier}`, title: `Rated ${RATING_TIERS[tier - 1].label}${source ? ` (${source.label})` : ""}` };
+}
+
+/** "★ 4.2 (311) Google": the stars, the review count, and where they come from (a link to the Google page when there is one). */
+function ratingBadge(building) {
+  const source = ratingSource(building);
+  if (!source) return null;
+  const tier = ratingTier(building.rating);
+  return h("span", { class: `rating${tier ? ` heat-${tier}` : ""}`, title: source.title }, `★ ${building.rating}`,
+    building.rating_count != null && h("small", null, ` (${building.rating_count.toLocaleString("en-US")})`),
+    h("small", { class: "source" }, " ",
+      source.url ? h("a", { href: source.url, target: "_blank", rel: "noopener" }, source.label) : source.label));
+}
+
 function popup(point) {
   const { building, deal } = point;
   return h("div", null,
-    h("p", null, h("b", null, building.name), building.rating > 0 && ` ★ ${building.rating}`,
-      building.rating_count != null && building.rating > 0 && h("small", null, ` (${building.rating_count.toLocaleString("en-US")})`),
-      " ", followButton(building)),
+    h("p", null, h("b", heat(building), building.name), " ", ratingBadge(building), " ", followButton(building)),
     h("p", null, [building.neighborhood, address(building)].filter(Boolean).join(" · ")),
     h("p", null, `${plural(point.count, "unit")} match`, point.tag && ` · best tag: ${tagLabel(point.tag)}`),
     deal && h("p", null, h("b", null, "Best deal: "),
@@ -469,16 +483,15 @@ function addLayers(L, map) {
   ratingLegend(L).addTo(map);
 }
 
-/** The key to the rings, in the map's corner: the gradient from the lowest rating to the highest. */
+/** The key to the rings, in the map's corner: one swatch per rating tier, hottest first. */
 function ratingLegend(L) {
   const control = L.control({ position: "topleft" });
   control.onAdd = () => {
-    const lo = RATING_RAMP[0][0], hi = RATING_RAMP[RATING_RAMP.length - 1][0];
-    const stops = RATING_RAMP.map(([at, colour]) => `${colour} ${Math.round(((at - lo) / (hi - lo)) * 100)}%`).join(", ");
-    return h("div", { class: "ratingkey", title: "The ring round each dot is the building's rating on its manager's site. A thin white ring: no rating published." },
+    const swatch = (colour, label) => h("span", { class: "tier" }, h("i", { style: `border-color: ${colour}` }), label);
+    return h("div", { class: "ratingkey", title: "The ring round each dot is the building's rating on Google, or on its manager's site when Google has none, in five tiers. A thin white ring: no rating." },
       h("b", null, "Rating ring"),
-      h("span", { class: "ramp", style: `background: linear-gradient(to right, ${stops})` }),
-      h("span", { class: "ends" }, h("span", null, `${lo} or less`), h("span", null, `${hi}`)),
+      [...RATING_TIERS].reverse().map((t) => swatch(t.light, t.label)),
+      swatch(LOW_RATING_COLOUR, "below 3.5"),
       h("span", { class: "none" }, h("i"), "no rating"));
   };
   return control;
@@ -719,6 +732,10 @@ function showFilters() {
   for (const row of document.querySelectorAll("#peoplepanel [data-race]")) row.hidden = !state.demographics;
   for (const row of document.querySelectorAll("#peoplepanel [data-norace]")) row.hidden = state.demographics;
   $("manager").value = f.manager;
+  if (f.minRating != null) {                          // a choice saved before the tiers (4.3, 4.5) snaps down to the tier below it
+    const tier = ratingTier(f.minRating);
+    f.minRating = tier ? RATING_TIERS[tier - 1].at : null;
+  }
   $("minRating").value = f.minRating == null ? "" : String(f.minRating);
   $("sort").value = f.sort;
   for (const button of document.querySelectorAll("[data-beds]")) button.setAttribute("aria-pressed", String(f.beds.includes(Number(button.dataset.beds))));

@@ -8,9 +8,9 @@ import concurrent.futures
 import re
 import time
 
-from . import affordable, census, crime, noise, places, rents, works
+from . import affordable, census, crime, google, noise, places, rents, works
 
-PARTS = ("census", "crime", "rents", "affordable", "places", "noise", "works")
+PARTS = ("census", "crime", "rents", "affordable", "places", "noise", "works", "google")
 
 
 def zip_code(building):
@@ -29,8 +29,9 @@ def zip_code(building):
     return (building.get("placed") or {}).get("zip") or building.get("zip") or None
 
 
-def collect(buildings, previous, get, today, now, parts=PARTS, post=None, sleep=time.sleep):
-    """Area data for these (in-region) buildings, starting from what was collected before."""
+def collect(buildings, previous, get, today, now, parts=PARTS, post=None, sleep=time.sleep, google_key=None, gone=None):
+    """Area data for these (in-region) buildings, starting from what was collected before.
+    `google_key` is a Google Maps key for the Google ratings; without one they keep what was collected before."""
     area = dict(previous or {})
 
     # what is looked up once per place (walkability, noise) is forgotten for a building that has moved
@@ -140,6 +141,12 @@ def collect(buildings, previous, get, today, now, parts=PARTS, post=None, sleep=
                       f"{sum(1 for w in area['works'].values() if w['here'])} with big work on their own lot")
             except Exception as error:
                 print(f"  no building permits this time: {error!r}")
+
+    if "google" in parts:
+        if google_key:
+            area["google"] = google.collect(buildings, area.get("google"), get, google_key, today, gone=gone)
+        else:
+            print("  no GOOGLE_MAPS_KEY: Google ratings keep what was collected before")
 
     area["updated"] = now
     return area

@@ -55,9 +55,9 @@
     <label title="Drive time from your work address, ignoring traffic. Set a work address below first.">Max drive
       <input type="range" id="maxDrive" min="10" max="95" step="5" value="95"> <output id="maxDriveOut" for="maxDrive">any</output></label>
 
-    <label title="The rating each manager publishes for the building. Buildings with no published rating are hidden while this is set.">Rating
+    <label title="The building's rating on Google, or the one its manager publishes when Google has none. The steps are the colour tiers names and rings use. Buildings with no rating are hidden while this is set.">Rating
       <select id="minRating"><option value="">Any</option><option value="3.5">3.5+</option><option value="4">4.0+</option>
-        <option value="4.3">4.3+</option><option value="4.5">4.5+</option><option value="4.7">4.7+</option></select></label>
+        <option value="4.4">4.4+</option><option value="4.7">4.7+</option><option value="4.9">4.9+</option></select></label>
     <label>Managed by <select id="manager"><option value="">Anyone</option></select></label>
     <details class="picker" id="areas">
       <summary>Areas: <span id="areaslabel">All areas</span></summary>

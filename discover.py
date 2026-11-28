@@ -12,7 +12,7 @@ its buildings are kept as they are.
 import argparse
 import os
 
-from aptrack import companies, discovery, fetch, files
+from aptrack import companies, discovery, fetch, files, vpn
 from aptrack.discover import DISCOVERERS
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -37,7 +37,7 @@ def main():
             parser.error(f"{name} is paused in managers.json ({why}); delete its \"paused\" entry to bring it back")
         print(f"{name}: paused ({why}); keeping what is known about it")
     managers = companies.active(managers)
-    get = fetch.polite(settings["delay_seconds"], settings.get("site_delays"))
+    get = fetch.polite(settings["delay_seconds"], settings.get("site_delays"), routes=vpn.routes())
 
     found = discovery.run_all(managers, DISCOVERERS, get, limit=args.limit, workers=settings.get("workers"))
 

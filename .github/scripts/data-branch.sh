@@ -17,7 +17,7 @@ case "${1:-}" in
       exit 3
     fi
     git show FETCH_HEAD:buildings.json > data/buildings.json
-    for extra in state.json area.json; do
+    for extra in state.json area.json routes.json; do
       if git cat-file -e "FETCH_HEAD:$extra" 2>/dev/null; then
         git show "FETCH_HEAD:$extra" > "data/$extra"
       fi
@@ -31,7 +31,7 @@ case "${1:-}" in
     out="$(mktemp -d)"
     mkdir -p "$out/site-data"
     cp data/buildings.json "$out/"
-    for extra in state.json area.json; do
+    for extra in state.json area.json routes.json; do
       if [ -f "data/$extra" ]; then cp "data/$extra" "$out/"; fi
     done
     if ls site/data/*.json >/dev/null 2>&1; then cp site/data/*.json "$out/site-data/"; fi

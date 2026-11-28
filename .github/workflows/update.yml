@@ -22,6 +22,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # Exits (aptrack/vpn.py): a site that refuses GitHub's address is asked through Cloudflare WARP, registered
+    # fresh each run unless WARP_PROFILE holds one, and through any WireGuard configs or proxies in the secrets.
+    env:
+      WARP_PROFILE: ${{ secrets.WARP_PROFILE }}
+      APTRACK_WG_CONFS: ${{ secrets.APTRACK_WG_CONFS }}
+      APTRACK_PROXIES: ${{ secrets.APTRACK_PROXIES }}
     steps:
       - uses: actions/checkout@v4
 

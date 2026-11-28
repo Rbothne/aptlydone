@@ -1,6 +1,13 @@
-"""Polite HTTP: one request at a time per site, gzip, and clear errors for "gone" and "slow down"."""
+"""Polite HTTP: one request at a time per site, gzip, and clear errors for "gone" and "slow down".
 
+With exits (`aptrack/vpn.py`), a site that refuses one address is asked through the next, and the exit it answered
+through is remembered for it (`Routes`).
+"""
+
+import datetime
 import gzip
+import json
+import os
 import threading
 import time
 import urllib.error
@@ -19,10 +26,14 @@ class RateLimited(Exception):
     """The site answered 429. Callers come back later instead of retrying."""
 
 
-def get(url, *, timeout=25, tries=3, headers=None, opener=urllib.request.urlopen, sleep=time.sleep, raw=False, data=None):
+def get(url, *, timeout=25, tries=3, headers=None, opener=None, sleep=time.sleep, raw=False, data=None, proxy=None):
     """Fetch `url` and return the body as bytes, decompressed if the server gzipped it.
     `raw` returns the bytes exactly as sent, for a piece of a binary file that might only look gzipped.
-    `data` (bytes) sends it as a POST: a listing service that answers questions (GraphQL) rather than pages."""
+    `data` (bytes) sends it as a POST: a listing service that answers questions (GraphQL) rather than pages.
+    `proxy` (an http:// address) sends it out through that exit. A refusal (403) is not asked again here."""
+    if opener is None:
+        opener = (urllib.request.build_opener(urllib.request.ProxyHandler({"http": proxy, "https": proxy})).open
+                  if proxy else urllib.request.urlopen)
     request = urllib.request.Request(url, data=data, method="POST" if data is not None else "GET", headers={
         "User-Agent": USER_AGENT,
         "Accept": "*/*",
@@ -40,6 +51,8 @@ def get(url, *, timeout=25, tries=3, headers=None, opener=urllib.request.urlopen
                 raise Gone(url) from error
             if error.code == 429:
                 raise RateLimited(url) from error
+            if error.code == 403:                  # asking the same address again only deepens a refusal
+                raise
             last = error
         except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as error:
             last = error
@@ -79,23 +92,103 @@ class Throttle:
             host = self._clock.get(host, host)
             self.delays[host] = max(self.delays.get(host, self.delay), self.delay)
 
-    def wait(self, url):
+    def wait(self, url, lane=""):
+        """`lane` is the exit the request goes out through: each exit keeps its own pace with each site."""
         host = urlparse(url).netloc
         with self._lock:
             host = self._clock.get(host, host)
+            key = (lane, host)
             now = time.monotonic()
-            at = max(now, self._next.get(host, now))
-            self._next[host] = at + self.delays.get(host, self.delay)
+            at = max(now, self._next.get(key, now))
+            self._next[key] = at + self.delays.get(host, self.delay)
         if at > now:
             time.sleep(at - now)
 
 
-def polite(delay=1.0, delays=None, **defaults):
-    """A `get(url, **options)` that waits its turn for each host before fetching."""
+def refused(error, through_tunnel=False):
+    """Would another exit be worth trying? A refusal of the address (403, 451, 503, 429) is; so is a tunnel that
+    did not carry the request. A page that is gone (404) is gone from everywhere."""
+    if isinstance(error, RateLimited):
+        return True
+    if isinstance(error, urllib.error.HTTPError):
+        return error.code in (403, 451, 503)
+    return through_tunnel and isinstance(error, (urllib.error.URLError, TimeoutError, ConnectionError, OSError))
+
+
+class Routes:
+    """Which exit each site answers through. Learned when a site refuses one exit and answers another, and kept
+    between runs in `path` (data/routes.json), separately for each place a run starts from ("github" or "local"):
+    GitHub's address is refused where this machine's is not."""
+
+    def __init__(self, exits, path=None, where=None, today=None):
+        self.exits = list(exits)
+        self.path = path
+        self.where = where or ("github" if os.environ.get("GITHUB_ACTIONS") == "true" else "local")
+        self.today = today or datetime.date.today().isoformat()
+        self._lock = threading.Lock()
+        try:
+            with open(path, encoding="utf-8") as f:
+                self.known = json.load(f)
+        except (TypeError, OSError, ValueError):
+            self.known = {}
+
+    def mine(self):
+        return self.known.setdefault(self.where, {})
+
+    def order(self, host):
+        """The exits to try for `host`: the one it answered through last, then the others in their usual order."""
+        learned = (self.mine().get(host) or {}).get("exit")
+        return sorted(self.exits, key=lambda e: e.name != learned)
+
+    def worked(self, host, exit_):
+        with self._lock:
+            mine = self.mine()
+            had = mine.get(host)
+            if exit_.name == "direct":                     # the usual way: nothing to remember
+                if had is not None:
+                    del mine[host]
+                    self._save()
+                return
+            if had and had.get("exit") == exit_.name and had.get("at") == self.today:
+                return
+            mine[host] = {"exit": exit_.name, "at": self.today}
+            self._save()
+
+    def _save(self):
+        if not self.path:
+            return
+        os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
+        with open(self.path + ".tmp", "w", encoding="utf-8", newline="\n") as f:
+            json.dump(self.known, f, indent=1, sort_keys=True)
+        os.replace(self.path + ".tmp", self.path)
+
+
+def polite(delay=1.0, delays=None, routes=None, **defaults):
+    """A `get(url, **options)` that waits its turn for each host before fetching. With `routes`, a site that
+    refuses one exit is asked through the next (once each, at that exit's own pace), and the exit that answered
+    is the first one tried for that site from then on. When every exit refuses, the first refusal is raised."""
     throttle = Throttle(delay, delays)
 
     def polite_get(url, **options):
-        throttle.wait(url)
-        return get(url, **{**defaults, **options})
+        if routes is None or len(routes.exits) < 2:
+            throttle.wait(url)
+            return get(url, **{**defaults, **options})
+        host, first = urlparse(url).netloc, None
+        for position, exit_ in enumerate(routes.order(host)):
+            throttle.wait(url, lane=exit_.name)
+            asked = {**defaults, **options, "proxy": exit_.proxy}
+            if position:
+                asked["tries"] = 1
+            try:
+                body = get(url, **asked)
+            except Exception as error:
+                if not refused(error, exit_.proxy is not None):
+                    raise
+                first = first or error
+                continue
+            routes.worked(host, exit_)
+            return body
+        raise first
     polite_get.throttle = throttle
+    polite_get.routes = routes
     return polite_get

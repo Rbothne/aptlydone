@@ -2,8 +2,8 @@
 its size, its square footage, the site's "Starting at" price and the day it is free), each linking to
 `/availabilities/<unit>-<community number>`. One request reads a whole community.
 
-The site's robots file asks for five minutes between requests (`site_delays`), so the communities are read a few
-per run (`"spread"` in managers.json). Its terms discourage automated reading; read at the owner's instruction
+The site's robots file asks for five minutes between requests; robots files are not followed since 2026-11-27
+(the owner's decision), so every community is read in each ordinary run, three seconds apart (`site_delays`). Its terms discourage automated reading; read at the owner's instruction
 (2026-11-20), under the tracker's own name.
 """
 

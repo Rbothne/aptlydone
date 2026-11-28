@@ -817,22 +817,44 @@ export function sparkline(history, width, height) {
 }
 
 /**
- * The colour of the ring round a building's dot on the map, from its published rating: deep purple at 3.5 or less,
- * through plum, rose and orange, to gold at 5. None (no rating, or a rating of 0, which no reviewer gives) is null.
- * These hues are kept apart from the tag colours that fill the dots.
+ * Where a building's rating comes from, for the small label beside its stars: Google's (the same scale for every
+ * building, refreshed weekly), else the one the manager publishes on its own site. Null without a rating.
  */
-export const RATING_RAMP = [[3.5, "#3b0f70"], [4.0, "#8c2981"], [4.3, "#de4968"], [4.6, "#f98e09"], [5.0, "#fcd116"]];
-export function ratingColour(rating) {
-  if (rating == null || !(rating > 0)) return null;
-  const stops = RATING_RAMP;
-  if (rating <= stops[0][0]) return stops[0][1];
-  for (let i = 1; i < stops.length; i++) {
-    const [hi, top] = stops[i];
-    if (rating > hi) continue;
-    const [lo, bottom] = stops[i - 1];
-    const t = (rating - lo) / (hi - lo);
-    const mix = (k) => Math.round(parseInt(bottom.slice(k, k + 2), 16) * (1 - t) + parseInt(top.slice(k, k + 2), 16) * t);
-    return "#" + [1, 3, 5].map((k) => mix(k).toString(16).padStart(2, "0")).join("");
+export function ratingSource(building) {
+  if (!building || building.rating == null || !(building.rating > 0)) return null;
+  if (building.rating_source === "google") {
+    const own = building.manager_rating > 0
+      ? ` The manager's own site says ${building.manager_rating}${building.manager_rating_count != null ? ` from ${building.manager_rating_count.toLocaleString("en-US")} reviews` : ""}.`
+      : "";
+    return { label: "Google", url: building.rating_url || null,
+      title: `Rating on Google${building.rating_at ? `, as of ${shortDate(building.rating_at)}` : ""}.${own}` };
   }
-  return stops[stops.length - 1][1];
+  return { label: "manager's site", url: null, title: "Rating published on the manager's own site. Google has none for this building yet." };
+}
+
+/**
+ * A building's colour comes from its rating, in the same five tiers as the owner's catalogue: 3.5+, 4.0+, 4.4+,
+ * 4.7+ and 4.9+, cool to hot. `light` is the hex used on the map, whose tiles do not change with the page's theme;
+ * the page itself uses the --heat-N tokens in app.css, which have a dark-mode set.
+ */
+export const RATING_TIERS = [
+  { tier: 1, at: 3.5, label: "3.5+", light: "#1f6fb2" },
+  { tier: 2, at: 4.0, label: "4.0+", light: "#0f7f6f" },
+  { tier: 3, at: 4.4, label: "4.4+", light: "#a05a00" },
+  { tier: 4, at: 4.7, label: "4.7+", light: "#c2410c" },
+  { tier: 5, at: 4.9, label: "4.9+", light: "#b0177a" },
+];
+export const LOW_RATING_COLOUR = "#6b6862";
+
+/** 0 to 5: how many tier thresholds the rating reaches. Null without a rating (or a rating of 0, which no reviewer gives). */
+export function ratingTier(rating) {
+  if (rating == null || !(rating > 0)) return null;
+  return RATING_TIERS.filter((t) => rating >= t.at).length;
+}
+
+/** The ring round a building's dot on the map: its tier's colour, grey below 3.5, null without a rating. */
+export function ratingColour(rating) {
+  const tier = ratingTier(rating);
+  if (tier == null) return null;
+  return tier ? RATING_TIERS[tier - 1].light : LOW_RATING_COLOUR;
 }

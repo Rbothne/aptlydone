@@ -12,15 +12,44 @@ one request.
 
 ## The rules
 
-- Requests go out under the tracker's own name (`aptrack/fetch.py`), at its usual pace or slower. A site's
-  `robots.txt` pace is kept (Dweck: five minutes).
+- Requests go out at the tracker's usual pace (`aptrack/fetch.py`, `site_delays`). **Since 2026-11-27 robots files
+  are not followed** (the owner's decision): a crawl delay or a `Disallow` no longer closes a route. Dweck went from
+  five minutes a request to three seconds; Gables 5 s → 1 s, AppFolio 10 s → 2 s, Polinger 3 s → 1 s.
 - **A refusal closes that address, not the source.** HTTP 403, 429, a Cloudflare challenge ("Just a moment",
   `cf-mitigated: challenge`), a CAPTCHA: write down what answered and take the next route. Do not ask again harder,
   and do not ask many addresses of one service at once: on 2026-11-20 two reads that asked 61 RentCafe sites in
   the same second turned its check from refusing some requests to refusing all of them.
-- **A refusal is never worked around.** No browser user-agent, no hidden automation, no proxies or borrowed
-  addresses, no solving of bot checks. This is where this tracker and the shopping tracker part ways: a route
-  that needs a disguise is not a route here.
+- **Exits, since 2026-11-27** (the owner's decision, the catalogue's tunnel idea): a site that refuses one address
+  is asked once through the next exit (`aptrack/vpn.py`: direct, Cloudflare WARP, any WireGuard configs or proxies
+  in the secrets), and the exit that answered is remembered for it (`data/routes.json`). Still no solving of bot
+  checks, and no asking one address harder. (The old rule also said "no browser user-agent"; `fetch.py` has in
+  fact sent a Chrome user-agent string since the start.)
+
+### What an exit changes, measured 2026-11-27 from this machine
+
+One request per cell, same Chrome user-agent string, a few seconds apart. `py` is Python's own HTTP client (what
+the tracker uses), `curl` is curl 8.19 on Windows' own TLS (Schannel); `warp` is a fresh WARP registration.
+
+| Site | py direct | py warp | curl direct | curl warp |
+|---|---|---|---|---|
+| Equity (`equityapartments.com`) | 200 | 403 | 200 | 403 |
+| RentCafe: `220living.com` (JBG SMITH) | 403 | 403 | 200 | 403 |
+| RentCafe: `1305dockstreet.com` (Kettler) | 403 | 403 | 200 | 200 |
+| RentCafe: `fairfaxsquareapt.com` (Van Metre) | 403 | **200** | 200 | 403 |
+| Van Metre company site | 403 | 403 | 200 | 403 |
+| Bernstein (`bmcproperties.com`) | 403 | 403 | 200 | 403 |
+
+An earlier round the same hour, through the catalogue's own WARP identity and a Proton VPN Free exit (Canada),
+gave much the same: WARP opened `220living.com`, Proton opened nothing, and both were refused by Equity.
+
+- **The wall is mostly the HTTP client, not the address.** Every refusing site answered curl from this machine's
+  own connection, and refused Python's client from the same address in the same minute. Cloudflare's bot check
+  tells clients apart by their TLS handshake. Exits help now and then (a new address is sometimes let through),
+  but a VPN or data-centre address is challenged more often than a home one, never less.
+- **Equity's refusal of GitHub is the address** (Python is let in from here). A data-centre exit does not open it;
+  a home exit would: `APTRACK_PROXIES` pointing at a proxy on this machine (over a tailnet, say) is the route.
+- **What would open the rest:** a client whose TLS handshake is a browser's or curl's, for the hosts that refuse
+  Python's. Not done: that is a disguise, a separate decision from the exits.
 - Terms of use: the owner accepted that risk for RentCafe sites, Kettler, Equity and Dweck (2026-11-20). That is a
   decision about terms, not about technical barriers.
 - Nothing is typed in by hand. A route counts only if a script can follow it from a company's own pages.

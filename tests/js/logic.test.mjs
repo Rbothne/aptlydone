@@ -430,14 +430,42 @@ test("a building not read for days says its prices were withdrawn", async () => 
   assert.equal(staleText({ stale: true, expired: true, read: "2026-11-19" }), "Not read since Nov 19; prices withdrawn until it reads again");
 });
 
-test("the ring colour follows the rating, from purple to gold, and is absent without one", async () => {
-  const { ratingColour } = await import("../../site/js/logic.js");
+test("a rating falls in the catalogue's five tiers: 3.5, 4.0, 4.4, 4.7 and 4.9", async () => {
+  const { ratingTier } = await import("../../site/js/logic.js");
+  assert.equal(ratingTier(null), null);
+  assert.equal(ratingTier(0), null);
+  assert.equal(ratingTier(3.4), 0);
+  assert.equal(ratingTier(3.5), 1);
+  assert.equal(ratingTier(4.0), 2);
+  assert.equal(ratingTier(4.39), 2);
+  assert.equal(ratingTier(4.4), 3);
+  assert.equal(ratingTier(4.7), 4);
+  assert.equal(ratingTier(4.9), 5);
+  assert.equal(ratingTier(5), 5);
+});
+
+test("the ring colour is the rating's tier colour, grey below 3.5, and absent without a rating", async () => {
+  const { ratingColour, RATING_TIERS, LOW_RATING_COLOUR } = await import("../../site/js/logic.js");
   assert.equal(ratingColour(null), null);
   assert.equal(ratingColour(0), null);
-  assert.equal(ratingColour(2.5), "#3b0f70");
-  assert.equal(ratingColour(4.0), "#8c2981");
-  assert.equal(ratingColour(5), "#fcd116");
-  assert.equal(ratingColour(5.4), "#fcd116");
-  assert.match(ratingColour(4.45), /^#[0-9a-f]{6}$/);
-  assert.notEqual(ratingColour(4.45), ratingColour(4.3));
+  assert.equal(ratingColour(2.5), LOW_RATING_COLOUR);
+  assert.equal(ratingColour(3.6), "#1f6fb2");
+  assert.equal(ratingColour(4.0), "#0f7f6f");
+  assert.equal(ratingColour(4.5), "#a05a00");
+  assert.equal(ratingColour(4.8), "#c2410c");
+  assert.equal(ratingColour(5), "#b0177a");
+  assert.deepEqual(RATING_TIERS.map((t) => t.label), ["3.5+", "4.0+", "4.4+", "4.7+", "4.9+"]);
+});
+
+test("a rating says where it comes from: Google, with the manager's own beside it, or the manager's site", async () => {
+  const { ratingSource } = await import("../../site/js/logic.js");
+  assert.equal(ratingSource({ rating: null }), null);
+  const g = ratingSource({ rating: 3.9, rating_source: "google", rating_url: "https://maps.google.com/?cid=1", rating_at: "2026-11-23",
+    manager_rating: 4.8, manager_rating_count: 1200 });
+  assert.equal(g.label, "Google");
+  assert.equal(g.url, "https://maps.google.com/?cid=1");
+  assert.match(g.title, /^Rating on Google, as of Nov 23\. The manager's own site says 4\.8 from 1,200 reviews\.$/);
+  const m = ratingSource({ rating: 4.6, rating_source: "manager" });
+  assert.equal(m.label, "manager's site");
+  assert.equal(m.url, null);
 });

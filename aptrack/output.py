@@ -74,6 +74,8 @@ def assemble(buildings, results, state, out_dir, today=None):
         else:
             for key in FACT_FIELDS:
                 entry[key] = old.get(key, [] if key == "features" else None)
+            if "manager_rating" in old:                     # last time's `rating` may be Google's: keep the manager's own
+                entry.update(rating=old["manager_rating"], rating_count=old.get("manager_rating_count"))
             if not entry["features"] and building.get("features"):               # found at discovery
                 entry["features"] = building["features"]
             if entry["laundry"] is None:
@@ -102,6 +104,17 @@ def price(entries, units_of):
     deals.rank(everything, entries)
 
 
+def rate(entry, google):
+    """Google's rating, when Google has one, takes the place of the manager's: the same scale for every building.
+    The manager's own stays beside it, and `rating_source` says which one `rating` is."""
+    entry["manager_rating"], entry["manager_rating_count"] = entry.get("rating"), entry.get("rating_count")
+    if google and google.get("rating") is not None:
+        entry.update(rating=google["rating"], rating_count=google.get("count"), rating_source="google",
+                     rating_url=google.get("url"), rating_at=google.get("at"))
+    else:
+        entry.update(rating_source="manager" if entry.get("rating") is not None else None, rating_url=None, rating_at=None)
+
+
 def write_site(buildings, results, state, out_dir, now, area=None):
     """`area` is what area.py collected (census, crime, rent trends), or None when it has not run yet."""
     area = area or {}
@@ -116,7 +129,9 @@ def write_site(buildings, results, state, out_dir, now, area=None):
     crime = area.get("crime") or {}
     nearby, walk = area.get("places") or {}, area.get("walk") or {}
     loud, building_sites = area.get("noise") or {}, area.get("works") or {}
+    on_google = area.get("google") or {}
     for entry in entries:
+        rate(entry, on_google.get(entry["id"]))
         entry["crime"] = crime.get(entry["id"])
         entry["zip"] = zip_code(entry)
         entry["near"] = nearby.get(entry["id"])

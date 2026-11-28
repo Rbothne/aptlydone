@@ -58,6 +58,7 @@ class Folder(QuietTestCase):
             self.patch(module, "MANAGERS", self.at("managers.json"))
             self.patch(module.fetch, "polite", lambda *args, **kwargs: self.web)
             self.patch(module.fetch, "post", self.no_post)
+            self.patch(module.vpn, "routes", lambda *args, **kwargs: None)      # no tunnels in tests
         self.patch(build, "SITE_DATA", self.at("site", "data"))
 
     def no_post(self, *args, **kwargs):

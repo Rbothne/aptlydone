@@ -30,6 +30,37 @@
 
   <!-- NEW ENTRIES GO DIRECTLY BELOW THIS LINE -->
 
+  <h2>27 November <small>rating colours, exits, robots files</small></h2>
+  <ul>
+    <li><b>Ratings set the colour.</b> A building's name, its ★ and its ring on the map take one of five colours by
+      rating, the same tiers as the catalogue: 3.5+, 4.0+, 4.4+, 4.7+ and 4.9+. Below 3.5 is grey on the map; no
+      rating keeps the thin white ring. The Rating filter offers the same five steps.</li>
+    <li><b>Exits.</b> Each run brings up its own WireGuard tunnel (Cloudflare WARP, free) and asks a site that refuses
+      the run's own address once more through it. The way that worked is remembered for that site, separately for
+      GitHub's runs and runs on this computer. More exits can be added as GitHub secrets.</li>
+    <li><b>Robots files are no longer followed.</b> Dweck's communities are read three seconds apart, not five
+      minutes, so all fifteen are read in every run instead of two at a time. Gables, AppFolio and Polinger are read
+      faster too.</li>
+    <li><b>Worth knowing:</b> measured today, most refusals (RentCafe, Van Metre, Bernstein) are about the program
+      asking, not the address it asks from: the same sites answer curl from the same connection. The exits open a
+      few; the rest need a different client. Details in <code>sources-unread.md</code>.</li>
+  </ul>
+
+  <h2>24 November <small>Google ratings, weekly</small></h2>
+  <ul>
+    <li><b>Ratings now come from Google</b> where Google has one, so every building is rated on the same scale, not on
+      a scale each manager picks for itself. They are collected in the weekly Monday run and kept with the page data.
+      The rings on the map, the ★ on cards and pop-ups, and the Rating filter all use them.</li>
+    <li><b>Each rating says where it is from.</b> "Google" (a link to the building's Google page) or "manager's site".
+      Hover a Google rating to see the date it was read and what the manager's own site claims.</li>
+    <li><b>A building is matched to its Google place once</b>, by its name and address near its own map point, and
+      only when the result is within 300 m and shares a word of the name (or sits within 100 m). A building with no
+      match is tried again after four weeks; one that moves is matched again.</li>
+    <li><b>This needs a key in GitHub.</b> Until a <code>GOOGLE_MAPS_KEY</code> secret is added the weekly run skips
+      this and the managers' ratings show as before. This replaces the 22 November note that Google's terms ruled it out:
+      that is a terms question, and the decision was to go ahead.</li>
+  </ul>
+
   <h2>22 November <small>the map: satellite and transit, rating rings, follow from the map</small></h2>
   <ul>
     <li><b>A Layers button on the map</b> (top right) switches the background between streets, satellite photos (with

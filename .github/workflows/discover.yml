@@ -15,7 +15,13 @@ concurrency:                    # shared with the unit tracking, so the two neve
 jobs:
   discover:
     runs-on: ubuntu-latest
-    timeout-minutes: 180        # Dweck's site asks for five minutes between requests: its fifteen pages alone take 80 minutes
+    timeout-minutes: 90         # was 180 while Dweck's five-minute crawl delay was kept (dropped 2026-11-27)
+    # Exits (aptrack/vpn.py): a site that refuses GitHub's address is asked through Cloudflare WARP, registered
+    # fresh each run unless WARP_PROFILE holds one, and through any WireGuard configs or proxies in the secrets.
+    env:
+      WARP_PROFILE: ${{ secrets.WARP_PROFILE }}
+      APTRACK_WG_CONFS: ${{ secrets.APTRACK_WG_CONFS }}
+      APTRACK_PROXIES: ${{ secrets.APTRACK_PROXIES }}
     steps:
       - uses: actions/checkout@v4
 
@@ -26,8 +32,11 @@ jobs:
         run: python3 discover.py
 
       # Census figures, crime near each building and ZIP rent trends change slowly: collect them here, weekly.
+      # Google ratings come from the Places API with the GOOGLE_MAPS_KEY secret; without it they are skipped.
       - name: Collect area data
         run: python3 area.py
+        env:
+          GOOGLE_MAPS_KEY: ${{ secrets.GOOGLE_MAPS_KEY }}
 
       - name: Save the data
         run: bash .github/scripts/data-branch.sh save

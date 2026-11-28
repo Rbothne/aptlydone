@@ -19,7 +19,7 @@ import sys
 import time
 from urllib.parse import urlparse
 
-from aptrack import companies, fetch, files, history, output, spread
+from aptrack import companies, fetch, files, history, output, spread, vpn
 from aptrack.facts import FACTS
 from aptrack.readers import READERS, NotAnswering, ReadError
 
@@ -211,7 +211,7 @@ def main():
     if known is None:
         sys.exit("data/buildings.json is missing: run discover.py first")
     buildings = companies.tracked(known, config["managers"])     # a paused company's buildings stay known, and are left alone
-    get = fetch.polite(settings["delay_seconds"], settings.get("site_delays"))
+    get = fetch.polite(settings["delay_seconds"], settings.get("site_delays"), routes=vpn.routes())
     # Every RentCafe building site sits behind RentCafe's own service: they share one clock ("rentcafe" in site_delays)
     throttle = getattr(get, "throttle", None)
     if throttle is not None:

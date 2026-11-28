@@ -3,3 +3,4 @@ site/data/
 __pycache__/
 .superpowers/
 site/_smoke.html
+.vpn/

@@ -2,8 +2,8 @@
 one-line address and coordinates. The same page lists its available apartments (readers/dweck.py), so it is also
 the feed.
 
-The site's robots file asks for five minutes between requests (`site_delays` holds that), so this search takes over
-an hour for some fifteen communities. It runs weekly.
+The site's robots file asks for five minutes between requests. Since 2026-11-27 robots files are not followed
+(the owner's decision); `site_delays` keeps three seconds, so the search takes about a minute. It runs weekly.
 """
 
 import html

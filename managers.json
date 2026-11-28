@@ -1,9 +1,9 @@
 {
   "settings": {
     "delay_seconds": 1.0,
-    "site_delays": {"sightmap.com": 0.25, "www.bozzuto.com": 0.25, "www.gables.com": 5, "www.polingerco.com": 3, "keenermgmt.appfolio.com": 10, "rentcafe": 2,
-                    "www.dweckproperties.com": 300},
-    "spread": {"rentcafe": 6, "dweck": 8},
+    "site_delays": {"sightmap.com": 0.25, "www.bozzuto.com": 0.25, "www.gables.com": 1, "www.polingerco.com": 1, "keenermgmt.appfolio.com": 2, "rentcafe": 2,
+                    "www.dweckproperties.com": 3, "places.googleapis.com": 0.2},
+    "spread": {"rentcafe": 6},
     "counties": ["11001", "51013", "51510", "51059", "51600", "51610", "51107", "51153", "51683", "51685", "24031", "24033", "24027", "24003"]
   },
   "managers": [
